@@ -1,0 +1,161 @@
+Project Overview
+Project Name
+
+Boarding House Management System
+
+Description
+
+Tôi đang phát triển một đồ án môn học với tên Boarding House Management System. Đây là một hệ thống đa nền tảng gồm Website, Mobile App và Backend RESTful API.
+
+Mục tiêu của dự án là xây dựng một nền tảng giúp người dùng tìm kiếm phòng trọ thông qua Website và giúp chủ trọ quản lý nhà trọ, phòng, khách thuê và hóa đơn thông qua ứng dụng di động.
+
+Website và Mobile App sử dụng chung một Backend và một cơ sở dữ liệu.
+
+System Architecture
+Website (React)
+        │
+        │ REST API
+        ▼
+Node.js + Express
+        │
+        ▼
+      MySQL
+        ▲
+        │ REST API
+        │
+React Native App
+Technology Stack
+Frontend Website
+React
+Vite
+Tailwind CSS
+Axios
+Mobile Application
+React Native
+Expo
+Backend
+Node.js
+Express.js
+RESTful API
+JWT Authentication
+Multer
+Bcrypt
+Database
+MySQL
+Other
+Google Maps API
+Cloudinary (Image Storage)
+Git & GitHub
+User Roles
+1. Visitor (No Login)
+
+Người dùng không cần đăng nhập vẫn có thể:
+
+Xem danh sách phòng trọ
+Tìm kiếm phòng
+Lọc theo giá
+Lọc theo địa điểm
+Lọc theo diện tích
+Lọc theo tiện ích
+Xem hình ảnh
+Xem vị trí trên Google Maps
+Liên hệ chủ trọ
+2. Landlord (Mobile App)
+
+Chủ trọ sử dụng ứng dụng để:
+
+Đăng nhập
+Quản lý nhà trọ
+Quản lý phòng
+Đăng hoặc ẩn phòng trống
+Quản lý khách thuê
+Quản lý hợp đồng
+Quản lý hóa đơn
+Quản lý tiền điện
+Quản lý tiền nước
+Theo dõi doanh thu
+Gửi thông báo
+Website Features
+Home Page
+Room Listing
+Room Detail
+Search & Filter
+Google Maps
+Responsive UI
+Mobile Features
+Login
+Dashboard
+Boarding House Management
+Room Management
+Tenant Management
+Contract Management
+Utility Bill Management
+Notification Management
+Backend Features
+JWT Authentication
+Role-based Authorization
+CRUD APIs
+Image Upload
+RESTful API
+MySQL Connection
+Database Modules
+Users
+Boarding Houses
+Rooms
+Room Images
+Tenants
+Contracts
+Utility Bills
+Notifications
+Development Rules
+Sử dụng Git và GitHub ngay từ đầu dự án.
+Mỗi chức năng hoàn thành sẽ được commit riêng.
+Áp dụng cấu trúc thư mục rõ ràng.
+Code theo mô hình MVC.
+Website và Mobile chỉ giao tiếp với Backend thông qua RESTful API.
+Không truy cập MySQL trực tiếp từ frontend.
+Project Folder Structure
+boarding-house-management-system/
+
+backend/
+    src/
+        controllers/
+        routes/
+        models/
+        middlewares/
+        config/
+        services/
+        utils/
+
+web/
+    src/
+
+mobile/
+
+database/
+
+docs/
+
+README.md
+My Expectations
+
+Tôi muốn xây dựng dự án theo quy trình của một dự án thực tế, bao gồm:
+
+Phân tích yêu cầu
+Thiết kế cơ sở dữ liệu
+Thiết kế API
+Thiết kế UI/UX
+Phát triển Backend
+Phát triển Website
+Phát triển Mobile App
+Kiểm thử
+Triển khai
+
+Khi hỗ trợ, hãy ưu tiên:
+
+Code sạch (Clean Code)
+Cấu trúc dễ mở rộng
+Best Practices
+Bảo mật (JWT, Validation)
+Thiết kế RESTful API chuẩn
+Giải thích từng bước thay vì chỉ đưa ra mã nguồn

@@ -1,0 +1,126 @@
+const { getPool } = require('../config/database');
+
+async function ensureRoomsTable() {
+  const pool = await getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rooms (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      boarding_house_id INT NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      price DECIMAL(10,2) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'available',
+      is_published BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function createRoom({ boardingHouseId, title, description, price }) {
+  await ensureRoomsTable();
+  const pool = await getPool();
+  const [result] = await pool.query(
+    'INSERT INTO rooms (boarding_house_id, title, description, price) VALUES (?, ?, ?, ?)',
+    [boardingHouseId, title, description || null, price]
+  );
+
+  return {
+    id: result.insertId,
+    boardingHouseId,
+    title,
+    description,
+    price,
+    status: 'available',
+    isPublished: false,
+  };
+}
+
+async function findRoomById(id) {
+  await ensureRoomsTable();
+  const pool = await getPool();
+  const [rows] = await pool.query('SELECT * FROM rooms WHERE id = ?', [id]);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const row = rows[0];
+  return {
+    id: row.id,
+    boardingHouseId: row.boarding_house_id,
+    title: row.title,
+    description: row.description,
+    price: Number(row.price),
+    status: row.status,
+    isPublished: Boolean(row.is_published),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function updateRoom(id, updates) {
+  await ensureRoomsTable();
+  const pool = await getPool();
+  const fields = [];
+  const values = [];
+
+  if (updates.title) {
+    fields.push('title = ?');
+    values.push(updates.title);
+  }
+  if (updates.description !== undefined) {
+    fields.push('description = ?');
+    values.push(updates.description);
+  }
+  if (updates.price !== undefined) {
+    fields.push('price = ?');
+    values.push(updates.price);
+  }
+  if (updates.status) {
+    fields.push('status = ?');
+    values.push(updates.status);
+  }
+  if (updates.isPublished !== undefined) {
+    fields.push('is_published = ?');
+    values.push(updates.isPublished);
+  }
+
+  if (fields.length === 0) {
+    return await findRoomById(id);
+  }
+
+  values.push(id);
+  await pool.query(`UPDATE rooms SET ${fields.join(', ')} WHERE id = ?`, values);
+  return await findRoomById(id);
+}
+
+async function deleteRoom(id) {
+  await ensureRoomsTable();
+  const pool = await getPool();
+  await pool.query('DELETE FROM rooms WHERE id = ?', [id]);
+}
+
+async function listPublishedRooms() {
+  await ensureRoomsTable();
+  const pool = await getPool();
+  const [rows] = await pool.query('SELECT * FROM rooms WHERE is_published = TRUE');
+  return rows.map((row) => ({
+    id: row.id,
+    boardingHouseId: row.boarding_house_id,
+    title: row.title,
+    description: row.description,
+    price: Number(row.price),
+    status: row.status,
+    isPublished: Boolean(row.is_published),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+module.exports = {
+  createRoom,
+  findRoomById,
+  updateRoom,
+  deleteRoom,
+  listPublishedRooms,
+};

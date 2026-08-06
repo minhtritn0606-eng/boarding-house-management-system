@@ -7,6 +7,7 @@ const houseRoutes = require('./routes/houseRoutes');
 const roomRoutes = require('./routes/roomRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const contractRoutes = require('./routes/contractRoutes');
+const billRoutes = require('./routes/billRoutes');
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use('/api/houses', houseRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/contracts', contractRoutes);
+app.use('/api/bills', billRoutes);
 
 if (require.main === module) {
   app.listen(PORT, async () => {

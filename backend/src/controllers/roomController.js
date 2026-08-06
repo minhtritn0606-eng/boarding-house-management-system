@@ -10,7 +10,7 @@ const { findHouseById } = require('../models/houseModel');
 async function createRoomHandler(req, res) {
   try {
     const landlordId = req.user.id;
-    const { boardingHouseId, title, description, price } = req.body;
+    const { boardingHouseId, title, description, price, roomType } = req.body;
 
     if (!boardingHouseId || !title || price === undefined) {
       return res.status(400).json({ message: 'boardingHouseId, title, and price are required' });
@@ -25,7 +25,7 @@ async function createRoomHandler(req, res) {
       return res.status(403).json({ message: 'Cannot add room for a house you do not own' });
     }
 
-    const room = await createRoom({ boardingHouseId: house.id, title, description, price });
+    const room = await createRoom({ boardingHouseId: house.id, title, description, price, roomType });
     return res.status(201).json({ message: 'Room created successfully', room });
   } catch (error) {
     return res.status(500).json({ message: 'Could not create room', error: error.message });
@@ -115,7 +115,15 @@ async function getRoomDetailsHandler(req, res) {
 
 async function listPublishedRoomsHandler(req, res) {
   try {
-    const rooms = await listPublishedRooms();
+    const { search, city, minPrice, maxPrice, roomType, status } = req.query;
+    const rooms = await listPublishedRooms({
+      search,
+      city,
+      minPrice,
+      maxPrice,
+      roomType,
+      status,
+    });
     return res.status(200).json({ rooms });
   } catch (error) {
     return res.status(500).json({ message: 'Could not fetch rooms', error: error.message });

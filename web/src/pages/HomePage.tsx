@@ -1,9 +1,15 @@
 import { Link } from 'react-router-dom'
-import { sampleRooms } from '../data/sampleRooms'
+import { useRooms } from '../context/RoomContext'
+import RoomCard from '../components/RoomCard'
 
 export default function HomePage() {
-  const newest = [...sampleRooms].sort((a, b) => (b.postedDate || '').localeCompare(a.postedDate || '')).slice(0, 4)
-  const cheap = [...sampleRooms].sort((a, b) => a.price - b.price).slice(0, 4)
+  const { rooms } = useRooms()
+
+  const availableRooms = rooms.filter((r) => r.status !== 'rented')
+  const newest = [...availableRooms]
+    .sort((a, b) => (b.postedDate || '').localeCompare(a.postedDate || ''))
+    .slice(0, 4)
+  const cheap = [...availableRooms].sort((a, b) => a.price - b.price).slice(0, 4)
 
   return (
     <main>
@@ -15,7 +21,10 @@ export default function HomePage() {
               BoardingHouse tổng hợp hàng trăm phòng trọ, studio và căn hộ mini với hình ảnh thực tế, thông tin chủ trọ
               rõ ràng và tiện nghi được liệt kê đầy đủ. So sánh, lọc và đặt lịch xem trực tiếp ngay trên web.
             </p>
-            <Link to="/rooms" className="cta">Tìm phòng ngay</Link>
+            <div className="hero-cta-group">
+              <Link to="/rooms" className="cta">Tìm phòng ngay</Link>
+              <Link to="/create-room" className="cta-secondary">Đăng tin cho thuê ➔</Link>
+            </div>
           </div>
           <div className="hero-features">
             <div className="feature-card">
@@ -27,8 +36,8 @@ export default function HomePage() {
               <p>Địa chỉ, diện tích, tiện nghi, liên hệ chủ trọ — mọi thứ đều rõ ràng.</p>
             </div>
             <div className="feature-card">
-              <h4>Đặt lịch dễ dàng</h4>
-              <p>Gửi yêu cầu xem phòng — chủ trọ sẽ liên hệ trực tiếp.</p>
+              <h4>Dành cho chủ trọ</h4>
+              <p>Đăng tin miễn phí, tiếp cận hàng ngàn người thuê mỗi ngày.</p>
             </div>
           </div>
         </div>
@@ -39,50 +48,42 @@ export default function HomePage() {
         <div className="steps">
           <div className="step">
             <strong>1</strong>
-            <h4>Tìm</h4>
-            <p>Sử dụng bộ lọc để thu hẹp khu vực, giá, diện tích, loại phòng.</p>
+            <h4>Tìm kiếm & Lọc</h4>
+            <p>Sử dụng bộ lọc để thu hẹp khu vực, giá, diện tích, loại phòng theo ý muốn.</p>
           </div>
           <div className="step">
             <strong>2</strong>
             <h4>Xem chi tiết</h4>
-            <p>Nhấn vào phòng để xem ảnh, mô tả, tiện nghi và vị trí trên bản đồ.</p>
+            <p>Nhấn vào phòng để xem ảnh, mô tả, tiện nghi, trạng thái và vị trí bản đồ.</p>
           </div>
           <div className="step">
             <strong>3</strong>
-            <h4>Đặt lịch</h4>
-            <p>Gửi yêu cầu xem phòng — chủ trọ sẽ liên hệ bạn để xác nhận.</p>
+            <h4>Liên hệ & Đặt lịch</h4>
+            <p>Gửi yêu cầu xem phòng — chủ trọ sẽ liên hệ bạn trực tiếp để xác nhận.</p>
           </div>
         </div>
       </section>
 
       <section className="featured">
-        <h3>Phòng mới đăng</h3>
+        <div className="section-header-row">
+          <h3>Phòng mới đăng</h3>
+          <Link to="/rooms" className="see-all-link">Xem tất cả →</Link>
+        </div>
         <div className="featured-grid">
           {newest.map((r) => (
-            <Link to={`/rooms/${r.id}`} key={r.id} className="featured-card">
-              <img src={r.images?.[0] || ''} alt={r.title} />
-              <div className="featured-body">
-                <div className="title">{r.title}</div>
-                <div className="meta">{r.district} • {r.area} m²</div>
-                <div className="price">{r.price.toLocaleString('vi-VN')}₫</div>
-              </div>
-            </Link>
+            <RoomCard key={r.id} room={r} />
           ))}
         </div>
       </section>
 
       <section className="featured">
-        <h3>Phòng giá rẻ</h3>
+        <div className="section-header-row">
+          <h3>Phòng giá rẻ</h3>
+          <Link to="/rooms" className="see-all-link">Xem tất cả →</Link>
+        </div>
         <div className="featured-grid">
           {cheap.map((r) => (
-            <Link to={`/rooms/${r.id}`} key={r.id} className="featured-card">
-              <img src={r.images?.[0] || ''} alt={r.title} />
-              <div className="featured-body">
-                <div className="title">{r.title}</div>
-                <div className="meta">{r.city} • {r.district}</div>
-                <div className="price">{r.price.toLocaleString('vi-VN')}₫</div>
-              </div>
-            </Link>
+            <RoomCard key={r.id} room={r} />
           ))}
         </div>
       </section>
@@ -103,12 +104,16 @@ export default function HomePage() {
       <section className="faq">
         <h3>Câu hỏi thường gặp</h3>
         <details>
-          <summary>Làm sao để đặt lịch xem phòng?</summary>
+          <summary>Làm sao để chủ trọ đăng bài cho thuê?</summary>
+          <p>Nhấn vào nút "Đăng tin" trên thanh điều hướng hoặc "Đăng nhập Chủ trọ", sau đó điền thông tin phòng để đăng ngay.</p>
+        </details>
+        <details>
+          <summary>Làm sao để người thuê đặt lịch xem phòng?</summary>
           <p>Vào trang chi tiết phòng, dùng form "Liên hệ / Đặt lịch" để gửi yêu cầu — chủ trọ sẽ gọi lại.</p>
         </details>
         <details>
-          <summary>Phải đăng ký tài khoản không?</summary>
-          <p>Không cần — người dùng có thể xem thông tin và gửi yêu cầu mà không cần đăng nhập.</p>
+          <summary>Phải đăng ký tài khoản mới xem được phòng không?</summary>
+          <p>Không cần — người thuê có thể xem đầy đủ thông tin và gửi yêu cầu mà không cần đăng nhập.</p>
         </details>
       </section>
     </main>

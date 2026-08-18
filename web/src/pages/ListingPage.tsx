@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { sampleRooms } from '../data/sampleRooms'
+import { useRooms } from '../context/RoomContext'
 import Pagination from '../components/Pagination'
+import RoomCard from '../components/RoomCard'
 
 export default function ListingPage() {
+  const { rooms } = useRooms()
+
   const [city, setCity] = useState('')
   const [district, setDistrict] = useState('')
   const [minArea, setMinArea] = useState('')
@@ -11,12 +13,12 @@ export default function ListingPage() {
   const [sort, setSort] = useState('new')
   const [page, setPage] = useState(1)
 
-  const perPage = 6
+  const perPage = 30
 
   const filtered = useMemo(() => {
-    let out = sampleRooms.filter((r) => r.status !== 'rented')
+    let out = rooms.filter((r) => r.status !== 'rented')
     if (city) out = out.filter((r) => r.city === city)
-    if (district) out = out.filter((r) => r.district === district)
+    if (district) out = out.filter((r) => (r.district || '').toLowerCase().includes(district.toLowerCase()))
     if (minArea) out = out.filter((r) => (r.area || 0) >= Number(minArea))
     if (roomType) out = out.filter((r) => r.roomType === roomType)
 
@@ -25,56 +27,73 @@ export default function ListingPage() {
     if (sort === 'new') out.sort((a, b) => (b.postedDate || '').localeCompare(a.postedDate || ''))
 
     return out
-  }, [city, district, minArea, roomType, sort])
+  }, [rooms, city, district, minArea, roomType, sort])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const shown = filtered.slice((page - 1) * perPage, page * perPage)
 
+  const handleFilterChange = (setter: (v: string) => void, val: string) => {
+    setter(val)
+    setPage(1)
+  }
+
+  const allCities = [...new Set(rooms.map((r) => r.city))]
+
   return (
     <div>
-      <h2>Danh sách phòng</h2>
+      <div className="listing-header">
+        <h2>Danh sách phòng ({filtered.length} phòng)</h2>
+        <p className="listing-subtitle">Tối đa 30 phòng mỗi trang</p>
+      </div>
+
       <section className="filters">
-        <select value={city} onChange={(e) => setCity(e.target.value)}>
+        <select value={city} onChange={(e) => handleFilterChange(setCity, e.target.value)}>
           <option value="">Tất cả thành phố</option>
-          {[...new Set(sampleRooms.map((r) => r.city))].map((c) => (
+          {allCities.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
-        <input placeholder="Quận/Huyện" value={district} onChange={(e) => setDistrict(e.target.value)} />
-        <input placeholder="Diện tích tối thiểu (m2)" value={minArea} onChange={(e) => setMinArea(e.target.value)} />
-        <select value={roomType} onChange={(e) => setRoomType(e.target.value)}>
-          <option value="">Tất cả loại</option>
+        <input
+          placeholder="Quận/Huyện"
+          value={district}
+          onChange={(e) => handleFilterChange(setDistrict, e.target.value)}
+        />
+        <input
+          type="number"
+          placeholder="Diện tích tối thiểu (m²)"
+          value={minArea}
+          onChange={(e) => handleFilterChange(setMinArea, e.target.value)}
+        />
+        <select value={roomType} onChange={(e) => handleFilterChange(setRoomType, e.target.value)}>
+          <option value="">Tất cả loại phòng</option>
           <option value="private">Phòng đơn</option>
           <option value="shared">Phòng đôi</option>
-          <option value="studio">Căn hộ mini</option>
+          <option value="studio">Căn hộ mini / Studio</option>
         </select>
-        <select value={sort} onChange={(e) => setSort(e.target.value)}>
+        <select value={sort} onChange={(e) => handleFilterChange(setSort, e.target.value)}>
           <option value="new">Mới đăng nhất</option>
           <option value="price-asc">Giá tăng dần</option>
           <option value="price-desc">Giá giảm dần</option>
         </select>
       </section>
 
-      <section className="room-grid">
-        {shown.map((r) => (
-          <article className="room-card" key={r.id}>
-            <Link to={`/rooms/${r.id}`}>
-              <img src={r.images?.[0] || ''} alt={r.title} />
-              <div className="room-info">
-                <p className="room-type">{r.roomType}</p>
-                <h3>{r.title}</h3>
-                <p>{r.address}</p>
-                <div className="room-meta">
-                  <span>{r.area} m²</span>
-                  <strong>{r.price.toLocaleString('vi-VN')}₫</strong>
-                </div>
-              </div>
-            </Link>
-          </article>
-        ))}
-      </section>
+      {shown.length > 0 ? (
+        <section className="featured-grid">
+          {shown.map((r) => (
+            <RoomCard key={r.id} room={r} />
+          ))}
+        </section>
+      ) : (
+        <div className="empty-state">
+          <p>Không tìm thấy phòng trọ nào phù hợp với bộ lọc hiện tại.</p>
+        </div>
+      )}
 
-      <Pagination page={page} totalPages={totalPages} onChange={(p) => setPage(Math.min(Math.max(1, p), totalPages))} />
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onChange={(p) => setPage(Math.min(Math.max(1, p), totalPages))}
+      />
     </div>
   )
 }

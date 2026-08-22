@@ -9,14 +9,35 @@ import {
   TouchableOpacity,
 } from 'react-native'
 import { useAuth } from '../context/AuthContext'
+import { useRooms } from '../context/RoomContext'
+import { useTenants } from '../context/TenantContext'
+import { useBills } from '../context/BillContext'
+import type { TabType } from '../components/BottomTabBar'
 
-export default function HomeScreen() {
+interface HomeScreenProps {
+  onNavigateTab?: (tab: TabType) => void
+}
+
+export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
   const { user, logout } = useAuth()
+  const { rooms, getRoomsByOwner } = useRooms()
+  const { tenants } = useTenants()
+  const { bills, totalUnpaidAmount, totalPaidAmount } = useBills()
+
+  const myRooms = getRoomsByOwner(user?.email)
+  const totalRooms = myRooms.length
+  const rentedRooms = myRooms.filter((r) => r.status === 'rented').length
+  const availableRooms = myRooms.filter((r) => r.status === 'available').length
+  const activeTenants = tenants.filter((t) => t.status === 'active').length
+
+  const formatVND = (num: number) => {
+    return num.toLocaleString('vi-VN') + ' đ'
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header Profile Banner */}
         <View style={styles.header}>
           <View style={styles.profileRow}>
@@ -41,67 +62,120 @@ export default function HomeScreen() {
 
         {/* Stats Grid */}
         <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>📊 Tổng quan nhà trọ</Text>
+          <Text style={styles.sectionTitle}>📊 Tổng quan hệ thống</Text>
           <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
+            <TouchableOpacity
+              style={[styles.statCard, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
+              onPress={() => onNavigateTab && onNavigateTab('rooms')}
+              activeOpacity={0.8}
+            >
               <Text style={styles.statIcon}>🏢</Text>
-              <Text style={[styles.statValue, { color: '#1d4ed8' }]}>12</Text>
+              <Text style={[styles.statValue, { color: '#1d4ed8' }]}>{totalRooms}</Text>
               <Text style={styles.statLabel}>Tổng số phòng</Text>
-            </View>
+            </TouchableOpacity>
 
-            <View style={[styles.statCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+            <TouchableOpacity
+              style={[styles.statCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}
+              onPress={() => onNavigateTab && onNavigateTab('rooms')}
+              activeOpacity={0.8}
+            >
               <Text style={styles.statIcon}>🟢</Text>
-              <Text style={[styles.statValue, { color: '#15803d' }]}>9</Text>
+              <Text style={[styles.statValue, { color: '#15803d' }]}>{rentedRooms}</Text>
               <Text style={styles.statLabel}>Đang cho thuê</Text>
-            </View>
+            </TouchableOpacity>
 
-            <View style={[styles.statCard, { backgroundColor: '#fefce8', borderColor: '#fef08a' }]}>
+            <TouchableOpacity
+              style={[styles.statCard, { backgroundColor: '#fefce8', borderColor: '#fef08a' }]}
+              onPress={() => onNavigateTab && onNavigateTab('rooms')}
+              activeOpacity={0.8}
+            >
               <Text style={styles.statIcon}>🟡</Text>
-              <Text style={[styles.statValue, { color: '#a16207' }]}>3</Text>
+              <Text style={[styles.statValue, { color: '#a16207' }]}>{availableRooms}</Text>
               <Text style={styles.statLabel}>Phòng còn trống</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.statCard, { backgroundColor: '#faf5ff', borderColor: '#e9d5ff' }]}
+              onPress={() => onNavigateTab && onNavigateTab('tenants')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.statIcon}>👥</Text>
+              <Text style={[styles.statValue, { color: '#7e22ce' }]}>{activeTenants}</Text>
+              <Text style={styles.statLabel}>Khách đang thuê</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Revenue Summary Card */}
+        <View style={styles.revenueSection}>
+          <Text style={styles.sectionTitle}>💰 Doanh thu & Hóa đơn tháng</Text>
+          <View style={styles.revenueCard}>
+            <View style={styles.revenueRow}>
+              <View style={styles.revenueCol}>
+                <Text style={styles.revenueLabel}>Đã thu (Tháng 8)</Text>
+                <Text style={[styles.revenueValue, { color: '#16a34a' }]}>{formatVND(totalPaidAmount)}</Text>
+              </View>
+              <View style={[styles.revenueCol, { borderLeftWidth: 1, borderLeftColor: '#e2e8f0', paddingLeft: 16 }]}>
+                <Text style={styles.revenueLabel}>Cần thu / Còn nợ</Text>
+                <Text style={[styles.revenueValue, { color: '#dc2626' }]}>{formatVND(totalUnpaidAmount)}</Text>
+              </View>
             </View>
 
-            <View style={[styles.statCard, { backgroundColor: '#faf5ff', borderColor: '#e9d5ff' }]}>
-              <Text style={styles.statIcon}>👥</Text>
-              <Text style={[styles.statValue, { color: '#7e22ce' }]}>15</Text>
-              <Text style={styles.statLabel}>Khách đang thuê</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.viewBillsBtn}
+              onPress={() => onNavigateTab && onNavigateTab('bills')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.viewBillsText}>Xem chi tiết {bills.length} hóa đơn ➔</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>⚡ Thao tác nhanh</Text>
-          
-          <TouchableOpacity style={styles.actionCard} activeOpacity={0.8}>
+          <Text style={styles.sectionTitle}>⚡ Phím tắt truy cập nhanh</Text>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => onNavigateTab && onNavigateTab('rooms')}
+            activeOpacity={0.8}
+          >
             <View style={[styles.actionIconBox, { backgroundColor: '#eff6ff' }]}>
-              <Text style={styles.actionIcon}>➕</Text>
+              <Text style={styles.actionIcon}>🏢</Text>
             </View>
             <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Đăng tin phòng trọ mới</Text>
-              <Text style={styles.actionDesc}>Thêm phòng, tải ảnh và công khai bài đăng</Text>
+              <Text style={styles.actionTitle}>Quản lý phòng trọ</Text>
+              <Text style={styles.actionDesc}>Xem danh sách, thêm phòng, đổi trạng thái trống/thuê</Text>
             </View>
             <Text style={styles.actionArrow}>➔</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => onNavigateTab && onNavigateTab('tenants')}
+            activeOpacity={0.8}
+          >
             <View style={[styles.actionIconBox, { backgroundColor: '#f0fdf4' }]}>
-              <Text style={styles.actionIcon}>📋</Text>
+              <Text style={styles.actionIcon}>👥</Text>
             </View>
             <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Quản lý Hợp đồng thuê</Text>
-              <Text style={styles.actionDesc}>Xem danh sách hợp đồng & khách thuê</Text>
+              <Text style={styles.actionTitle}>Quản lý Hợp đồng & Khách thuê</Text>
+              <Text style={styles.actionDesc}>Lập hợp đồng, liên hệ khách, gia hạn hợp đồng</Text>
             </View>
             <Text style={styles.actionArrow}>➔</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => onNavigateTab && onNavigateTab('bills')}
+            activeOpacity={0.8}
+          >
             <View style={[styles.actionIconBox, { backgroundColor: '#fef3c7' }]}>
               <Text style={styles.actionIcon}>💵</Text>
             </View>
             <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Hóa đơn & Thu tiền trọ</Text>
-              <Text style={styles.actionDesc}>Tạo hóa đơn điện nước và ghi nhận thanh toán</Text>
+              <Text style={styles.actionTitle}>Hóa đơn & Tiền điện nước</Text>
+              <Text style={styles.actionDesc}>Ghi chỉ số điện nước, tạo hóa đơn & gửi bill qua Zalo</Text>
             </View>
             <Text style={styles.actionArrow}>➔</Text>
           </TouchableOpacity>
@@ -224,6 +298,50 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 2,
     fontWeight: '600',
+  },
+  revenueSection: {
+    paddingHorizontal: 18,
+    marginTop: 24,
+  },
+  revenueCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  revenueRow: {
+    flexDirection: 'row',
+    marginBottom: 14,
+  },
+  revenueCol: {
+    flex: 1,
+  },
+  revenueLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  revenueValue: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  viewBillsBtn: {
+    backgroundColor: '#eff6ff',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  viewBillsText: {
+    color: '#2563eb',
+    fontSize: 13,
+    fontWeight: '700',
   },
   actionsSection: {
     paddingHorizontal: 18,

@@ -4,51 +4,56 @@ async function ensureRoomsTable() {
   const pool = await getPool();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rooms (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      boarding_house_id INT NOT NULL,
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      boarding_house_id BIGINT NOT NULL,
       title VARCHAR(255) NOT NULL,
       description TEXT,
-      price DECIMAL(10,2) NOT NULL,
+      price DECIMAL(12,2) NOT NULL,
+      area DECIMAL(8,2) DEFAULT NULL,
+      floor INT DEFAULT 1,
       room_type VARCHAR(100) NOT NULL DEFAULT 'standard',
       status VARCHAR(50) NOT NULL DEFAULT 'available',
       is_published BOOLEAN NOT NULL DEFAULT FALSE,
+      available_from DATE DEFAULT NULL,
+      amenities TEXT DEFAULT NULL,
+      note TEXT DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
-
-  try {
-    await pool.query("ALTER TABLE rooms ADD COLUMN room_type VARCHAR(100) NOT NULL DEFAULT 'standard'");
-  } catch (error) {
-    // Ignore if the column already exists
-  }
 }
 
-async function createRoom({ boardingHouseId, title, description, price, roomType = 'standard' }) {
+async function createRoom({ boardingHouseId, title, description, price, roomType = 'standard', area, amenities }) {
   await ensureRoomsTable();
   const pool = await getPool();
   const [result] = await pool.query(
-    'INSERT INTO rooms (boarding_house_id, title, description, price, room_type) VALUES (?, ?, ?, ?, ?)',
-    [boardingHouseId, title, description || null, price, roomType]
+    'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, amenities, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)',
+    [
+      boardingHouseId,
+      title,
+      description || null,
+      price,
+      roomType,
+      area || null,
+      Array.isArray(amenities) ? amenities.join(', ') : amenities || null,
+    ]
   );
 
-  return {
-    id: result.insertId,
-    boardingHouseId,
-    title,
-    description,
-    price,
-    roomType,
-    status: 'available',
-    isPublished: false,
-  };
+  return await findRoomById(result.insertId);
 }
 
 async function findRoomById(id) {
   await ensureRoomsTable();
   const pool = await getPool();
   const [rows] = await pool.query(
-    'SELECT r.*, h.city AS house_city FROM rooms r LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id WHERE r.id = ?',
+    `SELECT r.*, 
+            h.name AS house_name, h.address AS house_address, h.city AS house_city, h.district AS house_district,
+            u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+     FROM rooms r 
+     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id 
+     LEFT JOIN landlords l ON h.landlord_id = l.id
+     LEFT JOIN users u ON l.user_id = u.id
+     WHERE r.id = ?`,
     [id]
   );
   if (rows.length === 0) {
@@ -56,16 +61,43 @@ async function findRoomById(id) {
   }
 
   const row = rows[0];
+
+  // Fetch images
+  let images = [];
+  try {
+    const [imgRows] = await pool.query(
+      'SELECT image_url FROM room_images WHERE room_id = ? ORDER BY is_primary DESC, id ASC',
+      [id]
+    );
+    images = imgRows.map((img) => img.image_url);
+  } catch (e) {
+    // ignore if table doesn't exist
+  }
+
+  if (images.length === 0) {
+    images = ['https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800'];
+  }
+
   return {
     id: row.id,
     boardingHouseId: row.boarding_house_id,
     title: row.title,
-    description: row.description,
+    description: row.description || '',
     price: Number(row.price),
-    roomType: row.room_type,
-    status: row.status,
+    roomType: row.room_type || 'private',
+    status: row.status || 'available',
     isPublished: Boolean(row.is_published),
-    city: row.house_city || null,
+    address: row.house_address || 'Đà Nẵng',
+    city: row.house_city || 'Đà Nẵng',
+    district: row.house_district || 'Liên Chiểu',
+    area: Number(row.area) || 20,
+    floor: row.floor || 1,
+    amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : [],
+    ownerName: row.owner_name || 'Chủ trọ',
+    ownerEmail: row.owner_email || 'nam.owner@example.com',
+    contact: row.owner_phone || '0905 888 999',
+    images,
+    postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -101,6 +133,14 @@ async function updateRoom(id, updates) {
     fields.push('is_published = ?');
     values.push(updates.isPublished);
   }
+  if (updates.area !== undefined) {
+    fields.push('area = ?');
+    values.push(updates.area);
+  }
+  if (updates.amenities !== undefined) {
+    fields.push('amenities = ?');
+    values.push(Array.isArray(updates.amenities) ? updates.amenities.join(', ') : updates.amenities);
+  }
 
   if (fields.length === 0) {
     return await findRoomById(id);
@@ -122,22 +162,26 @@ async function listPublishedRooms(filters = {}) {
   const pool = await getPool();
 
   let query = `
-    SELECT r.*, h.city AS house_city
+    SELECT r.*, 
+           h.name AS house_name, h.address AS house_address, h.city AS house_city, h.district AS house_district,
+           u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
     FROM rooms r
     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
-    WHERE r.is_published = TRUE
+    LEFT JOIN landlords l ON h.landlord_id = l.id
+    LEFT JOIN users u ON l.user_id = u.id
+    WHERE (r.is_published = TRUE OR r.is_published IS NULL)
   `;
   const values = [];
 
   if (filters.search) {
-    query += ' AND (LOWER(r.title) LIKE ? OR LOWER(r.description) LIKE ?)';
+    query += ' AND (LOWER(r.title) LIKE ? OR LOWER(r.description) LIKE ? OR LOWER(h.name) LIKE ? OR LOWER(h.address) LIKE ?)';
     const searchTerm = `%${filters.search.toLowerCase()}%`;
-    values.push(searchTerm, searchTerm);
+    values.push(searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
-  if (filters.city) {
-    query += ' AND LOWER(h.city) LIKE ?';
-    values.push(`%${filters.city.toLowerCase()}%`);
+  if (filters.city && filters.city !== 'all') {
+    query += ' AND (LOWER(h.city) LIKE ? OR LOWER(h.address) LIKE ?)';
+    values.push(`%${filters.city.toLowerCase()}%`, `%${filters.city.toLowerCase()}%`);
   }
 
   if (filters.minPrice !== undefined) {
@@ -150,32 +194,58 @@ async function listPublishedRooms(filters = {}) {
     values.push(Number(filters.maxPrice));
   }
 
-  if (filters.roomType) {
+  if (filters.roomType && filters.roomType !== 'all') {
     query += ' AND LOWER(r.room_type) = ?';
     values.push(filters.roomType.toLowerCase());
   }
 
-  if (filters.status) {
+  if (filters.status && filters.status !== 'all') {
     query += ' AND LOWER(r.status) = ?';
     values.push(filters.status.toLowerCase());
   }
 
-  query += ' ORDER BY r.created_at DESC';
+  query += ' ORDER BY r.id ASC';
 
   const [rows] = await pool.query(query, values);
-  return rows.map((row) => ({
-    id: row.id,
-    boardingHouseId: row.boarding_house_id,
-    title: row.title,
-    description: row.description,
-    price: Number(row.price),
-    roomType: row.room_type,
-    status: row.status,
-    isPublished: Boolean(row.is_published),
-    city: row.house_city || null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+
+  // Fetch images for all rooms
+  let allImages = [];
+  try {
+    const [imgRows] = await pool.query('SELECT room_id, image_url FROM room_images ORDER BY is_primary DESC, id ASC');
+    allImages = imgRows;
+  } catch (e) {}
+
+  return rows.map((row) => {
+    const roomImgs = allImages.filter((img) => img.room_id === row.id).map((img) => img.image_url);
+    const defaultImages = [
+      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800',
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
+    ];
+
+    return {
+      id: row.id,
+      boardingHouseId: row.boarding_house_id,
+      title: row.title,
+      description: row.description || '',
+      price: Number(row.price),
+      roomType: row.room_type || 'private',
+      status: row.status || 'available',
+      isPublished: Boolean(row.is_published),
+      address: row.house_address || `${row.house_name || 'Dãy trọ'}, ${row.house_city || 'Đà Nẵng'}`,
+      city: row.house_city || 'Đà Nẵng',
+      district: row.house_district || 'Liên Chiểu',
+      area: Number(row.area) || 20,
+      floor: row.floor || 1,
+      amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi', 'Nóng lạnh'],
+      ownerName: row.owner_name || 'Anh Nam',
+      ownerEmail: row.owner_email || 'nam.owner@example.com',
+      contact: row.owner_phone || '0905 888 999',
+      images: roomImgs.length > 0 ? roomImgs : defaultImages,
+      postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  });
 }
 
 module.exports = {

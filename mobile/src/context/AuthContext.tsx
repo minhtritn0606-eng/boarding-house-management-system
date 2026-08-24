@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react'
 import type { LandlordUser, DemoAccount } from '../types'
+import { mobileAuthApi, setMobileAuthToken } from '../services/api'
 
 interface AuthContextType {
   user: LandlordUser | null
@@ -21,20 +22,20 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   {
     name: 'Anh Nam (Đà Nẵng)',
     email: 'nam.owner@example.com',
-    phone: '0938 123 456',
+    phone: '0905 888 999',
     label: 'Chủ trọ tại Đà Nẵng • 12 phòng',
   },
   {
-    name: 'Chị Lan (Huế)',
-    email: 'lan.owner@example.com',
-    phone: '0912 234 567',
-    label: 'Chủ trọ tại Huế • 8 phòng',
+    name: 'Chị Lan (Ngũ Hành Sơn)',
+    email: 'lan.landlord@example.com',
+    phone: '0914 222 333',
+    label: 'Chủ trọ tại Ngũ Hành Sơn • 8 phòng',
   },
   {
-    name: 'Cô Hoa (Hà Nội)',
-    email: 'hoa.owner@example.com',
-    phone: '0987 654 321',
-    label: 'Chủ trọ tại Hà Nội • 16 phòng',
+    name: 'Anh Đức (Hải Châu)',
+    email: 'duc.landlord@example.com',
+    phone: '0983 444 555',
+    label: 'Chủ trọ tại Hải Châu • 16 phòng',
   },
 ]
 
@@ -60,66 +61,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true)
-    try {
-      if (!email.trim() || !password.trim()) {
-        setIsLoading(false)
-        return { success: false, error: 'Vui lòng nhập đầy đủ Email và Mật khẩu' }
-      }
+    const cleanEmail = email.trim()
+    const cleanPass = password.trim()
 
-      // Check if it's a demo account
-      const demo = DEMO_ACCOUNTS.find((a) => a.email.toLowerCase() === email.trim().toLowerCase())
-      if (demo) {
-        setUser({
-          id: `owner_${demo.email}`,
-          name: demo.name,
-          email: demo.email,
-          phone: demo.phone,
-          role: 'landlord',
-          avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${demo.email}`,
-        })
-        setIsLoading(false)
-        return { success: true }
-      }
-
-      // Check registered accounts
-      const found = registeredUsers.find(
-        (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
-      )
-      if (found) {
-        setUser({
-          id: `owner_${found.email}`,
-          name: found.name,
-          email: found.email,
-          phone: found.phone,
-          role: 'landlord',
-          avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${found.email}`,
-        })
-        setIsLoading(false)
-        return { success: true }
-      }
-
-      // Auto login for testing if password length >= 6
-      if (password.length >= 6) {
-        const username = email.split('@')[0]
-        const capitalized = username.charAt(0).toUpperCase() + username.slice(1)
-        setUser({
-          id: `owner_${email}`,
-          name: `Chủ trọ ${capitalized}`,
-          email: email.trim(),
-          phone: '0900 123 456',
-          role: 'landlord',
-          avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${email}`,
-        })
-        setIsLoading(false)
-        return { success: true }
-      }
-
+    if (!cleanEmail || !cleanPass) {
       setIsLoading(false)
-      return { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' }
-    } catch {
-      setIsLoading(false)
-      return { success: false, error: 'Đăng nhập không thành công, vui lòng thử lại' }
+      return { success: false, error: 'Vui lòng nhập đầy đủ Email và Mật khẩu' }
     }
+
+    // 1. Try real Backend REST API
+    try {
+      const res = await mobileAuthApi.login(cleanEmail, cleanPass)
+      if (res && res.user) {
+        setUser({
+          id: String(res.user.id),
+          name: res.user.fullName || res.user.name || cleanEmail.split('@')[0],
+          email: res.user.email,
+          phone: res.user.phone || '0905 888 999',
+          role: 'landlord',
+          avatar: res.user.avatar || `https://api.dicebear.com/7.x/bottts/png?seed=${cleanEmail}`,
+        })
+        setIsLoading(false)
+        return { success: true }
+      }
+    } catch (apiErr: any) {
+      console.log('Mobile backend auth offline/fallback:', apiErr.message)
+    }
+
+    // 2. Fallback: Demo accounts
+    const demo = DEMO_ACCOUNTS.find((a) => a.email.toLowerCase() === cleanEmail.toLowerCase())
+    if (demo) {
+      setUser({
+        id: `owner_${demo.email}`,
+        name: demo.name,
+        email: demo.email,
+        phone: demo.phone,
+        role: 'landlord',
+        avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${demo.email}`,
+      })
+      setIsLoading(false)
+      return { success: true }
+    }
+
+    // 3. Fallback: Registered accounts
+    const found = registeredUsers.find(
+      (u) => u.email.toLowerCase() === cleanEmail.toLowerCase() && u.password === cleanPass
+    )
+    if (found) {
+      setUser({
+        id: `owner_${found.email}`,
+        name: found.name,
+        email: found.email,
+        phone: found.phone,
+        role: 'landlord',
+        avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${found.email}`,
+      })
+      setIsLoading(false)
+      return { success: true }
+    }
+
+    // 4. Fallback for testing: any email with password length >= 6
+    if (cleanPass.length >= 6) {
+      const username = cleanEmail.split('@')[0]
+      const capitalized = username.charAt(0).toUpperCase() + username.slice(1)
+      setUser({
+        id: `owner_${cleanEmail}`,
+        name: `Chủ trọ ${capitalized}`,
+        email: cleanEmail,
+        phone: '0905 888 999',
+        role: 'landlord',
+        avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${cleanEmail}`,
+      })
+      setIsLoading(false)
+      return { success: true }
+    }
+
+    setIsLoading(false)
+    return { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' }
   }
 
   const register = async (data: {
@@ -129,52 +147,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string
   }): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true)
-    try {
-      if (!data.name.trim() || !data.email.trim() || !data.phone.trim() || !data.password.trim()) {
-        setIsLoading(false)
-        return { success: false, error: 'Vui lòng điền đầy đủ tất cả thông tin' }
-      }
+    const cleanName = data.name.trim()
+    const cleanEmail = data.email.trim()
+    const cleanPhone = data.phone.trim()
+    const cleanPass = data.password.trim()
 
-      if (data.password.length < 6) {
-        setIsLoading(false)
-        return { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' }
-      }
-
-      const emailExists = registeredUsers.some(
-        (u) => u.email.toLowerCase() === data.email.trim().toLowerCase()
-      )
-      if (emailExists) {
-        setIsLoading(false)
-        return { success: false, error: 'Email này đã được đăng ký' }
-      }
-
-      const newUser = {
-        name: data.name.trim(),
-        email: data.email.trim(),
-        phone: data.phone.trim(),
-        password: data.password,
-      }
-
-      setRegisteredUsers((prev) => [...prev, newUser])
-
-      setUser({
-        id: `owner_${newUser.email}`,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        role: 'landlord',
-        avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${newUser.email}`,
-      })
-
+    if (!cleanName || !cleanEmail || !cleanPhone || !cleanPass) {
       setIsLoading(false)
-      return { success: true }
-    } catch {
-      setIsLoading(false)
-      return { success: false, error: 'Đăng ký thất bại, vui lòng thử lại' }
+      return { success: false, error: 'Vui lòng điền đầy đủ tất cả thông tin' }
     }
+
+    if (cleanPass.length < 6) {
+      setIsLoading(false)
+      return { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' }
+    }
+
+    // 1. Try real Backend REST API
+    try {
+      const res = await mobileAuthApi.register({
+        fullName: cleanName,
+        email: cleanEmail,
+        password: cleanPass,
+        role: 'landlord',
+      })
+      if (res && res.user) {
+        setUser({
+          id: String(res.user.id),
+          name: res.user.fullName || cleanName,
+          email: res.user.email,
+          phone: cleanPhone,
+          role: 'landlord',
+          avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${cleanEmail}`,
+        })
+        setIsLoading(false)
+        return { success: true }
+      }
+    } catch (apiErr: any) {
+      console.log('Mobile backend register offline/fallback:', apiErr.message)
+    }
+
+    // 2. Fallback: local memory
+    const emailExists = registeredUsers.some(
+      (u) => u.email.toLowerCase() === cleanEmail.toLowerCase()
+    )
+    if (emailExists) {
+      setIsLoading(false)
+      return { success: false, error: 'Email này đã được đăng ký' }
+    }
+
+    const newUser = {
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      password: cleanPass,
+    }
+
+    setRegisteredUsers((prev) => [...prev, newUser])
+
+    setUser({
+      id: `owner_${newUser.email}`,
+      name: newUser.name,
+      email: newUser.email,
+      phone: newUser.phone,
+      role: 'landlord',
+      avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${newUser.email}`,
+    })
+
+    setIsLoading(false)
+    return { success: true }
   }
 
   const logout = () => {
+    setMobileAuthToken(null)
     setUser(null)
   }
 

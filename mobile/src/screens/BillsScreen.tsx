@@ -244,7 +244,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
     Share.share({
       message: text,
       title: `Hóa đơn phòng ${bill.roomNumber}`,
-    }).catch(() => {})
+    }).catch(() => { })
   }
 
   // Delete bill
@@ -282,7 +282,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>💵 Hóa Đơn & Tiện Ích</Text>
+          <Text style={styles.headerTitle}>Hóa Đơn & Tiện Ích</Text>
           <Text style={styles.headerSubtitle}>
             Tháng {selectedMonth}/{selectedYear} • {bills.length} hóa đơn
           </Text>
@@ -308,7 +308,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
 
         {/* Month Selector Carousel */}
         <View style={styles.monthRow}>
-          <Text style={styles.sectionLabel}>📅 Chọn tháng:</Text>
+          <Text style={styles.sectionLabel}>Chọn tháng:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {[6, 7, 8, 9, 10, 11, 12].map((m) => (
               <TouchableOpacity
@@ -443,7 +443,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
                         onPress={() => handleConfirmPaid(bill)}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.actionCollectBtnText}>💰 Thu tiền</Text>
+                        <Text style={styles.actionCollectBtnText}>Thu tiền</Text>
                       </TouchableOpacity>
                     )}
 
@@ -452,7 +452,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
                       onPress={() => handleShareBill(bill)}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.actionShareBtnText}>📤 Gửi bill</Text>
+                      <Text style={styles.actionShareBtnText}>Gửi bill</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -460,7 +460,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
                       onPress={() => handleOpenEditModal(bill)}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.actionEditBtnText}>✏️ Sửa</Text>
+                      <Text style={styles.actionEditBtnText}>Sửa</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -468,7 +468,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
                       onPress={() => handleDeleteBill(bill)}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.actionDeleteBtnText}>🗑️</Text>
+                      <Text style={styles.actionDeleteBtnText}>Xóa</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -546,7 +546,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
 
               {/* Electric Inputs */}
               <View style={styles.subCard}>
-                <Text style={styles.subCardTitle}>⚡ Điện sinh hoạt (Đơn giá: {formatVND(utilitySettings.electricRate)}/kWh)</Text>
+                <Text style={styles.subCardTitle}>Điện sinh hoạt (Đơn giá: {formatVND(utilitySettings.electricRate)}/kWh)</Text>
                 <View style={styles.formRow}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={styles.fieldSubLabel}>Chỉ số cũ</Text>
@@ -574,7 +574,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
 
               {/* Water Inputs */}
               <View style={styles.subCard}>
-                <Text style={styles.subCardTitle}>💧 Nước sinh hoạt (Đơn giá: {formatVND(utilitySettings.waterRate)}/m³)</Text>
+                <Text style={styles.subCardTitle}>Nước sinh hoạt (Đơn giá: {formatVND(utilitySettings.waterRate)}/m³)</Text>
                 <View style={styles.formRow}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={styles.fieldSubLabel}>Chỉ số cũ</Text>

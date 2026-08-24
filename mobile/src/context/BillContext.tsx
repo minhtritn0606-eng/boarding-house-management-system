@@ -1,14 +1,17 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { BillItem, UtilitySettings, BillStatus } from '../types/bill'
+import { mobileBillApi } from '../services/api'
 
 interface BillContextType {
   bills: BillItem[]
+  isLoading: boolean
+  refreshBills: () => Promise<void>
   utilitySettings: UtilitySettings
   updateUtilitySettings: (settings: Partial<UtilitySettings>) => void
-  addBill: (bill: Omit<BillItem, 'id' | 'electricUsage' | 'electricAmount' | 'waterUsage' | 'waterAmount' | 'totalAmount'>) => void
-  updateBill: (id: string, updatedData: Partial<BillItem>) => void
-  deleteBill: (id: string) => void
-  markAsPaid: (id: string, method?: 'cash' | 'banking') => void
+  addBill: (bill: Omit<BillItem, 'id' | 'electricUsage' | 'electricAmount' | 'waterUsage' | 'waterAmount' | 'totalAmount'>) => Promise<void>
+  updateBill: (id: string, updatedData: Partial<BillItem>) => Promise<void>
+  deleteBill: (id: string) => Promise<void>
+  markAsPaid: (id: string, method?: 'cash' | 'banking') => Promise<void>
   getBillsByMonth: (month: number, year: number) => BillItem[]
   totalUnpaidAmount: number
   totalPaidAmount: number
@@ -161,12 +164,57 @@ const BillContext = createContext<BillContextType | undefined>(undefined)
 export function BillProvider({ children }: { children: React.ReactNode }) {
   const [bills, setBills] = useState<BillItem[]>(INITIAL_BILLS)
   const [utilitySettings, setUtilitySettings] = useState<UtilitySettings>(DEFAULT_UTILITY_SETTINGS)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const refreshBills = async () => {
+    setIsLoading(true)
+    try {
+      const res = await mobileBillApi.getBills()
+      if (res && Array.isArray(res.bills) && res.bills.length > 0) {
+        const mapped: BillItem[] = res.bills.map((b: any, idx: number) => ({
+          id: String(b.id),
+          roomNumber: b.title || `P.${100 + idx + 1}`,
+          houseName: 'Dãy trọ Hòa Khánh (Đà Nẵng)',
+          tenantName: 'Khách thuê',
+          tenantPhone: '0905 888 999',
+          month: 8,
+          year: 2026,
+          roomFee: Number(b.amount) || 2500000,
+          oldElectricMeter: 1000,
+          newElectricMeter: 1050,
+          electricUsage: 50,
+          electricRate: 3500,
+          electricAmount: 175000,
+          oldWaterMeter: 50,
+          newWaterMeter: 54,
+          waterUsage: 4,
+          waterRate: 15000,
+          waterAmount: 60000,
+          internetFee: 100000,
+          trashFee: 30000,
+          totalAmount: Number(b.amount) || 2735000,
+          status: (b.status === 'paid' ? 'paid' : 'unpaid') as BillStatus,
+          dueDate: b.dueDate || '2026-08-25',
+          note: b.description,
+        }))
+        setBills(mapped)
+      }
+    } catch (e: any) {
+      console.log('Mobile bill fetch fallback:', e.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refreshBills()
+  }, [])
 
   const updateUtilitySettings = (settings: Partial<UtilitySettings>) => {
     setUtilitySettings((prev) => ({ ...prev, ...settings }))
   }
 
-  const addBill = (
+  const addBill = async (
     data: Omit<BillItem, 'id' | 'electricUsage' | 'electricAmount' | 'waterUsage' | 'waterAmount' | 'totalAmount'>
   ) => {
     const electricUsage = Math.max(0, data.newElectricMeter - data.oldElectricMeter)
@@ -188,9 +236,24 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     }
 
     setBills((prev) => [newBill, ...prev])
+
+    try {
+      await mobileBillApi.createBill({
+        landlordId: 1,
+        contractId: 1,
+        tenantId: 1,
+        title: `Phòng ${data.roomNumber}`,
+        amount: totalAmount,
+        dueDate: data.dueDate,
+        status: data.status,
+        description: data.note,
+      })
+    } catch (e: any) {
+      console.log('Mobile create bill sync fallback:', e.message)
+    }
   }
 
-  const updateBill = (id: string, updatedData: Partial<BillItem>) => {
+  const updateBill = async (id: string, updatedData: Partial<BillItem>) => {
     setBills((prev) =>
       prev.map((bill) => {
         if (bill.id === id) {
@@ -220,13 +283,19 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
         return bill
       })
     )
+
+    try {
+      await mobileBillApi.updateBill(id, updatedData)
+    } catch (e: any) {
+      // fallback
+    }
   }
 
-  const deleteBill = (id: string) => {
+  const deleteBill = async (id: string) => {
     setBills((prev) => prev.filter((b) => b.id !== id))
   }
 
-  const markAsPaid = (id: string, method: 'cash' | 'banking' = 'banking') => {
+  const markAsPaid = async (id: string, method: 'cash' | 'banking' = 'banking') => {
     const today = new Date().toISOString().split('T')[0]
     setBills((prev) =>
       prev.map((b) =>
@@ -240,6 +309,12 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
           : b
       )
     )
+
+    try {
+      await mobileBillApi.updateBill(id, { status: 'paid' })
+    } catch (e: any) {
+      // fallback
+    }
   }
 
   const getBillsByMonth = (month: number, year: number) => {
@@ -258,6 +333,8 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     <BillContext.Provider
       value={{
         bills,
+        isLoading,
+        refreshBills,
         utilitySettings,
         updateUtilitySettings,
         addBill,

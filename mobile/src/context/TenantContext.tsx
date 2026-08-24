@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { Tenant, ContractStatus } from '../types/tenant'
+import { mobileTenantApi } from '../services/api'
 
 interface TenantContextType {
   tenants: Tenant[]
-  addTenant: (tenant: Omit<Tenant, 'id' | 'contractNumber'>) => void
-  updateTenant: (id: string, updatedData: Partial<Tenant>) => void
-  deleteTenant: (id: string) => void
-  updateContractStatus: (id: string, status: ContractStatus) => void
+  isLoading: boolean
+  refreshTenants: () => Promise<void>
+  addTenant: (tenant: Omit<Tenant, 'id' | 'contractNumber'>) => Promise<void>
+  updateTenant: (id: string, updatedData: Partial<Tenant>) => Promise<void>
+  deleteTenant: (id: string) => Promise<void>
+  updateContractStatus: (id: string, status: ContractStatus) => Promise<void>
   getTenantsByHouse: (houseName?: string) => Tenant[]
 }
 
@@ -109,13 +112,51 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined)
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
   const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const refreshTenants = async () => {
+    setIsLoading(true)
+    try {
+      const res = await mobileTenantApi.getTenants()
+      if (res && Array.isArray(res.tenants) && res.tenants.length > 0) {
+        const mapped: Tenant[] = res.tenants.map((t: any, idx: number) => ({
+          id: String(t.id),
+          contractNumber: `HD-2026-${String(idx + 101).padStart(3, '0')}`,
+          name: t.fullName || t.name,
+          phone: t.phone || '0905 111 222',
+          email: t.email,
+          idCard: t.identityNumber || t.idCard || '048200000000',
+          hometown: t.hometown || 'Đà Nẵng',
+          job: t.job || 'Người đi làm',
+          roomId: `room_${t.id}`,
+          roomNumber: `P.${100 + idx + 1}`,
+          houseName: 'Dãy trọ Hòa Khánh (Đà Nẵng)',
+          rentStartDate: '2026-01-01',
+          rentEndDate: '2026-12-31',
+          deposit: 2500000,
+          monthlyRent: 2500000,
+          status: 'active',
+          notes: t.note,
+        }))
+        setTenants(mapped)
+      }
+    } catch (e: any) {
+      console.log('Mobile tenant fetch offline/fallback:', e.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refreshTenants()
+  }, [])
 
   const getTenantsByHouse = (houseName?: string) => {
     if (!houseName || houseName === 'all') return tenants
     return tenants.filter((t) => t.houseName.toLowerCase() === houseName.toLowerCase())
   }
 
-  const addTenant = (tenantData: Omit<Tenant, 'id' | 'contractNumber'>) => {
+  const addTenant = async (tenantData: Omit<Tenant, 'id' | 'contractNumber'>) => {
     const nextSeq = tenants.length + 1
     const newTenant: Tenant = {
       ...tenantData,
@@ -123,19 +164,31 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       contractNumber: `HD-2026-${String(nextSeq).padStart(3, '0')}`,
     }
     setTenants((prev) => [newTenant, ...prev])
+
+    try {
+      await mobileTenantApi.createTenant({
+        fullName: tenantData.name,
+        email: tenantData.email,
+        phone: tenantData.phone,
+        identityNumber: tenantData.idCard,
+        note: tenantData.notes,
+      })
+    } catch (e: any) {
+      console.log('Mobile create tenant sync fallback:', e.message)
+    }
   }
 
-  const updateTenant = (id: string, updatedData: Partial<Tenant>) => {
+  const updateTenant = async (id: string, updatedData: Partial<Tenant>) => {
     setTenants((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updatedData } : item))
     )
   }
 
-  const deleteTenant = (id: string) => {
+  const deleteTenant = async (id: string) => {
     setTenants((prev) => prev.filter((item) => item.id !== id))
   }
 
-  const updateContractStatus = (id: string, status: ContractStatus) => {
+  const updateContractStatus = async (id: string, status: ContractStatus) => {
     setTenants((prev) =>
       prev.map((item) => (item.id === id ? { ...item, status } : item))
     )
@@ -145,6 +198,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     <TenantContext.Provider
       value={{
         tenants,
+        isLoading,
+        refreshTenants,
         addTenant,
         updateTenant,
         deleteTenant,

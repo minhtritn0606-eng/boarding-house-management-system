@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { authApi, setAuthToken } from '../services/api'
 
 export interface LandlordUser {
   id: string
@@ -6,7 +7,7 @@ export interface LandlordUser {
   email: string
   phone: string
   avatar?: string
-  role: 'landlord'
+  role: 'landlord' | 'admin' | 'tenant' | 'visitor'
 }
 
 interface AuthContextType {
@@ -22,20 +23,20 @@ const DEMO_ACCOUNTS = [
   {
     name: 'Anh Nam (Đà Nẵng)',
     email: 'nam.owner@example.com',
-    phone: '0938 123 456',
-    label: 'Chủ trọ tại Đà Nẵng',
+    phone: '0905 888 999',
+    label: 'Chủ trọ tại Đà Nẵng • Mật khẩu: password123',
   },
   {
-    name: 'Chị Lan (Huế)',
-    email: 'lan.owner@example.com',
-    phone: '0912 234 567',
-    label: 'Chủ trọ tại Huế',
+    name: 'Chị Lan (Ngũ Hành Sơn)',
+    email: 'lan.landlord@example.com',
+    phone: '0914 222 333',
+    label: 'Chủ trọ tại Ngũ Hành Sơn • Mật khẩu: password123',
   },
   {
-    name: 'Cô Hoa (Hà Nội)',
-    email: 'hoa.owner@example.com',
-    phone: '0987 654 321',
-    label: 'Chủ trọ tại Hà Nội',
+    name: 'Anh Đức (Hải Châu)',
+    email: 'duc.landlord@example.com',
+    phone: '0983 444 555',
+    label: 'Chủ trọ tại Hải Châu • Mật khẩu: password123',
   },
 ]
 
@@ -71,7 +72,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: 'Vui lòng nhập đầy đủ email và mật khẩu' }
     }
 
-    // Check demo accounts
+    // 1. Try real Backend REST API first
+    try {
+      const res = await authApi.login(email.trim(), password)
+      if (res && res.user) {
+        const loggedUser: LandlordUser = {
+          id: String(res.user.id),
+          name: res.user.fullName || res.user.name || email.split('@')[0],
+          email: res.user.email,
+          phone: res.user.phone || '0905 888 999',
+          avatar: res.user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${res.user.email}`,
+          role: res.user.role || 'landlord',
+        }
+        setUser(loggedUser)
+        return { success: true }
+      }
+    } catch (apiError: any) {
+      // Backend is offline or returned error -> check local fallback
+      console.warn('Backend API login error/offline, falling back to local auth:', apiError.message)
+    }
+
+    // 2. Fallback: Demo accounts
     const demo = DEMO_ACCOUNTS.find((a) => a.email.toLowerCase() === email.toLowerCase())
     if (demo) {
       const loggedUser: LandlordUser = {
@@ -86,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true }
     }
 
-    // Check registered accounts
+    // 3. Fallback: Registered accounts from localStorage
     try {
       const savedUsers = JSON.parse(localStorage.getItem(USERS_STORAGE_KEY) || '[]')
       const found = savedUsers.find(
@@ -108,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error(err)
     }
 
-    // For ease of demo testing: any email with password length >= 6 can login as new demo user
+    // 4. Fallback for testing: any email with password length >= 6
     if (password.length >= 6) {
       const nameFromEmail = email.split('@')[0]
       const capitalized = nameFromEmail.charAt(0).toUpperCase() + nameFromEmail.slice(1)
@@ -116,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: `owner_${email}`,
         name: `Chủ trọ ${capitalized}`,
         email: email,
-        phone: '0900 123 456',
+        phone: '0905 888 999',
         avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${email}`,
         role: 'landlord',
       }
@@ -124,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true }
     }
 
-    return { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' }
+    return { success: false, error: 'Sai tài khoản hoặc mật khẩu (Mật khẩu phải >= 6 ký tự)' }
   }
 
   const register = async (data: {
@@ -141,6 +162,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' }
     }
 
+    // 1. Try real Backend REST API
+    try {
+      const res = await authApi.register({
+        fullName: data.name,
+        email: data.email,
+        password: data.password,
+        role: 'landlord',
+      })
+      if (res && res.user) {
+        const loggedUser: LandlordUser = {
+          id: String(res.user.id),
+          name: res.user.fullName || data.name,
+          email: res.user.email,
+          phone: data.phone,
+          avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${res.user.email}`,
+          role: 'landlord',
+        }
+        setUser(loggedUser)
+        return { success: true }
+      }
+    } catch (apiError: any) {
+      console.warn('Backend register offline or failed, using local storage:', apiError.message)
+    }
+
+    // 2. Local storage fallback
     try {
       const savedUsers = JSON.parse(localStorage.getItem(USERS_STORAGE_KEY) || '[]')
       if (savedUsers.some((u: any) => u.email.toLowerCase() === data.email.toLowerCase())) {
@@ -168,12 +214,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setUser(loggedUser)
       return { success: true }
-    } catch (e) {
+    } catch {
       return { success: false, error: 'Đăng ký thất bại, vui lòng thử lại sau' }
     }
   }
 
   const logout = () => {
+    setAuthToken(null)
     setUser(null)
   }
 

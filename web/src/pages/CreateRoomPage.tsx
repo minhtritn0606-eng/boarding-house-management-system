@@ -199,7 +199,7 @@ export default function CreateRoomPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
@@ -228,7 +228,7 @@ export default function CreateRoomPage() {
 
     setIsSubmitting(true)
 
-    const created = addRoom({
+    const created = await addRoom({
       title: title.trim(),
       city,
       district: district.trim() || undefined,

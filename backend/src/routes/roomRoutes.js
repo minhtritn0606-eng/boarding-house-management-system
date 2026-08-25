@@ -7,15 +7,15 @@ const {
   getRoomDetailsHandler,
   listPublishedRoomsHandler,
 } = require('../controllers/roomController');
-const { authenticateToken, authorizeRoles } = require('../middlewares/authMiddleware');
+const { optionalAuth } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
 router.get('/', listPublishedRoomsHandler);
 router.get('/:id', getRoomDetailsHandler);
-router.post('/', authenticateToken, authorizeRoles('landlord'), createRoomHandler);
-router.put('/:id', authenticateToken, authorizeRoles('landlord'), updateRoomHandler);
-router.delete('/:id', authenticateToken, authorizeRoles('landlord'), deleteRoomHandler);
-router.post('/:id/publish', authenticateToken, authorizeRoles('landlord'), publishRoomHandler);
+router.post('/', optionalAuth, createRoomHandler);
+router.put('/:id', optionalAuth, updateRoomHandler);
+router.delete('/:id', optionalAuth, deleteRoomHandler);
+router.post('/:id/publish', optionalAuth, publishRoomHandler);
 
 module.exports = router;

@@ -13,7 +13,7 @@ async function ensureRoomsTable() {
       floor INT DEFAULT 1,
       room_type VARCHAR(100) NOT NULL DEFAULT 'standard',
       status VARCHAR(50) NOT NULL DEFAULT 'available',
-      is_published BOOLEAN NOT NULL DEFAULT FALSE,
+      is_published BOOLEAN NOT NULL DEFAULT TRUE,
       available_from DATE DEFAULT NULL,
       amenities TEXT DEFAULT NULL,
       note TEXT DEFAULT NULL,
@@ -23,11 +23,11 @@ async function ensureRoomsTable() {
   `);
 }
 
-async function createRoom({ boardingHouseId, title, description, price, roomType = 'standard', area, amenities }) {
+async function createRoom({ boardingHouseId, title, description, price, roomType = 'standard', area, floor = 1, amenities, images = [] }) {
   await ensureRoomsTable();
   const pool = await getPool();
   const [result] = await pool.query(
-    'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, amenities, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)',
+    'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, floor, amenities, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)',
     [
       boardingHouseId,
       title,
@@ -35,11 +35,26 @@ async function createRoom({ boardingHouseId, title, description, price, roomType
       price,
       roomType,
       area || null,
+      floor || 1,
       Array.isArray(amenities) ? amenities.join(', ') : amenities || null,
     ]
   );
 
-  return await findRoomById(result.insertId);
+  const roomId = result.insertId;
+
+  // Insert images if provided
+  if (Array.isArray(images) && images.length > 0) {
+    for (let i = 0; i < images.length; i++) {
+      try {
+        await pool.query(
+          'INSERT INTO room_images (room_id, image_url, is_primary) VALUES (?, ?, ?)',
+          [roomId, images[i], i === 0]
+        );
+      } catch (e) {}
+    }
+  }
+
+  return await findRoomById(roomId);
 }
 
 async function findRoomById(id) {
@@ -70,9 +85,7 @@ async function findRoomById(id) {
       [id]
     );
     images = imgRows.map((img) => img.image_url);
-  } catch (e) {
-    // ignore if table doesn't exist
-  }
+  } catch (e) {}
 
   if (images.length === 0) {
     images = ['https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800'];
@@ -136,6 +149,10 @@ async function updateRoom(id, updates) {
   if (updates.area !== undefined) {
     fields.push('area = ?');
     values.push(updates.area);
+  }
+  if (updates.floor !== undefined) {
+    fields.push('floor = ?');
+    values.push(updates.floor);
   }
   if (updates.amenities !== undefined) {
     fields.push('amenities = ?');
@@ -208,7 +225,6 @@ async function listPublishedRooms(filters = {}) {
 
   const [rows] = await pool.query(query, values);
 
-  // Fetch images for all rooms
   let allImages = [];
   try {
     const [imgRows] = await pool.query('SELECT room_id, image_url FROM room_images ORDER BY is_primary DESC, id ASC');

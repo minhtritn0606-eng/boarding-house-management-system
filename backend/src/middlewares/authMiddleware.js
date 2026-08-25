@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'boarding-house-secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'boarding-house-super-secret-key-2026';
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization || req.headers.Authorization;
@@ -19,6 +19,20 @@ function authenticateToken(req, res, next) {
   }
 }
 
+function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      req.user = payload;
+    } catch (error) {
+      // ignore invalid token in optional mode
+    }
+  }
+  return next();
+}
+
 function authorizeRoles(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) {
@@ -35,5 +49,6 @@ function authorizeRoles(...allowedRoles) {
 
 module.exports = {
   authenticateToken,
+  optionalAuth,
   authorizeRoles,
 };

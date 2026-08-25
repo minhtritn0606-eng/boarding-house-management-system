@@ -85,6 +85,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         roomType: roomData.roomType,
         area: roomData.area,
         amenities: Array.isArray(roomData.amenities) ? roomData.amenities.join(', ') : roomData.amenities,
+        images: roomData.images,
       })
       if (res && res.room) {
         setRooms((prev) => [res.room, ...prev])

@@ -67,7 +67,7 @@ export const authApi = {
     return res
   },
 
-  register: async (data: { fullName: string; email: string; password: string; role?: string }) => {
+  register: async (data: { fullName: string; email: string; password: string; phone?: string; role?: string }) => {
     const res = await request<{ user: any; token: string; message?: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -128,6 +128,7 @@ export const roomApi = {
     roomType?: string
     area?: number
     amenities?: string
+    images?: string[]
   }) => {
     return await request<{ room: any }>('/rooms', {
       method: 'POST',

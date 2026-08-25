@@ -167,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await authApi.register({
         fullName: data.name,
         email: data.email,
+        phone: data.phone,
         password: data.password,
         role: 'landlord',
       })

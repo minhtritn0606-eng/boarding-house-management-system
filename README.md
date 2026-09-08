@@ -12,6 +12,7 @@ The project consists of:
 - 📱 Mobile application for landlords to manage boarding houses and tenants.
 - ⚙️ RESTful API Backend.
 - 🗄️ MySQL Database.
+- 📘 [Tài liệu Chi tiết Kiến trúc & Chức năng (PROJECT_DOCUMENTATION.md)](PROJECT_DOCUMENTATION.md)
 
 ---
 

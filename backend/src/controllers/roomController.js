@@ -18,7 +18,7 @@ async function createRoomHandler(req, res) {
 
     const pool = await getPool();
 
-    // 1. Find or create landlord for this user
+    // 1. Find or create landlord record for this user
     let landlordId;
     const [landlords] = await pool.query('SELECT id FROM landlords WHERE user_id = ?', [userId]);
     if (landlords.length > 0) {
@@ -31,22 +31,35 @@ async function createRoomHandler(req, res) {
       landlordId = lRes.insertId;
     }
 
-    // 2. Find or create boarding house for this landlord
-    let targetHouseId = boardingHouseId ? Number(boardingHouseId) : null;
+    // 2. Validate or create a boarding house strictly belonging to this landlord
+    let targetHouseId = null;
+    if (boardingHouseId) {
+      const [validHouses] = await pool.query(
+        'SELECT id FROM boarding_houses WHERE id = ? AND landlord_id = ?',
+        [Number(boardingHouseId), landlordId]
+      );
+      if (validHouses.length > 0) {
+        targetHouseId = validHouses[0].id;
+      }
+    }
+
     if (!targetHouseId) {
-      const [houses] = await pool.query('SELECT id FROM boarding_houses WHERE landlord_id = ? LIMIT 1', [landlordId]);
+      const [houses] = await pool.query(
+        'SELECT id FROM boarding_houses WHERE landlord_id = ? ORDER BY id ASC LIMIT 1',
+        [landlordId]
+      );
       if (houses.length > 0) {
         targetHouseId = houses[0].id;
       } else {
         const [hRes] = await pool.query(
           'INSERT INTO boarding_houses (landlord_id, name, address, city, district) VALUES (?, ?, ?, ?, ?)',
-          [landlordId, 'Dãy trọ Đà Nẵng', '120 Ngô Thì Nhậm, Q. Liên Chiểu, Đà Nẵng', 'Đà Nẵng', 'Liên Chiểu']
+          [landlordId, 'Dãy trọ chính', 'TP. Đà Nẵng', 'Đà Nẵng', 'Liên Chiểu']
         );
         targetHouseId = hRes.insertId;
       }
     }
 
-    // 3. Create room in MySQL
+    // 3. Create room in MySQL with the landlord's boarding house
     const room = await createRoom({
       boardingHouseId: targetHouseId,
       title,

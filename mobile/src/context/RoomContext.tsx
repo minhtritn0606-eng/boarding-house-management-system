@@ -78,13 +78,17 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
   const getRoomsByOwner = (ownerEmail?: string) => {
     if (!ownerEmail) return rooms
-    return rooms.filter((r) => r.ownerEmail?.toLowerCase() === ownerEmail.toLowerCase())
+    const filtered = rooms.filter(
+      (r) => !r.ownerEmail || r.ownerEmail.toLowerCase() === ownerEmail.toLowerCase()
+    )
+    return filtered.length > 0 ? filtered : rooms
   }
 
   const addRoom = async (roomData: Omit<MobileRoom, 'id'>) => {
     try {
+      const targetHouseId = branches.length > 0 && branches[0]?.id ? Number(branches[0].id) : undefined
       const res = await mobileRoomApi.createRoom({
-        boardingHouseId: 1,
+        boardingHouseId: targetHouseId,
         title: `${roomData.roomNumber} - ${roomData.title}`,
         description: roomData.note || '',
         price: roomData.price,
@@ -93,20 +97,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         amenities: roomData.amenities,
       })
       if (res && res.room) {
-        const newRoom: MobileRoom = {
-          id: String(res.room.id),
-          houseName: res.room.address || roomData.houseName || 'Dãy trọ Hòa Khánh (Đà Nẵng)',
-          roomNumber: roomData.roomNumber,
-          title: res.room.title,
-          price: Number(res.room.price),
-          area: Number(res.room.area) || roomData.area,
-          roomType: res.room.roomType || roomData.roomType,
-          status: res.room.status || 'available',
-          ownerEmail: res.room.ownerEmail || roomData.ownerEmail,
-          amenities: Array.isArray(res.room.amenities) ? res.room.amenities : roomData.amenities,
-          floor: res.room.floor || roomData.floor || 1,
-        }
-        setRooms((prev) => [newRoom, ...prev])
+        await refreshRooms()
         return
       }
     } catch (e: any) {
@@ -116,6 +107,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     const newRoom: MobileRoom = {
       ...roomData,
       id: `m_room_${Date.now()}`,
+      ownerEmail: user?.email || roomData.ownerEmail || '',
     }
     setRooms((prev) => [newRoom, ...prev])
   }

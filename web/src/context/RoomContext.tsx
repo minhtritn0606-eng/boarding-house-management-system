@@ -34,18 +34,17 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   })
   const [isLoading, setIsLoading] = useState(false)
 
-  // Fetch live rooms from MySQL Backend API on mount
+  // Fetch live rooms from MySQL Backend API
   const refreshRooms = async () => {
     setIsLoading(true)
     try {
       const res = await roomApi.getPublishedRooms()
-      if (res && Array.isArray(res.rooms) && res.rooms.length > 0) {
+      if (res && Array.isArray(res.rooms)) {
         setRooms(res.rooms)
         localStorage.setItem(ROOMS_STORAGE_KEY, JSON.stringify(res.rooms))
-        return
       }
     } catch (err: any) {
-      console.warn('Backend offline or error, using local seed data:', err.message)
+      console.warn('Backend API fetch warning:', err.message)
     } finally {
       setIsLoading(false)
     }
@@ -55,46 +54,34 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     refreshRooms()
   }, [])
 
-  useEffect(() => {
-    try {
-      if (rooms.length > 0) {
-        localStorage.setItem(ROOMS_STORAGE_KEY, JSON.stringify(rooms))
-      }
-    } catch (e) {
-      console.error('Failed to save rooms to localStorage', e)
-    }
-  }, [rooms])
-
   const addRoom = async (roomData: Omit<Room, 'id' | 'postedDate'>): Promise<Room> => {
-    const today = new Date().toISOString().split('T')[0]
-    const nextId = rooms.length > 0 ? Math.max(...rooms.map((r) => r.id)) + 1 : 101
+    try {
+      const res = await roomApi.createRoom({
+        boardingHouseId: 1, // Default house
+        title: roomData.title,
+        description: roomData.description,
+        price: Number(roomData.price),
+        roomType: roomData.roomType,
+        area: Number(roomData.area) || 20,
+        amenities: Array.isArray(roomData.amenities) ? roomData.amenities.join(', ') : (roomData.amenities || ''),
+        images: roomData.images,
+      })
+      if (res && res.room) {
+        setRooms((prev) => [res.room, ...prev.filter((r) => r.id !== res.room.id)])
+        return res.room
+      }
+    } catch (e: any) {
+      console.warn('Backend createRoom error:', e.message)
+    }
 
+    const today = new Date().toISOString().split('T')[0]
+    const nextId = rooms.length > 0 ? Math.max(...rooms.map((r) => Number(r.id) || 0)) + 1 : 101
     const newLocalRoom: Room = {
       ...roomData,
       id: nextId,
       postedDate: today,
       status: roomData.status || 'available',
     }
-
-    try {
-      const res = await roomApi.createRoom({
-        boardingHouseId: 1, // Default house
-        title: roomData.title,
-        description: roomData.description,
-        price: roomData.price,
-        roomType: roomData.roomType,
-        area: roomData.area,
-        amenities: Array.isArray(roomData.amenities) ? roomData.amenities.join(', ') : roomData.amenities,
-        images: roomData.images,
-      })
-      if (res && res.room) {
-        setRooms((prev) => [res.room, ...prev])
-        return res.room
-      }
-    } catch (e: any) {
-      console.warn('Backend createRoom offline/fallback:', e.message)
-    }
-
     setRooms((prev) => [newLocalRoom, ...prev])
     return newLocalRoom
   }
@@ -105,7 +92,10 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     )
 
     try {
-      await roomApi.updateRoom(id, roomData)
+      const res = await roomApi.updateRoom(id, roomData)
+      if (res && res.room) {
+        setRooms((prev) => prev.map((r) => (r.id === id ? res.room : r)))
+      }
     } catch (e: any) {
       console.warn('Backend updateRoom error:', e.message)
     }
@@ -130,7 +120,10 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     )
 
     try {
-      await roomApi.updateRoom(id, { status: nextStatus })
+      const res = await roomApi.updateRoom(id, { status: nextStatus })
+      if (res && res.room) {
+        setRooms((prev) => prev.map((r) => (r.id === id ? res.room : r)))
+      }
     } catch (e: any) {
       console.warn('Backend toggle status error:', e.message)
     }

@@ -167,6 +167,17 @@ export const tenantApi = {
       body: JSON.stringify(data),
     })
   },
+  updateTenant: async (id: number | string, data: any) => {
+    return await request<{ tenant: any }>(`/tenants/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+  deleteTenant: async (id: number | string) => {
+    return await request<{ message: string }>(`/tenants/${id}`, {
+      method: 'DELETE',
+    })
+  },
 }
 
 export const contractApi = {
@@ -196,6 +207,11 @@ export const billApi = {
     return await request<{ bill: any }>(`/bills/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    })
+  },
+  deleteBill: async (id: number | string) => {
+    return await request<{ message: string }>(`/bills/${id}`, {
+      method: 'DELETE',
     })
   },
 }

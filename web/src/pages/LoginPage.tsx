@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login, register, demoAccounts } = useAuth()
+  const { login, register } = useAuth()
 
   const [tab, setTab] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
@@ -45,16 +45,6 @@ export default function LoginPage() {
       navigate(from, { replace: true })
     } else {
       setError(res.error || 'Đăng ký thất bại')
-    }
-  }
-
-  const handleQuickDemoLogin = async (demoEmail: string) => {
-    setError('')
-    setLoading(true)
-    const res = await login(demoEmail, '123456')
-    setLoading(false)
-    if (res.success) {
-      navigate(from, { replace: true })
     }
   }
 
@@ -179,26 +169,6 @@ export default function LoginPage() {
             </button>
           </form>
         )}
-
-        {/* Demo Fast Login Section */}
-        <div className="demo-accounts-box">
-          <div className="demo-title">
-            <span>⚡ Thử nghiệm nhanh với tài khoản mẫu:</span>
-          </div>
-          <div className="demo-list">
-            {demoAccounts.map((acc) => (
-              <button
-                key={acc.email}
-                type="button"
-                className="demo-account-chip"
-                onClick={() => handleQuickDemoLogin(acc.email)}
-              >
-                <div className="demo-name">{acc.name}</div>
-                <div className="demo-label">{acc.label}</div>
-              </button>
-            ))}
-          </div>
-        </div>
 
         <div className="auth-back-link">
           <Link to="/">← Quay về Trang chủ</Link>

@@ -109,10 +109,54 @@ async function deleteHouse(id) {
   await pool.query('DELETE FROM boarding_houses WHERE id = ?', [id]);
 }
 
+async function listAllHouses(filters = {}) {
+  await ensureHousesTable();
+  const pool = await getPool();
+
+  let query = `
+    SELECT h.*, 
+           COUNT(r.id) AS total_rooms,
+           u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+    FROM boarding_houses h
+    LEFT JOIN rooms r ON h.id = r.boarding_house_id
+    LEFT JOIN landlords l ON h.landlord_id = l.id
+    LEFT JOIN users u ON l.user_id = u.id
+    WHERE 1=1
+  `;
+  const values = [];
+
+  if (filters.userId) {
+    query += ' AND l.user_id = ?';
+    values.push(filters.userId);
+  } else if (filters.landlordId) {
+    query += ' AND h.landlord_id = ?';
+    values.push(filters.landlordId);
+  }
+
+  query += ' GROUP BY h.id ORDER BY h.id ASC';
+
+  const [rows] = await pool.query(query, values);
+  return rows.map((row) => ({
+    id: String(row.id),
+    name: row.name,
+    address: row.address,
+    city: row.city,
+    district: row.district || 'Liên Chiểu',
+    description: row.description || '',
+    totalRooms: Number(row.total_rooms) || 0,
+    ownerName: row.owner_name || 'Chủ trọ',
+    ownerEmail: row.owner_email || 'nam.owner@example.com',
+    ownerPhone: row.owner_phone || '0905 888 999',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
 module.exports = {
   createHouse,
   findHouseById,
   findHousesByLandlord,
+  listAllHouses,
   updateHouse,
   deleteHouse,
 };

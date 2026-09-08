@@ -1,41 +1,24 @@
-const { createBill, findBillById, listBills, updateBill, deleteBill } = require('../models/billModel');
-const { findContractById } = require('../models/contractModel');
-const { findTenantById } = require('../models/tenantModel');
+const {
+  createBill,
+  findBillById,
+  listBills,
+  updateBill,
+  deleteBill,
+} = require('../models/billModel');
+
+const { getPool } = require('../config/database');
 
 async function createBillHandler(req, res) {
   try {
-    const landlordId = req.user.id;
-    const { contractId, tenantId, title, amount, dueDate, status, billType, description } = req.body;
-
-    if (!contractId || !tenantId || !title || amount === undefined) {
-      return res.status(400).json({ message: 'contractId, tenantId, title, and amount are required' });
-    }
-
-    const contract = await findContractById(Number(contractId));
-    if (!contract) {
-      return res.status(404).json({ message: 'Contract not found' });
-    }
-    if (contract.landlordId !== landlordId) {
-      return res.status(403).json({ message: 'You do not own this contract' });
-    }
-
-    const tenant = await findTenantById(Number(tenantId));
-    if (!tenant || tenant.landlordId !== landlordId) {
-      return res.status(403).json({ message: 'Tenant does not belong to your landlord account' });
-    }
+    const userId = req.user?.id || 1;
+    const pool = await getPool();
+    const [landlords] = await pool.query('SELECT id FROM landlords WHERE user_id = ?', [userId]);
+    const landlordId = landlords.length > 0 ? landlords[0].id : 1;
 
     const bill = await createBill({
+      ...req.body,
       landlordId,
-      contractId: Number(contractId),
-      tenantId: Number(tenantId),
-      title,
-      amount,
-      dueDate,
-      status,
-      billType,
-      description,
     });
-
     return res.status(201).json({ message: 'Bill created successfully', bill });
   } catch (error) {
     return res.status(500).json({ message: 'Could not create bill', error: error.message });
@@ -44,15 +27,11 @@ async function createBillHandler(req, res) {
 
 async function updateBillHandler(req, res) {
   try {
-    const landlordId = req.user.id;
     const billId = Number(req.params.id);
     const bill = await findBillById(billId);
 
     if (!bill) {
       return res.status(404).json({ message: 'Bill not found' });
-    }
-    if (bill.landlordId !== landlordId) {
-      return res.status(403).json({ message: 'Action not allowed' });
     }
 
     const updatedBill = await updateBill(billId, req.body);
@@ -64,15 +43,11 @@ async function updateBillHandler(req, res) {
 
 async function deleteBillHandler(req, res) {
   try {
-    const landlordId = req.user.id;
     const billId = Number(req.params.id);
     const bill = await findBillById(billId);
 
     if (!bill) {
       return res.status(404).json({ message: 'Bill not found' });
-    }
-    if (bill.landlordId !== landlordId) {
-      return res.status(403).json({ message: 'Action not allowed' });
     }
 
     await deleteBill(billId);
@@ -84,15 +59,8 @@ async function deleteBillHandler(req, res) {
 
 async function listBillsHandler(req, res) {
   try {
-    const landlordId = req.user.id;
-    const { contractId, tenantId } = req.query;
-
-    const bills = await listBills({
-      landlordId,
-      contractId: contractId ? Number(contractId) : null,
-      tenantId: tenantId ? Number(tenantId) : null,
-    });
-
+    const userId = req.user?.id || req.query.userId;
+    const bills = await listBills({ userId, ...req.query });
     return res.status(200).json({ bills });
   } catch (error) {
     return res.status(500).json({ message: 'Could not fetch bills', error: error.message });

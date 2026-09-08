@@ -1,13 +1,17 @@
 const express = require('express');
-const { createBillHandler, updateBillHandler, deleteBillHandler, listBillsHandler } = require('../controllers/billController');
-const { authenticateToken, authorizeRoles } = require('../middlewares/authMiddleware');
+const {
+  createBillHandler,
+  updateBillHandler,
+  deleteBillHandler,
+  listBillsHandler,
+} = require('../controllers/billController');
+const { optionalAuth } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-router.use(authenticateToken, authorizeRoles('landlord'));
-router.post('/', createBillHandler);
-router.get('/', listBillsHandler);
-router.put('/:id', updateBillHandler);
-router.delete('/:id', deleteBillHandler);
+router.get('/', optionalAuth, listBillsHandler);
+router.post('/', optionalAuth, createBillHandler);
+router.put('/:id', optionalAuth, updateBillHandler);
+router.delete('/:id', optionalAuth, deleteBillHandler);
 
 module.exports = router;

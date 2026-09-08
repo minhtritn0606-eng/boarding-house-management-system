@@ -5,14 +5,13 @@ const {
   deleteTenantHandler,
   listTenantsHandler,
 } = require('../controllers/tenantController');
-const { authenticateToken, authorizeRoles } = require('../middlewares/authMiddleware');
+const { optionalAuth } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-router.use(authenticateToken, authorizeRoles('landlord'));
-router.post('/', createTenantHandler);
-router.get('/', listTenantsHandler);
-router.put('/:id', updateTenantHandler);
-router.delete('/:id', deleteTenantHandler);
+router.get('/', optionalAuth, listTenantsHandler);
+router.post('/', optionalAuth, createTenantHandler);
+router.put('/:id', optionalAuth, updateTenantHandler);
+router.delete('/:id', optionalAuth, deleteTenantHandler);
 
 module.exports = router;

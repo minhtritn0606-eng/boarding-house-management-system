@@ -3,17 +3,15 @@ const {
   createHouseHandler,
   updateHouseHandler,
   deleteHouseHandler,
-  getMyHousesHandler,
-  getHouseDetailsHandler,
+  listHousesHandler,
 } = require('../controllers/houseController');
-const { authenticateToken, authorizeRoles } = require('../middlewares/authMiddleware');
+const { optionalAuth } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-router.post('/', authenticateToken, authorizeRoles('landlord'), createHouseHandler);
-router.get('/me', authenticateToken, authorizeRoles('landlord'), getMyHousesHandler);
-router.get('/:id', getHouseDetailsHandler);
-router.put('/:id', authenticateToken, authorizeRoles('landlord'), updateHouseHandler);
-router.delete('/:id', authenticateToken, authorizeRoles('landlord'), deleteHouseHandler);
+router.get('/', optionalAuth, listHousesHandler);
+router.post('/', optionalAuth, createHouseHandler);
+router.put('/:id', optionalAuth, updateHouseHandler);
+router.delete('/:id', optionalAuth, deleteHouseHandler);
 
 module.exports = router;

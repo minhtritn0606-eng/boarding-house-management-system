@@ -221,6 +221,17 @@ async function listPublishedRooms(filters = {}) {
     values.push(filters.status.toLowerCase());
   }
 
+  if (filters.userId) {
+    query += ' AND (l.user_id = ?)';
+    values.push(filters.userId);
+  } else if (filters.landlordId) {
+    query += ' AND (h.landlord_id = ?)';
+    values.push(filters.landlordId);
+  } else if (filters.ownerEmail) {
+    query += ' AND (LOWER(u.email) = ?)';
+    values.push(filters.ownerEmail.toLowerCase());
+  }
+
   query += ' ORDER BY r.id ASC';
 
   const [rows] = await pool.query(query, values);

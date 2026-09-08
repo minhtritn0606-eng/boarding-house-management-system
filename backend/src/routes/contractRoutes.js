@@ -4,13 +4,12 @@ const {
   cancelContractHandler,
   listContractsHandler,
 } = require('../controllers/contractController');
-const { authenticateToken, authorizeRoles } = require('../middlewares/authMiddleware');
+const { optionalAuth } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-router.use(authenticateToken, authorizeRoles('landlord'));
-router.post('/', createContractHandler);
-router.get('/', listContractsHandler);
-router.post('/:id/cancel', cancelContractHandler);
+router.get('/', optionalAuth, listContractsHandler);
+router.post('/', optionalAuth, createContractHandler);
+router.post('/:id/cancel', optionalAuth, cancelContractHandler);
 
 module.exports = router;

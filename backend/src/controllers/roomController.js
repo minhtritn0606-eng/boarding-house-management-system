@@ -131,7 +131,13 @@ async function getRoomDetailsHandler(req, res) {
 
 async function listPublishedRoomsHandler(req, res) {
   try {
-    const { search, city, minPrice, maxPrice, roomType, status } = req.query;
+    const { search, city, minPrice, maxPrice, roomType, status, landlordId, ownerEmail, mine } = req.query;
+    
+    let userId = req.query.userId;
+    if (mine === 'true' || req.query.mine === '1' || (req.user?.id && req.query.public !== 'true')) {
+      userId = req.user?.id;
+    }
+
     const rooms = await listPublishedRooms({
       search,
       city,
@@ -139,6 +145,9 @@ async function listPublishedRoomsHandler(req, res) {
       maxPrice,
       roomType,
       status,
+      userId,
+      landlordId,
+      ownerEmail,
     });
     return res.status(200).json({ rooms });
   } catch (error) {

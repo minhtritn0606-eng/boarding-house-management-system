@@ -5,14 +5,16 @@
 
 import { Platform } from 'react-native'
 
-// Auto-detect host based on execution platform
+// Host IP of backend server (your PC's LAN IP: 192.168.106.94)
+const LAN_HOST = '192.168.106.94'
+
 const getDefaultHost = () => {
-  if (Platform.OS === 'android') {
-    // Android emulator special alias for host machine localhost
-    return 'http://10.0.2.2:5000/api'
+  // If running on web
+  if (Platform.OS === 'web') {
+    return 'http://localhost:5000/api'
   }
-  // iOS simulator or Web
-  return 'http://localhost:5000/api'
+  // For real mobile device on Wi-Fi or emulator
+  return `http://${LAN_HOST}:5000/api`
 }
 
 let customApiUrl: string | null = null
@@ -137,6 +139,17 @@ export const mobileTenantApi = {
       body: JSON.stringify(data),
     })
   },
+  updateTenant: async (id: number | string, data: any) => {
+    return await mobileRequest<{ tenant: any }>(`/tenants/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+  deleteTenant: async (id: number | string) => {
+    return await mobileRequest<{ message: string }>(`/tenants/${id}`, {
+      method: 'DELETE',
+    })
+  },
 }
 
 // ================= CONTRACTS =================
@@ -167,6 +180,11 @@ export const mobileBillApi = {
     return await mobileRequest<{ bill: any }>(`/bills/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    })
+  },
+  deleteBill: async (id: number | string) => {
+    return await mobileRequest<{ message: string }>(`/bills/${id}`, {
+      method: 'DELETE',
     })
   },
 }

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { BillItem, UtilitySettings, BillStatus } from '../types/bill'
 import { mobileBillApi } from '../services/api'
+import { useAuth } from './AuthContext'
 
 interface BillContextType {
   bills: BillItem[]
@@ -24,145 +25,11 @@ const DEFAULT_UTILITY_SETTINGS: UtilitySettings = {
   trashFee: 30000,
 }
 
-const INITIAL_BILLS: BillItem[] = [
-  {
-    id: 'bill_101_8',
-    roomNumber: 'P.101',
-    houseName: 'Dãy trọ Hòa Khánh (Đà Nẵng)',
-    tenantName: 'Nguyễn Văn Hùng',
-    tenantPhone: '0978 111 222',
-    month: 8,
-    year: 2026,
-    roomFee: 2500000,
-    oldElectricMeter: 1420,
-    newElectricMeter: 1485,
-    electricUsage: 65,
-    electricRate: 3500,
-    electricAmount: 227500,
-    oldWaterMeter: 110,
-    newWaterMeter: 116,
-    waterUsage: 6,
-    waterRate: 15000,
-    waterAmount: 90000,
-    internetFee: 100000,
-    trashFee: 30000,
-    totalAmount: 2947500,
-    status: 'paid',
-    dueDate: '2026-08-10',
-    paidDate: '2026-08-05',
-    paymentMethod: 'banking',
-  },
-  {
-    id: 'bill_102_8',
-    roomNumber: 'P.102',
-    houseName: 'Dãy trọ Hòa Khánh (Đà Nẵng)',
-    tenantName: 'Trần Thị Mai',
-    tenantPhone: '0912 333 444',
-    month: 8,
-    year: 2026,
-    roomFee: 2200000,
-    oldElectricMeter: 890,
-    newElectricMeter: 940,
-    electricUsage: 50,
-    electricRate: 3500,
-    electricAmount: 175000,
-    oldWaterMeter: 75,
-    newWaterMeter: 79,
-    waterUsage: 4,
-    waterRate: 15000,
-    waterAmount: 60000,
-    internetFee: 100000,
-    trashFee: 30000,
-    totalAmount: 2565000,
-    status: 'paid',
-    dueDate: '2026-08-10',
-    paidDate: '2026-08-07',
-    paymentMethod: 'banking',
-  },
-  {
-    id: 'bill_201_8',
-    roomNumber: 'P.201',
-    houseName: 'Dãy trọ Hòa Khánh (Đà Nẵng)',
-    tenantName: 'Lê Hoàng Long',
-    tenantPhone: '0905 555 666',
-    month: 8,
-    year: 2026,
-    roomFee: 3200000,
-    oldElectricMeter: 2100,
-    newElectricMeter: 2210,
-    electricUsage: 110,
-    electricRate: 3500,
-    electricAmount: 385000,
-    oldWaterMeter: 180,
-    newWaterMeter: 188,
-    waterUsage: 8,
-    waterRate: 15000,
-    waterAmount: 120000,
-    internetFee: 100000,
-    trashFee: 30000,
-    totalAmount: 3835000,
-    status: 'unpaid',
-    dueDate: '2026-08-25',
-    note: 'Đã gửi phiếu thu qua Zalo',
-  },
-  {
-    id: 'bill_203_8',
-    roomNumber: 'P.203',
-    houseName: 'Dãy trọ Hòa Khánh (Đà Nẵng)',
-    tenantName: 'Phạm Quỳnh Như',
-    tenantPhone: '0934 777 888',
-    month: 8,
-    year: 2026,
-    roomFee: 2400000,
-    oldElectricMeter: 1050,
-    newElectricMeter: 1115,
-    electricUsage: 65,
-    electricRate: 3500,
-    electricAmount: 227500,
-    oldWaterMeter: 90,
-    newWaterMeter: 95,
-    waterUsage: 5,
-    waterRate: 15000,
-    waterAmount: 75000,
-    internetFee: 100000,
-    trashFee: 30000,
-    totalAmount: 2832500,
-    status: 'unpaid',
-    dueDate: '2026-08-25',
-  },
-  {
-    id: 'bill_301_8',
-    roomNumber: 'P.301',
-    houseName: 'Nhà trọ Cẩm Lệ (Đà Nẵng)',
-    tenantName: 'Võ Minh Trí',
-    tenantPhone: '0988 999 000',
-    month: 8,
-    year: 2026,
-    roomFee: 4000000,
-    oldElectricMeter: 3400,
-    newElectricMeter: 3520,
-    electricUsage: 120,
-    electricRate: 3500,
-    electricAmount: 420000,
-    oldWaterMeter: 240,
-    newWaterMeter: 248,
-    waterUsage: 8,
-    waterRate: 15000,
-    waterAmount: 120000,
-    internetFee: 100000,
-    trashFee: 30000,
-    totalAmount: 4670000,
-    status: 'paid',
-    dueDate: '2026-08-10',
-    paidDate: '2026-08-04',
-    paymentMethod: 'banking',
-  },
-]
-
 const BillContext = createContext<BillContextType | undefined>(undefined)
 
 export function BillProvider({ children }: { children: React.ReactNode }) {
-  const [bills, setBills] = useState<BillItem[]>(INITIAL_BILLS)
+  const { user, isAuthenticated } = useAuth()
+  const [bills, setBills] = useState<BillItem[]>([])
   const [utilitySettings, setUtilitySettings] = useState<UtilitySettings>(DEFAULT_UTILITY_SETTINGS)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -170,37 +37,43 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true)
     try {
       const res = await mobileBillApi.getBills()
-      if (res && Array.isArray(res.bills) && res.bills.length > 0) {
-        const mapped: BillItem[] = res.bills.map((b: any, idx: number) => ({
+      if (res && Array.isArray(res.bills)) {
+        const mapped: BillItem[] = res.bills.map((b: any) => ({
           id: String(b.id),
-          roomNumber: b.title || `P.${100 + idx + 1}`,
-          houseName: 'Dãy trọ Hòa Khánh (Đà Nẵng)',
-          tenantName: 'Khách thuê',
-          tenantPhone: '0905 888 999',
-          month: 8,
-          year: 2026,
-          roomFee: Number(b.amount) || 2500000,
-          oldElectricMeter: 1000,
-          newElectricMeter: 1050,
-          electricUsage: 50,
-          electricRate: 3500,
-          electricAmount: 175000,
-          oldWaterMeter: 50,
-          newWaterMeter: 54,
-          waterUsage: 4,
-          waterRate: 15000,
-          waterAmount: 60000,
-          internetFee: 100000,
-          trashFee: 30000,
-          totalAmount: Number(b.amount) || 2735000,
+          roomNumber: b.roomNumber || `P.${b.roomId || '101'}`,
+          houseName: b.houseName || 'Nhà trọ',
+          tenantName: b.tenantName || 'Khách thuê',
+          tenantPhone: b.tenantPhone || '',
+          month: Number(b.month) || (new Date().getMonth() + 1),
+          year: Number(b.year) || new Date().getFullYear(),
+          roomFee: Number(b.roomFee) || 0,
+          oldElectricMeter: Number(b.oldElectricMeter) || 0,
+          newElectricMeter: Number(b.newElectricMeter) || 0,
+          electricUsage: Number(b.electricUsage) || 0,
+          electricRate: Number(b.electricRate) || 3500,
+          electricAmount: Number(b.electricAmount) || 0,
+          oldWaterMeter: Number(b.oldWaterMeter) || 0,
+          newWaterMeter: Number(b.newWaterMeter) || 0,
+          waterUsage: Number(b.waterUsage) || 0,
+          waterRate: Number(b.waterRate) || 15000,
+          waterAmount: Number(b.waterAmount) || 0,
+          internetFee: Number(b.internetFee) || 0,
+          trashFee: Number(b.trashFee) || 0,
+          otherFee: Number(b.otherFee) || 0,
+          totalAmount: Number(b.totalAmount) || 0,
           status: (b.status === 'paid' ? 'paid' : 'unpaid') as BillStatus,
-          dueDate: b.dueDate || '2026-08-25',
-          note: b.description,
+          dueDate: b.dueDate || '',
+          paidDate: b.paidDate,
+          paymentMethod: b.paymentMethod,
+          note: b.note || '',
         }))
         setBills(mapped)
+      } else {
+        setBills([])
       }
     } catch (e: any) {
-      console.log('Mobile bill fetch fallback:', e.message)
+      console.log('Mobile bill fetch error:', e.message)
+      setBills([])
     } finally {
       setIsLoading(false)
     }
@@ -208,7 +81,7 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshBills()
-  }, [])
+  }, [user?.id, isAuthenticated])
 
   const updateUtilitySettings = (settings: Partial<UtilitySettings>) => {
     setUtilitySettings((prev) => ({ ...prev, ...settings }))
@@ -235,22 +108,38 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
       totalAmount,
     }
 
-    setBills((prev) => [newBill, ...prev])
-
     try {
-      await mobileBillApi.createBill({
-        landlordId: 1,
-        contractId: 1,
-        tenantId: 1,
-        title: `Phòng ${data.roomNumber}`,
-        amount: totalAmount,
+      const res = await mobileBillApi.createBill({
+        landlordId: user?.id || 1,
+        month: `${data.year}-${String(data.month).padStart(2, '0')}-01`,
+        roomFee: data.roomFee,
+        oldElectricMeter: data.oldElectricMeter,
+        newElectricMeter: data.newElectricMeter,
+        electricityUnits: electricUsage,
+        electricRate: data.electricRate,
+        electricityAmount: electricAmount,
+        oldWaterMeter: data.oldWaterMeter,
+        newWaterMeter: data.newWaterMeter,
+        waterUnits: waterUsage,
+        waterRate: data.waterRate,
+        waterAmount: waterAmount,
+        internetFee: data.internetFee,
+        trashFee: data.trashFee,
+        otherFee: other,
+        totalAmount,
         dueDate: data.dueDate,
         status: data.status,
-        description: data.note,
+        note: data.note,
       })
+      if (res && res.bill) {
+        setBills((prev) => [res.bill, ...prev])
+        return
+      }
     } catch (e: any) {
-      console.log('Mobile create bill sync fallback:', e.message)
+      console.log('Mobile create bill error:', e.message)
     }
+
+    setBills((prev) => [newBill, ...prev])
   }
 
   const updateBill = async (id: string, updatedData: Partial<BillItem>) => {
@@ -287,12 +176,17 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     try {
       await mobileBillApi.updateBill(id, updatedData)
     } catch (e: any) {
-      // fallback
+      console.log('Mobile update bill error:', e.message)
     }
   }
 
   const deleteBill = async (id: string) => {
     setBills((prev) => prev.filter((b) => b.id !== id))
+    try {
+      await mobileBillApi.deleteBill(id)
+    } catch (e: any) {
+      console.log('Mobile delete bill error:', e.message)
+    }
   }
 
   const markAsPaid = async (id: string, method: 'cash' | 'banking' = 'banking') => {
@@ -311,9 +205,9 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     )
 
     try {
-      await mobileBillApi.updateBill(id, { status: 'paid' })
+      await mobileBillApi.updateBill(id, { status: 'paid', paymentMethod: method })
     } catch (e: any) {
-      // fallback
+      console.log('Mobile mark as paid error:', e.message)
     }
   }
 

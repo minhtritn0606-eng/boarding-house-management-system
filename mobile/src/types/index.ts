@@ -6,10 +6,3 @@ export interface LandlordUser {
   role: 'landlord'
   avatar?: string
 }
-
-export interface DemoAccount {
-  name: string
-  email: string
-  phone: string
-  label: string
-}

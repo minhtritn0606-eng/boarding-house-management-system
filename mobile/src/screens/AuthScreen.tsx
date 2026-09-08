@@ -13,10 +13,9 @@ import {
   Platform,
 } from 'react-native'
 import { useAuth } from '../context/AuthContext'
-import type { DemoAccount } from '../types'
 
 export default function AuthScreen() {
-  const { login, register, loginWithDemo, demoAccounts, isLoading } = useAuth()
+  const { login, register, isLoading } = useAuth()
 
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
   const [errorMessage, setErrorMessage] = useState('')
@@ -55,11 +54,6 @@ export default function AuthScreen() {
     if (!result.success) {
       setErrorMessage(result.error || 'Đăng ký không thành công')
     }
-  }
-
-  const handleDemoSelect = (demo: DemoAccount) => {
-    setErrorMessage('')
-    loginWithDemo(demo)
   }
 
   return (
@@ -164,28 +158,6 @@ export default function AuthScreen() {
                     <Text style={styles.submitBtnText}>Đăng nhập ngay ➔</Text>
                   )}
                 </TouchableOpacity>
-
-                {/* Demo Accounts Section */}
-                <View style={styles.demoSection}>
-                  <Text style={styles.demoHeading}>⚡ Hoặc đăng nhập nhanh bằng tài khoản Demo:</Text>
-                  {demoAccounts.map((item, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.demoCard}
-                      onPress={() => handleDemoSelect(item)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.demoAvatar}>
-                        <Text style={styles.demoAvatarText}>👤</Text>
-                      </View>
-                      <View style={styles.demoInfo}>
-                        <Text style={styles.demoName}>{item.name}</Text>
-                        <Text style={styles.demoLabel}>{item.label}</Text>
-                      </View>
-                      <Text style={styles.demoArrow}>➔</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
               </View>
             ) : (
               /* Register Form */
@@ -417,62 +389,6 @@ const styles = StyleSheet.create({
   submitBtnText: {
     color: '#ffffff',
     fontSize: 15,
-    fontWeight: '700',
-  },
-  demoSection: {
-    marginTop: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    gap: 8,
-  },
-  demoHeading: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  demoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 10,
-  },
-  demoAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#eff6ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  demoAvatarText: {
-    fontSize: 16,
-  },
-  demoInfo: {
-    flex: 1,
-  },
-  demoName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  demoLabel: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 1,
-  },
-  demoArrow: {
-    fontSize: 13,
-    color: '#2563eb',
     fontWeight: '700',
   },
   footerText: {

@@ -11,13 +11,13 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
-    "typescript": "^5.3.3"
+    "typescript": "~5.9.2"
   },
   "scripts": {
-    "start": "npx expo start",
-    "android": "npx expo start --android",
-    "ios": "npx expo start --ios",
-    "web": "npx expo start --web"
+    "start": "npx expo start --offline",
+    "android": "npx expo start --android --offline",
+    "ios": "npx expo start --ios --offline",
+    "web": "npx expo start --web --offline"
   },
   "private": true
 }

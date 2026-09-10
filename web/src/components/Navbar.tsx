@@ -29,6 +29,13 @@ export default function Navbar() {
         <li>
           <NavLink to="/contact">Liên hệ</NavLink>
         </li>
+        {isAuthenticated && user?.role === 'admin' && (
+          <li>
+            <NavLink to="/admin" style={{ color: '#2563eb', fontWeight: '700' }}>
+              🛡️ Quản trị Admin
+            </NavLink>
+          </li>
+        )}
       </ul>
 
       <div className="nav-actions">

@@ -11,6 +11,7 @@ import ContactPage from './pages/ContactPage'
 import LoginPage from './pages/LoginPage'
 import CreateRoomPage from './pages/CreateRoomPage'
 import MyRoomsPage from './pages/MyRoomsPage'
+import AdminDashboardPage from './pages/AdminDashboardPage'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/create-room" element={<CreateRoomPage />} />
                 <Route path="/my-rooms" element={<MyRoomsPage />} />
+                <Route path="/admin" element={<AdminDashboardPage />} />
               </Routes>
             </div>
             <Footer />

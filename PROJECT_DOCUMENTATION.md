@@ -175,6 +175,30 @@ Cơ sở dữ liệu `boarding_house_db` được chuẩn hóa với các bảng
   - `GET /api/tenants` & `POST /api/tenants` & `PUT /api/tenants/:id` & `DELETE /api/tenants/:id`: Quản lý khách thuê.
   - `GET /api/bills` & `POST /api/bills` & `PUT /api/bills/:id` & `DELETE /api/bills/:id`: Quản lý hóa đơn.
   - `GET /api/contracts`: Quản lý hợp đồng thuê.
+  - `GET /api/admin/stats`: Thống kê tổng hợp toàn sàn cho Admin.
+  - `GET /api/admin/users` & `PUT /api/admin/users/:id/role` & `DELETE /api/admin/users/:id`: Quản trị tài khoản & phân quyền.
+  - `GET /api/admin/rooms` & `PATCH /api/admin/rooms/:id/toggle-publish` & `DELETE /api/admin/rooms/:id`: Kiểm duyệt & gỡ bài đăng phòng.
+  - `GET /api/admin/bills`: Giám sát hóa đơn & doanh thu toàn sàn.
+
+---
+
+### 5.4. 🛡️ Phân hệ Web Admin (Quản trị viên Hệ thống)
+- **Tổng quan & Chỉ số KPI (Dashboard Overview)**:
+  - Tổng số người dùng (Phân loại Chủ trọ, Khách thuê, Admin).
+  - Tổng số bài đăng phòng trọ (Đã duyệt hiển thị, Đang ẩn, Còn trống, Đã thuê).
+  - Tỷ lệ lấp đầy phòng toàn sàn và Doanh thu/Hóa đơn tổng hợp.
+- **Quản lý Tài khoản (User Management)**:
+  - Danh sách tài khoản người dùng, tìm kiếm theo tên, email, SĐT.
+  - Lọc tài khoản theo vai trò (`admin`, `landlord`, `tenant`, `visitor`).
+  - Thay đổi vai trò người dùng (phân quyền) trực tiếp trên giao diện.
+  - Khóa/Xóa tài khoản vi phạm chính sách cộng đồng.
+- **Kiểm duyệt Tin đăng & Phòng trọ (Listing Moderation)**:
+  - Xem danh sách toàn bộ phòng trọ kèm thông tin chủ sở hữu.
+  - Bật/Tắt trạng thái hiển thị (Duyệt bài đăng / Ẩn bài đăng) chỉ với 1 click.
+  - Cưỡng chế xóa bài đăng phòng trọ vi phạm quy định sàn.
+- **Giám sát Hóa đơn & Giao dịch (Bills Monitoring)**:
+  - Theo dõi toàn bộ hóa đơn tiền phòng và điện/nước của tất cả các dãy trọ.
+  - Lọc theo trạng thái đã thanh toán / chưa thanh toán.
 
 ---
 

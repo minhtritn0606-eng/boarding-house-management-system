@@ -215,3 +215,89 @@ export const billApi = {
     })
   },
 }
+
+// ================= ADMIN API =================
+export interface AdminStats {
+  users: {
+    total_users: number
+    total_landlords: number
+    total_tenants: number
+    total_admins: number
+    total_visitors: number
+  }
+  rooms: {
+    total_rooms: number
+    published_rooms: number
+    hidden_rooms: number
+    rented_rooms: number
+    available_rooms: number
+    average_price: number | null
+  }
+  houses: {
+    total_houses: number
+  }
+  bills: {
+    total_bills: number
+    paid_bills: number
+    unpaid_bills: number
+    total_revenue: number
+  }
+}
+
+export const adminApi = {
+  getStats: async () => {
+    return await request<AdminStats>('/admin/stats')
+  },
+
+  getUsers: async (params: { search?: string; role?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (params.search) query.append('search', params.search)
+    if (params.role && params.role !== 'all') query.append('role', params.role)
+    const qs = query.toString() ? `?${query.toString()}` : ''
+    return await request<{ users: any[] }>(`/admin/users${qs}`)
+  },
+
+  updateUserRole: async (userId: number | string, role: string) => {
+    return await request<{ message: string; userId: number; role: string }>(`/admin/users/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    })
+  },
+
+  deleteUser: async (userId: number | string) => {
+    return await request<{ message: string; userId: number }>(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  getRooms: async (params: { search?: string; status?: string; isPublished?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (params.search) query.append('search', params.search)
+    if (params.status && params.status !== 'all') query.append('status', params.status)
+    if (params.isPublished && params.isPublished !== 'all') query.append('isPublished', params.isPublished)
+    const qs = query.toString() ? `?${query.toString()}` : ''
+    return await request<{ rooms: any[] }>(`/admin/rooms${qs}`)
+  },
+
+  toggleRoomPublish: async (roomId: number | string) => {
+    return await request<{ message: string; roomId: number; isPublished: boolean }>(
+      `/admin/rooms/${roomId}/toggle-publish`,
+      {
+        method: 'PATCH',
+      }
+    )
+  },
+
+  deleteRoom: async (roomId: number | string) => {
+    return await request<{ message: string; roomId: number }>(`/admin/rooms/${roomId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  getBills: async (params: { status?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (params.status && params.status !== 'all') query.append('status', params.status)
+    const qs = query.toString() ? `?${query.toString()}` : ''
+    return await request<{ bills: any[] }>(`/admin/bills${qs}`)
+  },
+}

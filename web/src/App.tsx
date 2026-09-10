@@ -18,22 +18,32 @@ export default function App() {
     <AuthProvider>
       <RoomProvider>
         <BrowserRouter>
-          <div className="app-shell">
-            <Navbar />
-            <div className="container">
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/rooms" element={<ListingPage />} />
-                <Route path="/rooms/:id" element={<DetailPage />} />
-                <Route path="/contact" element={<ContactPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/create-room" element={<CreateRoomPage />} />
-                <Route path="/my-rooms" element={<MyRoomsPage />} />
-                <Route path="/admin" element={<AdminDashboardPage />} />
-              </Routes>
-            </div>
-            <Footer />
-          </div>
+          <Routes>
+            {/* 🛡️ Trang Admin độc lập với giao diện riêng biệt toàn màn hình */}
+            <Route path="/admin" element={<AdminDashboardPage />} />
+
+            {/* 🌐 Các trang công khai dành cho Người tìm trọ & Chủ trọ */}
+            <Route
+              path="*"
+              element={
+                <div className="app-shell">
+                  <Navbar />
+                  <div className="container">
+                    <Routes>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/rooms" element={<ListingPage />} />
+                      <Route path="/rooms/:id" element={<DetailPage />} />
+                      <Route path="/contact" element={<ContactPage />} />
+                      <Route path="/login" element={<LoginPage />} />
+                      <Route path="/create-room" element={<CreateRoomPage />} />
+                      <Route path="/my-rooms" element={<MyRoomsPage />} />
+                    </Routes>
+                  </div>
+                  <Footer />
+                </div>
+              }
+            />
+          </Routes>
         </BrowserRouter>
       </RoomProvider>
     </AuthProvider>

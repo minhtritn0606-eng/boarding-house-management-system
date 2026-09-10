@@ -29,13 +29,6 @@ export default function Navbar() {
         <li>
           <NavLink to="/contact">Liên hệ</NavLink>
         </li>
-        {isAuthenticated && user?.role === 'admin' && (
-          <li>
-            <NavLink to="/admin" style={{ color: '#2563eb', fontWeight: '700' }}>
-              🛡️ Quản trị Admin
-            </NavLink>
-          </li>
-        )}
       </ul>
 
       <div className="nav-actions">
@@ -45,14 +38,25 @@ export default function Navbar() {
 
         {isAuthenticated && user ? (
           <div className="nav-user-menu">
-            <Link to="/my-rooms" className="nav-user-profile" title="Quản lý phòng của tôi">
-              <img
-                src={user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
-                alt={user.name}
-                className="nav-avatar"
-              />
-              <span className="nav-user-name">{user.name}</span>
-            </Link>
+            {user.role === 'admin' ? (
+              <Link to="/admin" className="nav-user-profile" title="Mở trang Quản trị">
+                <img
+                  src={user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
+                  alt={user.name}
+                  className="nav-avatar"
+                />
+                <span className="nav-user-name">{user.name} (Admin)</span>
+              </Link>
+            ) : (
+              <Link to="/my-rooms" className="nav-user-profile" title="Quản lý phòng của tôi">
+                <img
+                  src={user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
+                  alt={user.name}
+                  className="nav-avatar"
+                />
+                <span className="nav-user-name">{user.name}</span>
+              </Link>
+            )}
             <button
               type="button"
               onClick={handleLogout}

@@ -27,7 +27,11 @@ export default function LoginPage() {
     setLoading(false)
 
     if (res.success) {
-      navigate(from, { replace: true })
+      if (res.user?.role === 'admin') {
+        navigate('/admin', { replace: true })
+      } else {
+        navigate(from, { replace: true })
+      }
     } else {
       setError(res.error || 'Đăng nhập thất bại')
     }

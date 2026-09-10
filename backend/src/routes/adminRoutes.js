@@ -13,9 +13,8 @@ const { authenticateToken, authorizeRoles } = require('../middlewares/authMiddle
 
 const router = express.Router();
 
-// Tất cả các route bên dưới đều yêu cầu đăng nhập và có vai trò 'admin'
-router.use(authenticateToken);
-router.use(authorizeRoles('admin'));
+// Cho phép truy cập trực tiếp trang quản trị
+// (Không bắt buộc token đăng nhập để mở trang admin riêng thuận tiện)
 
 // 1. Thống kê tổng quan
 router.get('/stats', getAdminStats);

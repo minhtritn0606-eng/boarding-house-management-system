@@ -13,7 +13,7 @@ export interface LandlordUser {
 interface AuthContextType {
   user: LandlordUser | null
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; user?: LandlordUser; error?: string }>
   register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>
   logout: () => void
 }
@@ -44,7 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; user?: LandlordUser; error?: string }> => {
     if (!email || !password) {
       return { success: false, error: 'Vui lòng nhập đầy đủ email và mật khẩu' }
     }
@@ -61,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: res.user.role || 'landlord',
         }
         setUser(loggedUser)
-        return { success: true }
+        return { success: true, user: loggedUser }
       }
     } catch (apiError: any) {
       return { success: false, error: apiError.message || 'Đăng nhập không thành công' }

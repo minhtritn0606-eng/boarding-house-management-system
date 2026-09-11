@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { useTenants } from '../context/TenantContext'
 import { useRooms } from '../context/RoomContext'
+import { useAuth } from '../context/AuthContext'
 import type { Tenant, ContractStatus } from '../types/tenant'
 import type { TabType } from '../components/BottomTabBar'
 
@@ -23,10 +24,12 @@ interface TenantsScreenProps {
 }
 
 export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsScreenProps) {
+  const { user } = useAuth()
   const { tenants, addTenant, updateTenant, deleteTenant, updateContractStatus } = useTenants()
-  const { branches, rooms } = useRooms()
+  const { rooms, getRoomsByOwner } = useRooms()
 
-  const [selectedBranch, setSelectedBranch] = useState<string>('all')
+  const myRooms = getRoomsByOwner(user?.email)
+
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -41,7 +44,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
   const [formIdCard, setFormIdCard] = useState('')
   const [formHometown, setFormHometown] = useState('')
   const [formJob, setFormJob] = useState('')
-  const [formHouseName, setFormHouseName] = useState(branches[0]?.name || '')
   const [formRoomNumber, setFormRoomNumber] = useState('P.101')
   const [formStartDate, setFormStartDate] = useState('2026-08-01')
   const [formEndDate, setFormEndDate] = useState('2027-07-31')
@@ -60,7 +62,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
         setFormIdCard('')
         setFormHometown('')
         setFormJob('')
-        setFormHouseName(initialAction.houseName || branches[0]?.name || 'Dãy trọ chính')
         setFormRoomNumber(initialAction.roomNumber || 'P.101')
         setFormStartDate(new Date().toISOString().split('T')[0])
         setFormEndDate('2027-08-01')
@@ -77,10 +78,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
 
   // Filter Logic
   const filteredTenants = tenants.filter((tenant) => {
-    // Branch filter
-    if (selectedBranch !== 'all' && tenant.houseName !== selectedBranch) {
-      return false
-    }
     // Status filter
     if (filterStatus !== 'all' && tenant.status !== filterStatus) {
       return false
@@ -111,7 +108,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     setFormIdCard('')
     setFormHometown('')
     setFormJob('')
-    setFormHouseName(branches[0]?.name || 'Dãy trọ Hòa Khánh (Đà Nẵng)')
     setFormRoomNumber('P.103')
     setFormStartDate(new Date().toISOString().split('T')[0])
     setFormEndDate('2027-08-01')
@@ -130,7 +126,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     setFormIdCard(tenant.idCard)
     setFormHometown(tenant.hometown)
     setFormJob(tenant.job || '')
-    setFormHouseName(tenant.houseName)
     setFormRoomNumber(tenant.roomNumber)
     setFormStartDate(tenant.rentStartDate)
     setFormEndDate(tenant.rentEndDate)
@@ -155,7 +150,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
       return
     }
 
-    const matchedRoom = rooms.find((r) => r.roomNumber === formRoomNumber)
+    const matchedRoom = myRooms.find((r) => r.roomNumber.toLowerCase() === formRoomNumber.toLowerCase())
 
     const tenantPayload = {
       name: formName.trim(),
@@ -166,7 +161,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
       job: formJob.trim() || undefined,
       roomId: matchedRoom ? matchedRoom.id : `room_${formRoomNumber}`,
       roomNumber: formRoomNumber,
-      houseName: formHouseName,
+      houseName: '',
       rentStartDate: formStartDate,
       rentEndDate: formEndDate,
       deposit: Number(formDeposit) || 0,
@@ -277,31 +272,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
           )}
         </View>
 
-        {/* Branch Filter Pills */}
-        <View style={styles.filterSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            <TouchableOpacity
-              style={[styles.filterChip, selectedBranch === 'all' && styles.filterChipActive]}
-              onPress={() => setSelectedBranch('all')}
-            >
-              <Text style={[styles.filterChipText, selectedBranch === 'all' && styles.filterChipTextActive]}>
-                Tất cả dãy trọ ({tenants.length})
-              </Text>
-            </TouchableOpacity>
-            {branches.map((b) => (
-              <TouchableOpacity
-                key={b.id}
-                style={[styles.filterChip, selectedBranch === b.name && styles.filterChipActive]}
-                onPress={() => setSelectedBranch(b.name)}
-              >
-                <Text style={[styles.filterChipText, selectedBranch === b.name && styles.filterChipTextActive]}>
-                  {b.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
         {/* Status Filter */}
         <View style={styles.statusFilterRow}>
           {[
@@ -362,10 +332,10 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                     </View>
                   </View>
 
-                  {/* Room & Branch banner */}
+                  {/* Room banner */}
                   <View style={styles.roomBanner}>
                     <Text style={styles.roomBannerText}>
-                      🏠 <Text style={styles.roomHighlight}>{item.roomNumber}</Text> • {item.houseName}
+                      🏠 <Text style={styles.roomHighlight}>Phòng {item.roomNumber}</Text>
                     </Text>
                   </View>
 
@@ -568,25 +538,10 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                 onChangeText={setFormEmail}
               />
 
-              {/* House & Room Selection */}
-              <Text style={styles.fieldLabel}>Dãy trọ</Text>
+              {/* Room Selection */}
+              <Text style={styles.fieldLabel}>Chọn phòng để Check-in / Gán hợp đồng</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                {branches.map((b) => (
-                  <TouchableOpacity
-                    key={b.id}
-                    style={[styles.modalChip, formHouseName === b.name && styles.modalChipActive]}
-                    onPress={() => setFormHouseName(b.name)}
-                  >
-                    <Text style={[styles.modalChipText, formHouseName === b.name && styles.modalChipTextActive]}>
-                      {b.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <Text style={styles.fieldLabel}>Chọn phòng cần Check-in / Gán hợp đồng</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                {rooms.map((r) => {
+                {myRooms.map((r) => {
                   const isSelected = formRoomNumber.toLowerCase() === r.roomNumber.toLowerCase()
                   const isAvailable = r.status === 'available'
                   return (
@@ -599,7 +554,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                       ]}
                       onPress={() => {
                         setFormRoomNumber(r.roomNumber)
-                        setFormHouseName(r.houseName)
                         setFormMonthlyRent(String(r.price))
                         setFormDeposit(String(r.price))
                       }}

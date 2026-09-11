@@ -14,8 +14,8 @@ import BillsScreen from './src/screens/BillsScreen'
 import BottomTabBar, { type TabType } from './src/components/BottomTabBar'
 
 function MainApp() {
-  const { isAuthenticated } = useAuth()
-  const { rooms } = useRooms()
+  const { user, isAuthenticated } = useAuth()
+  const { rooms, getRoomsByOwner } = useRooms()
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [tabPayload, setTabPayload] = useState<any>(null)
 
@@ -38,7 +38,8 @@ function MainApp() {
     )
   }
 
-  const availableRoomsCount = rooms.filter((r) => r.status === 'available').length
+  const myRooms = getRoomsByOwner(user?.email)
+  const availableRoomsCount = myRooms.filter((r) => r.status === 'available').length
 
   const renderActiveScreen = () => {
     switch (activeTab) {

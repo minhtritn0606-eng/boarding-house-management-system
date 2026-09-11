@@ -33,14 +33,14 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       if (res && Array.isArray(res.rooms)) {
         const mapped: MobileRoom[] = res.rooms.map((r: any) => ({
           id: String(r.id),
-          houseName: r.address || 'Dãy trọ Đà Nẵng',
-          roomNumber: r.title.includes('P.') ? r.title.split(' - ')[0] || `P.${r.id}` : `P.${r.id}`,
+          houseName: r.houseName || r.house_name || (r.address ? r.address.split(',')[0] : 'Dãy trọ chính'),
+          roomNumber: r.title && r.title.includes('P.') ? r.title.split(' - ')[0] || `P.${r.id}` : `P.${r.id}`,
           title: r.title,
           price: Number(r.price) || 2500000,
           area: Number(r.area) || 20,
           roomType: r.roomType || 'private',
           status: r.status || 'available',
-          ownerEmail: r.ownerEmail || user?.email || '',
+          ownerEmail: r.ownerEmail || r.owner_email || '',
           tenantName: r.status === 'rented' ? 'Khách thuê' : undefined,
           amenities: Array.isArray(r.amenities) ? r.amenities : ['Wifi', 'Điều hòa', 'Nóng lạnh'],
           floor: r.floor || 1,

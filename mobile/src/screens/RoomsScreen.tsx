@@ -38,7 +38,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
   const { user } = useAuth()
   const {
     rooms,
-    branches,
     addRoom,
     updateRoom,
     deleteRoom,
@@ -49,7 +48,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
 
   const myRooms = getRoomsByOwner(user?.email)
 
-  const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'rented' | 'available'>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -80,7 +78,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
           text: 'Xác nhận trả phòng',
           style: 'destructive',
           onPress: () => {
-            vacateRoom(room.roomNumber, room.houseName)
+            vacateRoom(room.roomNumber)
             Alert.alert('Thành công', `Phòng ${room.roomNumber} đã được chuyển về trạng thái còn trống.`)
           },
         },
@@ -89,7 +87,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
   }
 
   // Add/Edit Form State
-  const [formHouseName, setFormHouseName] = useState(branches[0]?.name || 'Dãy trọ chính')
   const [formRoomNumber, setFormRoomNumber] = useState('')
   const [formTitle, setFormTitle] = useState('')
   const [formPrice, setFormPrice] = useState('')
@@ -102,8 +99,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
 
   // Filter Logic
   const filteredRooms = myRooms.filter((room) => {
-    // Branch filter
-    if (selectedBranch !== 'all' && room.houseName !== selectedBranch) return false
     // Status filter
     if (filterStatus !== 'all' && room.status !== filterStatus) return false
     // Search query
@@ -121,7 +116,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
   const availableCount = myRooms.filter((r) => r.status === 'available').length
 
   const openAddModal = () => {
-    setFormHouseName(branches[0]?.name || 'Dãy trọ chính')
     setFormRoomNumber('')
     setFormTitle('')
     setFormPrice('')
@@ -137,7 +131,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
 
   const openEditModal = (room: MobileRoom) => {
     setEditingRoom(room)
-    setFormHouseName(room.houseName)
     setFormRoomNumber(room.roomNumber)
     setFormTitle(room.title)
     setFormPrice(String(room.price))
@@ -170,7 +163,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
 
     if (editingRoom) {
       updateRoom(editingRoom.id, {
-        houseName: formHouseName,
         roomNumber: formRoomNumber.trim(),
         title: formTitle.trim(),
         price: priceNum,
@@ -184,7 +176,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
       Alert.alert('Thành công', 'Đã cập nhật thông tin phòng trọ!')
     } else {
       addRoom({
-        houseName: formHouseName,
+        houseName: '',
         roomNumber: formRoomNumber.trim(),
         title: formTitle.trim(),
         price: priceNum,
@@ -252,44 +244,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
           ) : null}
         </View>
 
-        {/* Branch Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.branchScroll}
-        >
-          <TouchableOpacity
-            style={[styles.branchChip, selectedBranch === 'all' && styles.branchChipActive]}
-            onPress={() => setSelectedBranch('all')}
-          >
-            <Text
-              style={[
-                styles.branchChipText,
-                selectedBranch === 'all' && styles.branchChipTextActive,
-              ]}
-            >
-              Tất cả dãy nhà ({myRooms.length})
-            </Text>
-          </TouchableOpacity>
-
-          {branches.map((b) => (
-            <TouchableOpacity
-              key={b.id}
-              style={[styles.branchChip, selectedBranch === b.name && styles.branchChipActive]}
-              onPress={() => setSelectedBranch(b.name)}
-            >
-              <Text
-                style={[
-                  styles.branchChipText,
-                  selectedBranch === b.name && styles.branchChipTextActive,
-                ]}
-              >
-                {b.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
         {/* Status Filter Tabs */}
         <View style={styles.statusFilterBar}>
           <TouchableOpacity
@@ -354,7 +308,9 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
                       <View style={styles.roomNumberPill}>
                         <Text style={styles.roomNumberText}>{room.roomNumber}</Text>
                       </View>
-                      <Text style={styles.houseTag}>{room.houseName}</Text>
+                      <Text style={styles.houseTag}>
+                        {room.roomType === 'studio' ? 'Phòng Studio' : room.roomType === 'shared' ? 'Phòng ở ghép' : 'Phòng khép kín'}
+                      </Text>
                     </View>
 
                     {/* Status Toggle Button */}
@@ -541,30 +497,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
             </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {/* House Branch Selector */}
-              <Text style={styles.formLabel}>Dãy nhà trọ *</Text>
-              <View style={styles.branchSelectGrid}>
-                {branches.map((b) => (
-                  <TouchableOpacity
-                    key={b.id}
-                    style={[
-                      styles.branchSelectChip,
-                      formHouseName === b.name && styles.branchSelectChipActive,
-                    ]}
-                    onPress={() => setFormHouseName(b.name)}
-                  >
-                    <Text
-                      style={[
-                        styles.branchSelectText,
-                        formHouseName === b.name && styles.branchSelectTextActive,
-                      ]}
-                    >
-                      {b.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
               {/* Room Number & Floor */}
               <View style={styles.formRow}>
                 <View style={{ flex: 1 }}>

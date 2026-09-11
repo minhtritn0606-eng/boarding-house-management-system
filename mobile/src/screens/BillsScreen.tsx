@@ -15,6 +15,7 @@ import {
 import { useBills } from '../context/BillContext'
 import { useTenants } from '../context/TenantContext'
 import { useRooms } from '../context/RoomContext'
+import { useAuth } from '../context/AuthContext'
 import type { BillItem, BillStatus } from '../types/bill'
 
 import type { TabType } from '../components/BottomTabBar'
@@ -25,6 +26,7 @@ interface BillsScreenProps {
 }
 
 export default function BillsScreen({ onNavigateTab, initialAction }: BillsScreenProps) {
+  const { user } = useAuth()
   const {
     bills,
     utilitySettings,
@@ -37,7 +39,9 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
     totalPaidAmount,
   } = useBills()
   const { tenants } = useTenants()
-  const { rooms, branches } = useRooms()
+  const { rooms, getRoomsByOwner } = useRooms()
+
+  const myRooms = getRoomsByOwner(user?.email)
 
   const [selectedMonth, setSelectedMonth] = useState<number>(8)
   const [selectedYear, setSelectedYear] = useState<number>(2026)
@@ -49,7 +53,6 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   const [editingBill, setEditingBill] = useState<BillItem | null>(null)
 
   // Form State
-  const [formHouseName, setFormHouseName] = useState(branches[0]?.name || '')
   const [formRoomNumber, setFormRoomNumber] = useState('P.101')
   const [formTenantName, setFormTenantName] = useState('')
   const [formTenantPhone, setFormTenantPhone] = useState('')
@@ -73,7 +76,6 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
     if (initialAction) {
       if (initialAction.action === 'createBill') {
         setEditingBill(null)
-        setFormHouseName(initialAction.houseName || branches[0]?.name || '')
         const rNum = initialAction.roomNumber || 'P.101'
         setFormRoomNumber(rNum)
         setFormTenantName(initialAction.tenantName || '')
@@ -140,12 +142,10 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
       setFormTenantName(activeTenant.name)
       setFormTenantPhone(activeTenant.phone)
       setFormRoomFee(String(activeTenant.monthlyRent))
-      setFormHouseName(activeTenant.houseName)
     } else {
-      const roomObj = rooms.find((r) => r.roomNumber.toLowerCase() === roomNum.toLowerCase())
+      const roomObj = myRooms.find((r) => r.roomNumber.toLowerCase() === roomNum.toLowerCase())
       if (roomObj) {
         setFormRoomFee(String(roomObj.price))
-        setFormHouseName(roomObj.houseName)
       }
       setFormTenantName('')
       setFormTenantPhone('')
@@ -165,13 +165,11 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
     setEditingBill(null)
     const firstTenant = tenants.find((t) => t.status === 'active')
     if (firstTenant) {
-      setFormHouseName(firstTenant.houseName)
       setFormRoomNumber(firstTenant.roomNumber)
       setFormTenantName(firstTenant.name)
       setFormTenantPhone(firstTenant.phone)
       setFormRoomFee(String(firstTenant.monthlyRent))
     } else {
-      setFormHouseName(branches[0]?.name || '')
       setFormRoomNumber('P.101')
       setFormTenantName('')
       setFormTenantPhone('')
@@ -196,7 +194,6 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   // Open modal edit
   const handleOpenEditModal = (bill: BillItem) => {
     setEditingBill(bill)
-    setFormHouseName(bill.houseName)
     setFormRoomNumber(bill.roomNumber)
     setFormTenantName(bill.tenantName)
     setFormTenantPhone(bill.tenantPhone)
@@ -226,7 +223,7 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
 
     const payload = {
       roomNumber: formRoomNumber,
-      houseName: formHouseName,
+      houseName: '',
       tenantName: formTenantName.trim(),
       tenantPhone: formTenantPhone.trim(),
       month: Number(formMonth),
@@ -286,7 +283,7 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   // Share bill via SMS / Zalo
   const handleShareBill = (bill: BillItem) => {
     const text = `[HÓA ĐƠN TIỀN TRỌ T${bill.month}/${bill.year}]
-Phòng: ${bill.roomNumber} (${bill.houseName})
+Phòng: ${bill.roomNumber}
 Khách thuê: ${bill.tenantName}
 - Tiền phòng: ${formatVND(bill.roomFee)}
 - Điện (${bill.newElectricMeter} - ${bill.oldElectricMeter} = ${bill.electricUsage} kWh): ${formatVND(bill.electricAmount)}
@@ -560,7 +557,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
               {/* Select Room */}
               <Text style={styles.fieldLabel}>Chọn phòng lập hóa đơn</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                {rooms.map((r) => (
+                {myRooms.map((r) => (
                   <TouchableOpacity
                     key={r.id}
                     style={[styles.modalChip, formRoomNumber === r.roomNumber && styles.modalChipActive]}
@@ -572,7 +569,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
                         formRoomNumber === r.roomNumber && styles.modalChipTextActive,
                       ]}
                     >
-                      {r.roomNumber} ({r.houseName.slice(0, 10)}...)
+                      {r.roomNumber}
                     </Text>
                   </TouchableOpacity>
                 ))}

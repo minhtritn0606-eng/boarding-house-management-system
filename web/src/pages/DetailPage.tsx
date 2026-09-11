@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
 import Carousel from '../components/Carousel'
 
 export default function DetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { rooms } = useRooms()
 
   const [mapMode, setMapMode] = useState<'location' | 'directions'>('location')
@@ -116,11 +118,40 @@ export default function DetailPage() {
     ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeOriginText)}&destination=${encodeURIComponent(room.address)}`
     : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(room.address)}`
 
+  const isOwner = Boolean(user && (user.email === room.ownerEmail || user.role === 'admin'))
+
   return (
     <div className="detail-page-container">
-      <button className="back-button" onClick={() => navigate(-1)}>
-        ← Quay lại
-      </button>
+      <div className="detail-top-nav">
+        <button className="back-button" onClick={() => navigate(-1)}>
+          ← Quay lại
+        </button>
+        {isOwner && (
+          <Link to={`/rooms/${room.id}/edit`} className="btn-edit-post-top">
+            ✏️ Chỉnh sửa bài đăng
+          </Link>
+        )}
+      </div>
+
+      {isOwner && (
+        <div className="owner-manage-banner">
+          <div className="owner-manage-info">
+            <span className="owner-icon">👑</span>
+            <div>
+              <strong>Bạn là người quản lý bài đăng này</strong>
+              <p>Bạn có thể cập nhật thông tin phòng, giá thuê hoặc đổi trạng thái còn/hết phòng</p>
+            </div>
+          </div>
+          <div className="owner-manage-actions">
+            <Link to={`/rooms/${room.id}/edit`} className="btn-edit-post">
+              ✏️ Chỉnh sửa bài đăng
+            </Link>
+            <Link to="/my-rooms" className="btn-my-rooms">
+              📋 Quản lý tất cả phòng
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main Room Detail Card */}
       <div className="room-detail-card">

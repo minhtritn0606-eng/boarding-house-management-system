@@ -2218,6 +2218,18 @@ body {
   background: #eff6ff;
 }
 
+.btn-action.edit {
+  color: #0284c7;
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.btn-action.edit:hover {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #0369a1;
+}
+
 .btn-action.delete {
   color: #dc2626;
   border-color: #fecaca;
@@ -2382,4 +2394,126 @@ body {
     flex: 1;
     justify-content: center;
   }
+}
+
+/* ==========================================================================
+   Owner Manage Banner & Edit Post Styles
+   ========================================================================== */
+.detail-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.btn-edit-post-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-edit-post-top:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+}
+
+.owner-manage-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1px solid #86efac;
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.08);
+}
+
+.owner-manage-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.owner-manage-info .owner-icon {
+  font-size: 1.8rem;
+  background: white;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.owner-manage-info strong {
+  display: block;
+  font-size: 1rem;
+  color: #14532d;
+}
+
+.owner-manage-info p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: #15803d;
+}
+
+.owner-manage-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-edit-post {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: #16a34a;
+  color: white;
+  text-decoration: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+}
+
+.btn-edit-post:hover {
+  background: #15803d;
+  transform: translateY(-1px);
+}
+
+.btn-my-rooms {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: white;
+  color: #14532d;
+  text-decoration: none;
+  border: 1px solid #86efac;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-my-rooms:hover {
+  background: #f0fdf4;
 }

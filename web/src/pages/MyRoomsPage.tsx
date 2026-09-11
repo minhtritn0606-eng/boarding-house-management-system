@@ -153,6 +153,13 @@ export default function MyRoomsPage() {
                           >
                             👁️ Xem
                           </Link>
+                          <Link
+                            to={`/rooms/${room.id}/edit`}
+                            className="btn-action edit"
+                            title="Chỉnh sửa bài đăng"
+                          >
+                            ✏️ Sửa
+                          </Link>
                           <button
                             type="button"
                             className="btn-action delete"

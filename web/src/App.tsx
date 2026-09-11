@@ -10,8 +10,10 @@ import DetailPage from './pages/DetailPage'
 import ContactPage from './pages/ContactPage'
 import LoginPage from './pages/LoginPage'
 import CreateRoomPage from './pages/CreateRoomPage'
+import EditRoomPage from './pages/EditRoomPage'
 import MyRoomsPage from './pages/MyRoomsPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
+import ChatBot from './components/ChatBot'
 
 export default function App() {
   return (
@@ -33,6 +35,7 @@ export default function App() {
                       <Route path="/" element={<HomePage />} />
                       <Route path="/rooms" element={<ListingPage />} />
                       <Route path="/rooms/:id" element={<DetailPage />} />
+                      <Route path="/rooms/:id/edit" element={<EditRoomPage />} />
                       <Route path="/contact" element={<ContactPage />} />
                       <Route path="/login" element={<LoginPage />} />
                       <Route path="/create-room" element={<CreateRoomPage />} />
@@ -40,6 +43,8 @@ export default function App() {
                     </Routes>
                   </div>
                   <Footer />
+                  {/* 💬 Trợ Lý Chatbot AI nổi trên tất cả các trang người dùng */}
+                  <ChatBot />
                 </div>
               }
             />

@@ -202,6 +202,22 @@ Cơ sở dữ liệu `boarding_house_db` được chuẩn hóa với các bảng
 
 ---
 
+### 5.5. 🤖 Phân hệ Trợ Lý Chatbot AI (Tư vấn Tìm phòng & Hỏi đáp Bài đăng)
+- **Truy vấn & Lọc phòng ngôn ngữ tự nhiên**:
+  - Tự động nhận diện mức giá (VD: *"dưới 2 triệu"*, *"từ 2 đến 3.5 triệu"*).
+  - Tự động nhận diện khu vực/quận huyện (VD: *"Liên Chiểu"*, *"Hải Châu"*, *"gần Bách Khoa"*).
+  - Tự động nhận diện tiện ích (VD: *"máy lạnh"*, *"gác lửng"*, *"máy giặt"*, *"giờ tự do"*).
+- **Phản hồi tương tác trực quan**:
+  - Trả lời bằng văn bản tiếng Việt tự nhiên kèm **Thẻ phòng trọ trực quan (Ảnh đại diện, Tiêu đề, Giá thuê/tháng, Khu vực và Nút xem chi tiết)**.
+- **Nhận diện ngữ cảnh phòng đang xem (Context-Aware)**:
+  - Tự động phát hiện khi người dùng đang ở trang chi tiết phòng `/rooms/:id` để trả lời nhanh về giá, liên hệ chủ trọ, tiện ích phòng đó.
+- **Giải đáp thắc mắc thường gặp (FAQs)**:
+  - Hướng dẫn liên hệ chủ trọ, thủ tục đặt lịch xem phòng, tiền đặt cọc và biểu phí điện nước.
+- **Giao diện Widget nổi tiện lợi**:
+  - Nút bấm nổi góc phải dưới màn hình với gợi ý câu hỏi nhanh (Quick Prompts), hỗ trợ trên cả máy tính và điện thoại.
+
+---
+
 ## 6. 🔒 CƠ CHẾ CÔ LẬP DỮ LIỆU CHỦ TRỌ (DATA ISOLATION)
 
 Điểm cốt lõi đảm bảo tính riêng tư và vận hành thực tế của hệ thống:

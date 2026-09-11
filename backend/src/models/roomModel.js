@@ -159,12 +159,47 @@ async function updateRoom(id, updates) {
     values.push(Array.isArray(updates.amenities) ? updates.amenities.join(', ') : updates.amenities);
   }
 
-  if (fields.length === 0) {
-    return await findRoomById(id);
+  if (fields.length > 0) {
+    values.push(id);
+    await pool.query(`UPDATE rooms SET ${fields.join(', ')} WHERE id = ?`, values);
   }
 
-  values.push(id);
-  await pool.query(`UPDATE rooms SET ${fields.join(', ')} WHERE id = ?`, values);
+  // Cập nhật lại danh sách hình ảnh nếu được cung cấp
+  if (Array.isArray(updates.images)) {
+    try {
+      await pool.query('DELETE FROM room_images WHERE room_id = ?', [id]);
+      for (let i = 0; i < updates.images.length; i++) {
+        await pool.query(
+          'INSERT INTO room_images (room_id, image_url, is_primary) VALUES (?, ?, ?)',
+          [id, updates.images[i], i === 0]
+        );
+      }
+    } catch (e) {
+      console.warn('Could not update room images:', e.message);
+    }
+  }
+
+  // Cập nhật địa chỉ / quận / thành phố cho nhà trọ liên kết nếu có
+  if (updates.address || updates.district || updates.city) {
+    try {
+      const [rRows] = await pool.query('SELECT boarding_house_id FROM rooms WHERE id = ?', [id]);
+      if (rRows.length > 0 && rRows[0].boarding_house_id) {
+        const bId = rRows[0].boarding_house_id;
+        const bFields = [];
+        const bVals = [];
+        if (updates.address) { bFields.push('address = ?'); bVals.push(updates.address); }
+        if (updates.district) { bFields.push('district = ?'); bVals.push(updates.district); }
+        if (updates.city) { bFields.push('city = ?'); bVals.push(updates.city); }
+        if (bFields.length > 0) {
+          bVals.push(bId);
+          await pool.query(`UPDATE boarding_houses SET ${bFields.join(', ')} WHERE id = ?`, bVals);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not update boarding house address info:', e.message);
+    }
+  }
+
   return await findRoomById(id);
 }
 

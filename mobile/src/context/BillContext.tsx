@@ -14,6 +14,7 @@ interface BillContextType {
   deleteBill: (id: string) => Promise<void>
   markAsPaid: (id: string, method?: 'cash' | 'banking') => Promise<void>
   getBillsByMonth: (month: number, year: number) => BillItem[]
+  getLastBillForRoom: (roomNumber: string, houseName?: string) => BillItem | undefined
   totalUnpaidAmount: number
   totalPaidAmount: number
 }
@@ -215,6 +216,18 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     return bills.filter((b) => b.month === month && b.year === year)
   }
 
+  const getLastBillForRoom = (roomNumber: string, houseName?: string) => {
+    const roomBills = bills
+      .filter((b) => {
+        const matchRoom = b.roomNumber.toLowerCase() === roomNumber.toLowerCase()
+        const matchHouse = !houseName || b.houseName.toLowerCase() === houseName.toLowerCase()
+        return matchRoom && matchHouse
+      })
+      .sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month))
+
+    return roomBills[0]
+  }
+
   const totalUnpaidAmount = bills
     .filter((b) => b.status === 'unpaid' || b.status === 'overdue')
     .reduce((sum, b) => sum + b.totalAmount, 0)
@@ -236,6 +249,7 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
         deleteBill,
         markAsPaid,
         getBillsByMonth,
+        getLastBillForRoom,
         totalUnpaidAmount,
         totalPaidAmount,
       }}

@@ -17,6 +17,17 @@ function MainApp() {
   const { isAuthenticated } = useAuth()
   const { rooms } = useRooms()
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
+  const [tabPayload, setTabPayload] = useState<any>(null)
+
+  const handleNavigate = (tab: TabType, payload?: any) => {
+    setTabPayload(payload || null)
+    setActiveTab(tab)
+  }
+
+  const handleTabChange = (tab: TabType) => {
+    setTabPayload(null)
+    setActiveTab(tab)
+  }
 
   if (!isAuthenticated) {
     return (
@@ -32,15 +43,15 @@ function MainApp() {
   const renderActiveScreen = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <HomeScreen onNavigateTab={(tab) => setActiveTab(tab)} />
+        return <HomeScreen onNavigateTab={handleNavigate} />
       case 'rooms':
-        return <RoomsScreen />
+        return <RoomsScreen onNavigateTab={handleNavigate} initialAction={tabPayload} />
       case 'tenants':
-        return <TenantsScreen />
+        return <TenantsScreen onNavigateTab={handleNavigate} initialAction={tabPayload} />
       case 'bills':
-        return <BillsScreen />
+        return <BillsScreen onNavigateTab={handleNavigate} initialAction={tabPayload} />
       default:
-        return <HomeScreen onNavigateTab={(tab) => setActiveTab(tab)} />
+        return <HomeScreen onNavigateTab={handleNavigate} />
     }
   }
 
@@ -50,7 +61,7 @@ function MainApp() {
       <View style={styles.screenWrapper}>{renderActiveScreen()}</View>
       <BottomTabBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         availableRoomsCount={availableRoomsCount}
       />
     </SafeAreaView>

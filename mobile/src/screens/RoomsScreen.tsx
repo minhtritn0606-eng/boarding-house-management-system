@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import { useRooms } from '../context/RoomContext'
 import { useAuth } from '../context/AuthContext'
 import type { MobileRoom, RoomType, RoomStatus } from '../types/room'
+import type { TabType } from '../components/BottomTabBar'
 
 const ALL_AMENITIES = [
   'Điều hòa',
@@ -28,10 +29,23 @@ const ALL_AMENITIES = [
   'Chỗ để xe riêng',
 ]
 
-export default function RoomsScreen() {
+interface RoomsScreenProps {
+  onNavigateTab?: (tab: TabType, payload?: any) => void
+  initialAction?: any
+}
+
+export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScreenProps) {
   const { user } = useAuth()
-  const { rooms, branches, addRoom, updateRoom, deleteRoom, toggleRoomStatus, getRoomsByOwner } =
-    useRooms()
+  const {
+    rooms,
+    branches,
+    addRoom,
+    updateRoom,
+    deleteRoom,
+    toggleRoomStatus,
+    getRoomsByOwner,
+    vacateRoom,
+  } = useRooms()
 
   const myRooms = getRoomsByOwner(user?.email)
 
@@ -42,6 +56,37 @@ export default function RoomsScreen() {
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingRoom, setEditingRoom] = useState<MobileRoom | null>(null)
+
+  // Phản hồi khi được chuyển hướng từ màn hình khác (Dashboard / Khách thuê / Hóa đơn)
+  useEffect(() => {
+    if (initialAction) {
+      if (initialAction.action === 'addRoom') {
+        openAddModal()
+      } else if (initialAction.filterStatus) {
+        setFilterStatus(initialAction.filterStatus)
+      } else if (initialAction.searchQuery) {
+        setSearchQuery(initialAction.searchQuery)
+      }
+    }
+  }, [initialAction])
+
+  const handleCheckOutRoom = (room: MobileRoom) => {
+    Alert.alert(
+      'Trả phòng / Check-out',
+      `Bạn có chắc chắn muốn làm thủ tục trả phòng cho phòng ${room.roomNumber}? Trạng thái phòng sẽ được chuyển về "Còn trống".`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xác nhận trả phòng',
+          style: 'destructive',
+          onPress: () => {
+            vacateRoom(room.roomNumber, room.houseName)
+            Alert.alert('Thành công', `Phòng ${room.roomNumber} đã được chuyển về trạng thái còn trống.`)
+          },
+        },
+      ]
+    )
+  }
 
   // Add/Edit Form State
   const [formHouseName, setFormHouseName] = useState(branches[0]?.name || 'Dãy trọ chính')
@@ -388,6 +433,71 @@ export default function RoomsScreen() {
                       </View>
                     )}
                   </View>
+
+                  {/* Cross Actions Bar */}
+                  {!isAvailable ? (
+                    <View style={styles.crossActionsRow}>
+                      <TouchableOpacity
+                        style={[styles.crossActionBtn, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
+                        onPress={() =>
+                          onNavigateTab &&
+                          onNavigateTab('bills', {
+                            action: 'createBill',
+                            roomNumber: room.roomNumber,
+                            houseName: room.houseName,
+                            tenantName: room.tenantName,
+                            tenantPhone: room.tenantPhone,
+                            roomFee: room.price,
+                          })
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.crossActionText, { color: '#1d4ed8' }]}>🧾 Lập hóa đơn</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.crossActionBtn, { backgroundColor: '#faf5ff', borderColor: '#e9d5ff' }]}
+                        onPress={() =>
+                          onNavigateTab &&
+                          onNavigateTab('tenants', { searchQuery: room.roomNumber })
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.crossActionText, { color: '#7e22ce' }]}>👤 Khách thuê</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.crossActionBtn, { backgroundColor: '#fff1f2', borderColor: '#fecdd3' }]}
+                        onPress={() => handleCheckOutRoom(room)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.crossActionText, { color: '#e11d48' }]}>🚪 Trả phòng</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.crossActionsRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.crossActionBtn,
+                          { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', flex: 1, paddingVertical: 10 },
+                        ]}
+                        onPress={() =>
+                          onNavigateTab &&
+                          onNavigateTab('tenants', {
+                            action: 'checkin',
+                            roomNumber: room.roomNumber,
+                            houseName: room.houseName,
+                            monthlyRent: room.price,
+                          })
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.crossActionText, { color: '#15803d', fontWeight: '700' }]}>
+                          ➕ Tiếp nhận khách vào phòng này (Check-in) ➔
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
                   {/* Card Actions */}
                   <View style={styles.cardFooter}>
@@ -1111,5 +1221,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  crossActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  crossActionBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  crossActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 })

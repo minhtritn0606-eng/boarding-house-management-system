@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -15,8 +15,14 @@ import {
 import { useTenants } from '../context/TenantContext'
 import { useRooms } from '../context/RoomContext'
 import type { Tenant, ContractStatus } from '../types/tenant'
+import type { TabType } from '../components/BottomTabBar'
 
-export default function TenantsScreen() {
+interface TenantsScreenProps {
+  onNavigateTab?: (tab: TabType, payload?: any) => void
+  initialAction?: any
+}
+
+export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsScreenProps) {
   const { tenants, addTenant, updateTenant, deleteTenant, updateContractStatus } = useTenants()
   const { branches, rooms } = useRooms()
 
@@ -42,6 +48,32 @@ export default function TenantsScreen() {
   const [formDeposit, setFormDeposit] = useState('2500000')
   const [formMonthlyRent, setFormMonthlyRent] = useState('2500000')
   const [formNotes, setFormNotes] = useState('')
+
+  // Xử lý khi được chuyển hướng từ màn hình khác (Ví dụ: bấm Nhận khách từ thẻ phòng)
+  useEffect(() => {
+    if (initialAction) {
+      if (initialAction.action === 'checkin') {
+        setEditingTenant(null)
+        setFormName('')
+        setFormPhone('')
+        setFormEmail('')
+        setFormIdCard('')
+        setFormHometown('')
+        setFormJob('')
+        setFormHouseName(initialAction.houseName || branches[0]?.name || 'Dãy trọ chính')
+        setFormRoomNumber(initialAction.roomNumber || 'P.101')
+        setFormStartDate(new Date().toISOString().split('T')[0])
+        setFormEndDate('2027-08-01')
+        const rentStr = String(initialAction.monthlyRent || '2500000')
+        setFormDeposit(rentStr)
+        setFormMonthlyRent(rentStr)
+        setFormNotes('')
+        setIsModalOpen(true)
+      } else if (initialAction.searchQuery) {
+        setSearchQuery(initialAction.searchQuery)
+      }
+    }
+  }, [initialAction])
 
   // Filter Logic
   const filteredTenants = tenants.filter((tenant) => {
@@ -158,6 +190,14 @@ export default function TenantsScreen() {
   const handleCallTenant = (phone: string) => {
     Linking.openURL(`tel:${phone}`).catch(() => {
       Alert.alert('Không thể thực hiện cuộc gọi', `Số điện thoại: ${phone}`)
+    })
+  }
+
+  // SMS Tenant
+  const handleSmsTenant = (phone: string, name: string, roomNumber: string) => {
+    const cleanPhone = phone.replace(/\s+/g, '')
+    Linking.openURL(`sms:${cleanPhone}?body=Chào bạn ${name} (${roomNumber}), chủ trọ liên hệ bạn về phòng trọ...`).catch(() => {
+      Alert.alert('Không thể mở ứng dụng tin nhắn', `Số điện thoại: ${phone}`)
     })
   }
 
@@ -378,40 +418,72 @@ export default function TenantsScreen() {
                   </View>
 
                   {/* Action Buttons */}
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity
-                      style={styles.actionCallBtn}
-                      onPress={() => handleCallTenant(item.phone)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.actionCallBtnText}>📞 Gọi điện</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.actionEditBtn}
-                      onPress={() => handleOpenEditModal(item)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.actionEditBtnText}>✏️ Sửa HĐ</Text>
-                    </TouchableOpacity>
-
-                    {isActive ? (
+                  <View style={styles.cardActionsContainer}>
+                    {/* Hàng 1: Thao tác nghiệp vụ liên kết */}
+                    <View style={styles.cardActionsRow}>
                       <TouchableOpacity
-                        style={styles.actionEndBtn}
-                        onPress={() => handleTerminateContract(item)}
+                        style={styles.actionBillBtn}
+                        onPress={() =>
+                          onNavigateTab &&
+                          onNavigateTab('bills', {
+                            action: 'createBill',
+                            roomNumber: item.roomNumber,
+                            houseName: item.houseName,
+                            tenantName: item.name,
+                            tenantPhone: item.phone,
+                            roomFee: item.monthlyRent,
+                          })
+                        }
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.actionEndBtnText}>🛑 Thanh lý</Text>
+                        <Text style={styles.actionBillBtnText}>🧾 Lập hóa đơn tháng này</Text>
                       </TouchableOpacity>
-                    ) : (
+
                       <TouchableOpacity
-                        style={styles.actionDeleteBtn}
-                        onPress={() => handleDeleteTenant(item)}
+                        style={styles.actionSmsBtn}
+                        onPress={() => handleSmsTenant(item.phone, item.name, item.roomNumber)}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.actionDeleteBtnText}>🗑️ Xóa</Text>
+                        <Text style={styles.actionSmsBtnText}>💬 Nhắn tin</Text>
                       </TouchableOpacity>
-                    )}
+                    </View>
+
+                    {/* Hàng 2: Gọi điện, Sửa, Thanh lý */}
+                    <View style={styles.cardActionsRow}>
+                      <TouchableOpacity
+                        style={styles.actionCallBtn}
+                        onPress={() => handleCallTenant(item.phone)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.actionCallBtnText}>📞 Gọi điện</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.actionEditBtn}
+                        onPress={() => handleOpenEditModal(item)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.actionEditBtnText}>✏️ Sửa HĐ</Text>
+                      </TouchableOpacity>
+
+                      {isActive ? (
+                        <TouchableOpacity
+                          style={styles.actionEndBtn}
+                          onPress={() => handleTerminateContract(item)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.actionEndBtnText}>🚪 Trả phòng</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.actionDeleteBtn}
+                          onPress={() => handleDeleteTenant(item)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.actionDeleteBtnText}>🗑️ Xóa</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </View>
               )
@@ -512,7 +584,41 @@ export default function TenantsScreen() {
                 ))}
               </ScrollView>
 
-              <Text style={styles.fieldLabel}>Số phòng</Text>
+              <Text style={styles.fieldLabel}>Chọn phòng cần Check-in / Gán hợp đồng</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {rooms.map((r) => {
+                  const isSelected = formRoomNumber.toLowerCase() === r.roomNumber.toLowerCase()
+                  const isAvailable = r.status === 'available'
+                  return (
+                    <TouchableOpacity
+                      key={r.id}
+                      style={[
+                        styles.modalChip,
+                        isSelected && styles.modalChipActive,
+                        !isAvailable && !isSelected && { borderColor: '#fed7aa', backgroundColor: '#fff7ed' },
+                      ]}
+                      onPress={() => {
+                        setFormRoomNumber(r.roomNumber)
+                        setFormHouseName(r.houseName)
+                        setFormMonthlyRent(String(r.price))
+                        setFormDeposit(String(r.price))
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.modalChipText,
+                          isSelected && styles.modalChipTextActive,
+                          !isAvailable && !isSelected && { color: '#c2410c' },
+                        ]}
+                      >
+                        {r.roomNumber} ({isAvailable ? 'Trống 🟢' : 'Đang thuê 🔴'})
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </ScrollView>
+
+              <Text style={styles.fieldLabel}>Số phòng (hoặc tự nhập)</Text>
               <TextInput
                 style={styles.formInput}
                 placeholder="VD: P.103"
@@ -844,12 +950,45 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#92400e',
   },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 8,
+  cardActionsContainer: {
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    paddingTop: 12,
+    paddingTop: 10,
+    gap: 8,
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBillBtn: {
+    flex: 2,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBillBtnText: {
+    color: '#1d4ed8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  actionSmsBtn: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSmsBtnText: {
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '600',
   },
   actionCallBtn: {
     flex: 1,
@@ -857,6 +996,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionCallBtnText: {
     color: '#ffffff',
@@ -869,6 +1009,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionEditBtnText: {
     color: '#334155',
@@ -876,11 +1017,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   actionEndBtn: {
-    paddingHorizontal: 12,
+    flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#fee2e2',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionEndBtnText: {
     color: '#dc2626',

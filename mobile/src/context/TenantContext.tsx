@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { Tenant, ContractStatus } from '../types/tenant'
 import { mobileTenantApi } from '../services/api'
 import { useAuth } from './AuthContext'
+import { useRooms } from './RoomContext'
 
 interface TenantContextType {
   tenants: Tenant[]
@@ -18,6 +19,7 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined)
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated } = useAuth()
+  const { occupyRoom, vacateRoom } = useRooms()
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
@@ -67,6 +69,11 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   }
 
   const addTenant = async (tenantData: Omit<Tenant, 'id' | 'contractNumber'>) => {
+    // Tự động đồng bộ sang Phòng trọ tương ứng -> Đã thuê
+    if (tenantData.roomNumber) {
+      await occupyRoom(tenantData.roomNumber, tenantData.houseName, tenantData.name, tenantData.phone)
+    }
+
     try {
       const res = await mobileTenantApi.createTenant({
         fullName: tenantData.name,
@@ -115,6 +122,11 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   }
 
   const deleteTenant = async (id: string) => {
+    const target = tenants.find((t) => t.id === id)
+    if (target && target.roomNumber) {
+      await vacateRoom(target.roomNumber, target.houseName)
+    }
+
     setTenants((prev) => prev.filter((item) => item.id !== id))
     try {
       await mobileTenantApi.deleteTenant(id)
@@ -124,6 +136,13 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   }
 
   const updateContractStatus = async (id: string, status: ContractStatus) => {
+    const target = tenants.find((t) => t.id === id)
+    if (target && (status === 'terminated' || status === 'expired') && target.roomNumber) {
+      await vacateRoom(target.roomNumber, target.houseName)
+    } else if (target && status === 'active' && target.roomNumber) {
+      await occupyRoom(target.roomNumber, target.houseName, target.name, target.phone)
+    }
+
     setTenants((prev) =>
       prev.map((item) => (item.id === id ? { ...item, status } : item))
     )

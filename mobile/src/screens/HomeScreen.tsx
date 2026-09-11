@@ -15,7 +15,7 @@ import { useBills } from '../context/BillContext'
 import type { TabType } from '../components/BottomTabBar'
 
 interface HomeScreenProps {
-  onNavigateTab?: (tab: TabType) => void
+  onNavigateTab?: (tab: TabType, payload?: any) => void
 }
 
 export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
@@ -29,6 +29,7 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
   const rentedRooms = myRooms.filter((r) => r.status === 'rented').length
   const availableRooms = myRooms.filter((r) => r.status === 'available').length
   const activeTenants = tenants.filter((t) => t.status === 'active').length
+  const unpaidBillsCount = bills.filter((b) => b.status === 'unpaid' || b.status === 'overdue').length
 
   const formatVND = (num: number) => {
     return num.toLocaleString('vi-VN') + ' đ'
@@ -76,7 +77,7 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
 
             <TouchableOpacity
               style={[styles.statCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}
-              onPress={() => onNavigateTab && onNavigateTab('rooms')}
+              onPress={() => onNavigateTab && onNavigateTab('rooms', { filterStatus: 'rented' })}
               activeOpacity={0.8}
             >
               <Text style={styles.statIcon}>🟢</Text>
@@ -86,7 +87,7 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
 
             <TouchableOpacity
               style={[styles.statCard, { backgroundColor: '#fefce8', borderColor: '#fef08a' }]}
-              onPress={() => onNavigateTab && onNavigateTab('rooms')}
+              onPress={() => onNavigateTab && onNavigateTab('rooms', { filterStatus: 'available' })}
               activeOpacity={0.8}
             >
               <Text style={styles.statIcon}>🟡</Text>
@@ -116,66 +117,68 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
                 <Text style={[styles.revenueValue, { color: '#16a34a' }]}>{formatVND(totalPaidAmount)}</Text>
               </View>
               <View style={[styles.revenueCol, { borderLeftWidth: 1, borderLeftColor: '#e2e8f0', paddingLeft: 16 }]}>
-                <Text style={styles.revenueLabel}>Cần thu / Còn nợ</Text>
+                <Text style={styles.revenueLabel}>Cần thu / Còn nợ ({unpaidBillsCount})</Text>
                 <Text style={[styles.revenueValue, { color: '#dc2626' }]}>{formatVND(totalUnpaidAmount)}</Text>
               </View>
             </View>
 
             <TouchableOpacity
               style={styles.viewBillsBtn}
-              onPress={() => onNavigateTab && onNavigateTab('bills')}
+              onPress={() => onNavigateTab && onNavigateTab('bills', { action: unpaidBillsCount > 0 ? 'filterUnpaid' : undefined })}
               activeOpacity={0.8}
             >
-              <Text style={styles.viewBillsText}>Xem chi tiết {bills.length} hóa đơn ➔</Text>
+              <Text style={styles.viewBillsText}>
+                {unpaidBillsCount > 0 ? `⚠️ Có ${unpaidBillsCount} hóa đơn chưa thu ➔` : `Xem chi tiết ${bills.length} hóa đơn ➔`}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>⚡ Phím tắt truy cập nhanh</Text>
+          <Text style={styles.sectionTitle}>⚡ Thao tác nghiệp vụ nhanh</Text>
 
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => onNavigateTab && onNavigateTab('rooms')}
+            onPress={() => onNavigateTab && onNavigateTab('rooms', { action: 'addRoom' })}
             activeOpacity={0.8}
           >
             <View style={[styles.actionIconBox, { backgroundColor: '#eff6ff' }]}>
-              <Text style={styles.actionIcon}>🏢</Text>
+              <Text style={styles.actionIcon}>➕</Text>
             </View>
             <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Quản lý phòng trọ</Text>
-              <Text style={styles.actionDesc}>Xem danh sách, thêm phòng, đổi trạng thái trống/thuê</Text>
+              <Text style={styles.actionTitle}>Thêm phòng trọ mới</Text>
+              <Text style={styles.actionDesc}>Tạo phòng, thiết lập giá thuê, diện tích & tiện ích</Text>
             </View>
             <Text style={styles.actionArrow}>➔</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => onNavigateTab && onNavigateTab('tenants')}
+            onPress={() => onNavigateTab && onNavigateTab('tenants', { action: 'checkin' })}
             activeOpacity={0.8}
           >
             <View style={[styles.actionIconBox, { backgroundColor: '#f0fdf4' }]}>
-              <Text style={styles.actionIcon}>👥</Text>
+              <Text style={styles.actionIcon}>👤</Text>
             </View>
             <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Quản lý Hợp đồng & Khách thuê</Text>
-              <Text style={styles.actionDesc}>Lập hợp đồng, liên hệ khách, gia hạn hợp đồng</Text>
+              <Text style={styles.actionTitle}>Tiếp nhận khách thuê (Check-in)</Text>
+              <Text style={styles.actionDesc}>Lập hợp đồng vào phòng trống, đồng bộ trạng thái</Text>
             </View>
             <Text style={styles.actionArrow}>➔</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => onNavigateTab && onNavigateTab('bills')}
+            onPress={() => onNavigateTab && onNavigateTab('bills', { action: 'createBill' })}
             activeOpacity={0.8}
           >
             <View style={[styles.actionIconBox, { backgroundColor: '#fef3c7' }]}>
-              <Text style={styles.actionIcon}>💵</Text>
+              <Text style={styles.actionIcon}>🧾</Text>
             </View>
             <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Hóa đơn & Tiền điện nước</Text>
-              <Text style={styles.actionDesc}>Ghi chỉ số điện nước, tạo hóa đơn & gửi bill qua Zalo</Text>
+              <Text style={styles.actionTitle}>Ghi chỉ số & Lập hóa đơn</Text>
+              <Text style={styles.actionDesc}>Tính tiền điện nước tự động & gửi bill qua Zalo</Text>
             </View>
             <Text style={styles.actionArrow}>➔</Text>
           </TouchableOpacity>

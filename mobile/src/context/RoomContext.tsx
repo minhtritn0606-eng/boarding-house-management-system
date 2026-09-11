@@ -13,6 +13,8 @@ interface RoomContextType {
   updateRoom: (id: string, updatedData: Partial<MobileRoom>) => Promise<void>
   deleteRoom: (id: string) => Promise<void>
   toggleRoomStatus: (id: string) => Promise<void>
+  occupyRoom: (roomNumber: string, houseName?: string, tenantName?: string, tenantPhone?: string) => Promise<void>
+  vacateRoom: (roomNumber: string, houseName?: string) => Promise<void>
 }
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined)
@@ -156,6 +158,72 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const occupyRoom = async (roomNumber: string, houseName?: string, tenantName?: string, tenantPhone?: string) => {
+    let matchedId = ''
+    setRooms((prev) =>
+      prev.map((room) => {
+        const isMatch =
+          room.roomNumber.toLowerCase() === roomNumber.toLowerCase() ||
+          room.title.toLowerCase().includes(roomNumber.toLowerCase())
+        if (isMatch) {
+          matchedId = room.id
+          return {
+            ...room,
+            status: 'rented' as RoomStatus,
+            tenantName: tenantName || 'Khách thuê',
+            tenantPhone: tenantPhone || '',
+          }
+        }
+        return room
+      })
+    )
+
+    if (matchedId) {
+      try {
+        await mobileRoomApi.updateRoom(matchedId, {
+          status: 'rented',
+          tenantName,
+          tenantPhone,
+        })
+      } catch (e: any) {
+        console.log('Mobile occupyRoom sync error:', e.message)
+      }
+    }
+  }
+
+  const vacateRoom = async (roomNumber: string, houseName?: string) => {
+    let matchedId = ''
+    setRooms((prev) =>
+      prev.map((room) => {
+        const isMatch =
+          room.roomNumber.toLowerCase() === roomNumber.toLowerCase() ||
+          room.title.toLowerCase().includes(roomNumber.toLowerCase())
+        if (isMatch) {
+          matchedId = room.id
+          return {
+            ...room,
+            status: 'available' as RoomStatus,
+            tenantName: undefined,
+            tenantPhone: undefined,
+          }
+        }
+        return room
+      })
+    )
+
+    if (matchedId) {
+      try {
+        await mobileRoomApi.updateRoom(matchedId, {
+          status: 'available',
+          tenantName: null,
+          tenantPhone: null,
+        })
+      } catch (e: any) {
+        console.log('Mobile vacateRoom sync error:', e.message)
+      }
+    }
+  }
+
   return (
     <RoomContext.Provider
       value={{
@@ -168,6 +236,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         updateRoom,
         deleteRoom,
         toggleRoomStatus,
+        occupyRoom,
+        vacateRoom,
       }}
     >
       {children}

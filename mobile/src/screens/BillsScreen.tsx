@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -17,7 +17,14 @@ import { useTenants } from '../context/TenantContext'
 import { useRooms } from '../context/RoomContext'
 import type { BillItem, BillStatus } from '../types/bill'
 
-export default function BillsScreen() {
+import type { TabType } from '../components/BottomTabBar'
+
+interface BillsScreenProps {
+  onNavigateTab?: (tab: TabType, payload?: any) => void
+  initialAction?: any
+}
+
+export default function BillsScreen({ onNavigateTab, initialAction }: BillsScreenProps) {
   const {
     bills,
     utilitySettings,
@@ -25,6 +32,7 @@ export default function BillsScreen() {
     updateBill,
     deleteBill,
     markAsPaid,
+    getLastBillForRoom,
     totalUnpaidAmount,
     totalPaidAmount,
   } = useBills()
@@ -60,6 +68,47 @@ export default function BillsScreen() {
   const [formStatus, setFormStatus] = useState<BillStatus>('unpaid')
   const [formNote, setFormNote] = useState('')
 
+  // Xử lý khi được chuyển hướng từ Phòng trọ / Khách thuê / Dashboard
+  useEffect(() => {
+    if (initialAction) {
+      if (initialAction.action === 'createBill') {
+        setEditingBill(null)
+        setFormHouseName(initialAction.houseName || branches[0]?.name || '')
+        const rNum = initialAction.roomNumber || 'P.101'
+        setFormRoomNumber(rNum)
+        setFormTenantName(initialAction.tenantName || '')
+        setFormTenantPhone(initialAction.tenantPhone || '')
+        setFormRoomFee(String(initialAction.roomFee || '2500000'))
+        setFormMonth(selectedMonth)
+        setFormYear(selectedYear)
+
+        const lastBill = getLastBillForRoom(rNum)
+        if (lastBill) {
+          setFormOldElectric(String(lastBill.newElectricMeter))
+          setFormNewElectric(String(lastBill.newElectricMeter + 55))
+          setFormOldWater(String(lastBill.newWaterMeter))
+          setFormNewWater(String(lastBill.newWaterMeter + 5))
+        } else {
+          setFormOldElectric('1200')
+          setFormNewElectric('1265')
+          setFormOldWater('80')
+          setFormNewWater('86')
+        }
+
+        setFormInternetFee(String(utilitySettings.internetFee))
+        setFormTrashFee(String(utilitySettings.trashFee))
+        setFormOtherFee('0')
+        setFormOtherFeeNote('')
+        setFormDueDate('2026-08-25')
+        setFormStatus('unpaid')
+        setFormNote('')
+        setIsModalOpen(true)
+      } else if (initialAction.action === 'filterUnpaid') {
+        setFilterStatus('unpaid')
+      }
+    }
+  }, [initialAction])
+
   // Format currency
   const formatVND = (num: number) => {
     return num.toLocaleString('vi-VN') + ' đ'
@@ -83,23 +132,31 @@ export default function BillsScreen() {
     return true
   })
 
-  // Auto populate tenant info when room is picked
+  // Tự động nạp thông tin khách và chỉ số điện nước kỳ trước khi chọn phòng
   const handleSelectRoomForForm = (roomNum: string) => {
     setFormRoomNumber(roomNum)
-    const activeTenant = tenants.find((t) => t.roomNumber === roomNum && t.status === 'active')
+    const activeTenant = tenants.find((t) => t.roomNumber.toLowerCase() === roomNum.toLowerCase() && t.status === 'active')
     if (activeTenant) {
       setFormTenantName(activeTenant.name)
       setFormTenantPhone(activeTenant.phone)
       setFormRoomFee(String(activeTenant.monthlyRent))
       setFormHouseName(activeTenant.houseName)
     } else {
-      const roomObj = rooms.find((r) => r.roomNumber === roomNum)
+      const roomObj = rooms.find((r) => r.roomNumber.toLowerCase() === roomNum.toLowerCase())
       if (roomObj) {
         setFormRoomFee(String(roomObj.price))
         setFormHouseName(roomObj.houseName)
       }
       setFormTenantName('')
       setFormTenantPhone('')
+    }
+
+    const lastBill = getLastBillForRoom(roomNum)
+    if (lastBill) {
+      setFormOldElectric(String(lastBill.newElectricMeter))
+      setFormNewElectric(String(lastBill.newElectricMeter + 50))
+      setFormOldWater(String(lastBill.newWaterMeter))
+      setFormNewWater(String(lastBill.newWaterMeter + 5))
     }
   }
 
@@ -384,10 +441,18 @@ Vui lòng thanh toán qua STK chủ trọ.`
                           </Text>
                         </View>
                       </View>
-                      <Text style={styles.billTenantName}>
-                        Khách: <Text style={{ fontWeight: '700', color: '#0f172a' }}>{bill.tenantName}</Text> •{' '}
-                        {bill.tenantPhone}
-                      </Text>
+                      <TouchableOpacity
+                        onPress={() =>
+                          onNavigateTab &&
+                          onNavigateTab('tenants', { searchQuery: bill.roomNumber })
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.billTenantName}>
+                          Khách: <Text style={{ fontWeight: '700', color: '#1d4ed8' }}>{bill.tenantName}</Text> •{' '}
+                          {bill.tenantPhone} <Text style={{ color: '#2563eb', fontSize: 11 }}>[Xem hồ sơ ➔]</Text>
+                        </Text>
+                      </TouchableOpacity>
                     </View>
 
                     <Text style={styles.totalPriceHighlight}>{formatVND(bill.totalAmount)}</Text>

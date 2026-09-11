@@ -43,8 +43,11 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
 
   const myRooms = getRoomsByOwner(user?.email)
 
-  const [selectedMonth, setSelectedMonth] = useState<number>(8)
-  const [selectedYear, setSelectedYear] = useState<number>(2026)
+  const currentMonth = new Date().getMonth() + 1
+  const currentYear = new Date().getFullYear()
+
+  const [selectedMonth, setSelectedMonth] = useState<number | 'all'>('all')
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -56,8 +59,8 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   const [formRoomNumber, setFormRoomNumber] = useState('P.101')
   const [formTenantName, setFormTenantName] = useState('')
   const [formTenantPhone, setFormTenantPhone] = useState('')
-  const [formMonth, setFormMonth] = useState(8)
-  const [formYear, setFormYear] = useState(2026)
+  const [formMonth, setFormMonth] = useState(currentMonth)
+  const [formYear, setFormYear] = useState(currentYear)
   const [formRoomFee, setFormRoomFee] = useState('2500000')
   const [formOldElectric, setFormOldElectric] = useState('1400')
   const [formNewElectric, setFormNewElectric] = useState('1470')
@@ -81,7 +84,8 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
         setFormTenantName(initialAction.tenantName || '')
         setFormTenantPhone(initialAction.tenantPhone || '')
         setFormRoomFee(String(initialAction.roomFee || '2500000'))
-        setFormMonth(selectedMonth)
+        const targetM = typeof selectedMonth === 'number' ? selectedMonth : currentMonth
+        setFormMonth(targetM)
         setFormYear(selectedYear)
 
         const lastBill = getLastBillForRoom(rNum)
@@ -118,7 +122,10 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
 
   // Filter bills
   const filteredBills = bills.filter((b) => {
-    if (b.month !== selectedMonth || b.year !== selectedYear) {
+    if (selectedMonth !== 'all' && b.month !== selectedMonth) {
+      return false
+    }
+    if (b.year !== selectedYear) {
       return false
     }
     if (filterStatus !== 'all' && b.status !== filterStatus) {
@@ -137,13 +144,23 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   // Tự động nạp thông tin khách và chỉ số điện nước kỳ trước khi chọn phòng
   const handleSelectRoomForForm = (roomNum: string) => {
     setFormRoomNumber(roomNum)
-    const activeTenant = tenants.find((t) => t.roomNumber.toLowerCase() === roomNum.toLowerCase() && t.status === 'active')
+    const cleanTarget = roomNum.replace(/[^\d]/g, '')
+    const activeTenant = tenants.find((t) => {
+      const cleanT = t.roomNumber.replace(/[^\d]/g, '')
+      return (
+        t.status === 'active' &&
+        (t.roomNumber.toLowerCase() === roomNum.toLowerCase() || (cleanTarget !== '' && cleanT === cleanTarget))
+      )
+    })
     if (activeTenant) {
       setFormTenantName(activeTenant.name)
       setFormTenantPhone(activeTenant.phone)
       setFormRoomFee(String(activeTenant.monthlyRent))
     } else {
-      const roomObj = myRooms.find((r) => r.roomNumber.toLowerCase() === roomNum.toLowerCase())
+      const roomObj = myRooms.find((r) => {
+        const cleanR = r.roomNumber.replace(/[^\d]/g, '')
+        return r.roomNumber.toLowerCase() === roomNum.toLowerCase() || (cleanTarget !== '' && cleanR === cleanTarget)
+      })
       if (roomObj) {
         setFormRoomFee(String(roomObj.price))
       }
@@ -153,34 +170,31 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
 
     const lastBill = getLastBillForRoom(roomNum)
     if (lastBill) {
+      // Chỉ số cũ của kỳ mới kế thừa chính xác từ chỉ số mới của kỳ liền trước
       setFormOldElectric(String(lastBill.newElectricMeter))
       setFormNewElectric(String(lastBill.newElectricMeter + 50))
       setFormOldWater(String(lastBill.newWaterMeter))
       setFormNewWater(String(lastBill.newWaterMeter + 5))
+    } else {
+      setFormOldElectric('1200')
+      setFormNewElectric('1265')
+      setFormOldWater('80')
+      setFormNewWater('86')
     }
   }
 
   // Open modal create
   const handleOpenAddModal = () => {
     setEditingBill(null)
-    const firstTenant = tenants.find((t) => t.status === 'active')
-    if (firstTenant) {
-      setFormRoomNumber(firstTenant.roomNumber)
-      setFormTenantName(firstTenant.name)
-      setFormTenantPhone(firstTenant.phone)
-      setFormRoomFee(String(firstTenant.monthlyRent))
-    } else {
-      setFormRoomNumber('P.101')
-      setFormTenantName('')
-      setFormTenantPhone('')
-      setFormRoomFee('2500000')
-    }
-    setFormMonth(selectedMonth)
+    const initialRoom =
+      myRooms[0]?.roomNumber ||
+      tenants.find((t) => t.status === 'active')?.roomNumber ||
+      'P.101'
+    handleSelectRoomForForm(initialRoom)
+
+    const targetM = typeof selectedMonth === 'number' ? selectedMonth : (new Date().getMonth() + 1)
+    setFormMonth(targetM)
     setFormYear(selectedYear)
-    setFormOldElectric('1200')
-    setFormNewElectric('1265')
-    setFormOldWater('80')
-    setFormNewWater('86')
     setFormInternetFee(String(utilitySettings.internetFee))
     setFormTrashFee(String(utilitySettings.trashFee))
     setFormOtherFee('0')
@@ -338,7 +352,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
         <View>
           <Text style={styles.headerTitle}>Hóa Đơn & Tiện Ích</Text>
           <Text style={styles.headerSubtitle}>
-            Tháng {selectedMonth}/{selectedYear} • {bills.length} hóa đơn
+            {selectedMonth === 'all' ? `Tất cả các tháng năm ${selectedYear}` : `Tháng ${selectedMonth}/${selectedYear}`} • {filteredBills.length} hóa đơn
           </Text>
         </View>
 
@@ -362,19 +376,30 @@ Vui lòng thanh toán qua STK chủ trọ.`
 
         {/* Month Selector Carousel */}
         <View style={styles.monthRow}>
-          <Text style={styles.sectionLabel}>Chọn tháng:</Text>
+          <Text style={styles.sectionLabel}>Lọc theo tháng:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {[6, 7, 8, 9, 10, 11, 12].map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.monthChip, selectedMonth === m && styles.monthChipActive]}
-                onPress={() => setSelectedMonth(m)}
-              >
-                <Text style={[styles.monthChipText, selectedMonth === m && styles.monthChipTextActive]}>
-                  Tháng {m}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              style={[styles.monthChip, selectedMonth === 'all' && styles.monthChipActive]}
+              onPress={() => setSelectedMonth('all')}
+            >
+              <Text style={[styles.monthChipText, selectedMonth === 'all' && styles.monthChipTextActive]}>
+                Tất cả ({bills.filter((b) => b.year === selectedYear).length})
+              </Text>
+            </TouchableOpacity>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => {
+              const count = bills.filter((b) => b.month === m && b.year === selectedYear).length
+              return (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.monthChip, selectedMonth === m && styles.monthChipActive]}
+                  onPress={() => setSelectedMonth(m)}
+                >
+                  <Text style={[styles.monthChipText, selectedMonth === m && styles.monthChipTextActive]}>
+                    Tháng {m} {count > 0 ? `(${count})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
           </ScrollView>
         </View>
 
@@ -554,6 +579,39 @@ Vui lòng thanh toán qua STK chủ trọ.`
             </View>
 
             <ScrollView contentContainerStyle={styles.modalScroll}>
+              {/* Select Month & Year */}
+              <Text style={styles.fieldLabel}>Kỳ hóa đơn (Tháng / Năm) *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.modalChip, formMonth === m && styles.modalChipActive]}
+                    onPress={() => setFormMonth(m)}
+                  >
+                    <Text style={[styles.modalChipText, formMonth === m && styles.modalChipTextActive]}>
+                      Tháng {m}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                {[2025, 2026, 2027].map((y) => (
+                  <TouchableOpacity
+                    key={y}
+                    style={[
+                      styles.modalChip,
+                      { paddingHorizontal: 16 },
+                      formYear === y && styles.modalChipActive,
+                    ]}
+                    onPress={() => setFormYear(y)}
+                  >
+                    <Text style={[styles.modalChipText, formYear === y && styles.modalChipTextActive]}>
+                      Năm {y}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               {/* Select Room */}
               <Text style={styles.fieldLabel}>Chọn phòng lập hóa đơn</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>

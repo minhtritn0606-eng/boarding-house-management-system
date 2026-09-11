@@ -15,7 +15,25 @@ async function createTenantHandler(req, res) {
     const [landlords] = await pool.query('SELECT id FROM landlords WHERE user_id = ?', [userId]);
     const landlordId = landlords.length > 0 ? landlords[0].id : 1;
 
-    const { fullName, name, email, phone, idCard, identityNumber, hometown, job, emergencyContact, note, notes } = req.body;
+    const {
+      fullName,
+      name,
+      email,
+      phone,
+      idCard,
+      identityNumber,
+      hometown,
+      job,
+      emergencyContact,
+      note,
+      notes,
+      roomId,
+      roomNumber,
+      rentStartDate,
+      rentEndDate,
+      deposit,
+      monthlyRent,
+    } = req.body;
 
     const tenantName = fullName || name;
     if (!tenantName) {
@@ -33,6 +51,12 @@ async function createTenantHandler(req, res) {
       job,
       emergencyContact,
       note: note || notes,
+      roomId,
+      roomNumber,
+      rentStartDate,
+      rentEndDate,
+      deposit,
+      monthlyRent,
     });
 
     return res.status(201).json({ message: 'Tenant added successfully', tenant });

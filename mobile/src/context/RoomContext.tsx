@@ -41,7 +41,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           roomType: r.roomType || 'private',
           status: r.status || 'available',
           ownerEmail: r.ownerEmail || r.owner_email || '',
-          tenantName: r.status === 'rented' ? 'Khách thuê' : undefined,
+          tenantName: r.tenantName || r.tenant_name || (r.status === 'rented' ? 'Khách thuê' : undefined),
+          tenantPhone: r.tenantPhone || r.tenant_phone || undefined,
           amenities: Array.isArray(r.amenities) ? r.amenities : ['Wifi', 'Điều hòa', 'Nóng lạnh'],
           floor: r.floor || 1,
         }))

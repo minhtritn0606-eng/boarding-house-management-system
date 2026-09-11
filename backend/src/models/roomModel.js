@@ -63,11 +63,14 @@ async function findRoomById(id) {
   const [rows] = await pool.query(
     `SELECT r.*, 
             h.name AS house_name, h.address AS house_address, h.city AS house_city, h.district AS house_district,
-            u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+            u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone,
+            t.id AS tenant_id, t.full_name AS tenant_name, t.phone AS tenant_phone
      FROM rooms r 
      LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id 
      LEFT JOIN landlords l ON h.landlord_id = l.id
      LEFT JOIN users u ON l.user_id = u.id
+     LEFT JOIN contracts c ON r.id = c.room_id AND c.status = 'active'
+     LEFT JOIN tenants t ON c.tenant_id = t.id
      WHERE r.id = ?`,
     [id]
   );
@@ -110,6 +113,9 @@ async function findRoomById(id) {
     ownerName: row.owner_name || 'Chủ trọ',
     ownerEmail: row.owner_email || 'nam.owner@example.com',
     contact: row.owner_phone || '0905 888 999',
+    tenantId: row.tenant_id ? String(row.tenant_id) : undefined,
+    tenantName: row.tenant_name || (row.status === 'rented' ? 'Khách thuê' : undefined),
+    tenantPhone: row.tenant_phone || undefined,
     images,
     postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
     createdAt: row.created_at,
@@ -217,11 +223,14 @@ async function listPublishedRooms(filters = {}) {
   let query = `
     SELECT r.*, 
            h.name AS house_name, h.address AS house_address, h.city AS house_city, h.district AS house_district,
-           u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+           u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone,
+           t.id AS tenant_id, t.full_name AS tenant_name, t.phone AS tenant_phone
     FROM rooms r
     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
     LEFT JOIN landlords l ON h.landlord_id = l.id
     LEFT JOIN users u ON l.user_id = u.id
+    LEFT JOIN contracts c ON r.id = c.room_id AND c.status = 'active'
+    LEFT JOIN tenants t ON c.tenant_id = t.id
     WHERE (r.is_published = TRUE OR r.is_published IS NULL)
   `;
   const values = [];
@@ -304,6 +313,9 @@ async function listPublishedRooms(filters = {}) {
       ownerName: row.owner_name || 'Anh Nam',
       ownerEmail: row.owner_email || 'nam.owner@example.com',
       contact: row.owner_phone || '0905 888 999',
+      tenantId: row.tenant_id ? String(row.tenant_id) : undefined,
+      tenantName: row.tenant_name || (row.status === 'rented' ? 'Khách thuê' : undefined),
+      tenantPhone: row.tenant_phone || undefined,
       images: roomImgs.length > 0 ? roomImgs : defaultImages,
       postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
       createdAt: row.created_at,

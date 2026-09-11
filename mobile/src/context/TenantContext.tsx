@@ -77,12 +77,20 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await mobileTenantApi.createTenant({
         fullName: tenantData.name,
+        name: tenantData.name,
         email: tenantData.email,
         phone: tenantData.phone,
         identityNumber: tenantData.idCard,
+        idCard: tenantData.idCard,
         hometown: tenantData.hometown,
         job: tenantData.job,
         note: tenantData.notes,
+        roomId: tenantData.roomId,
+        roomNumber: tenantData.roomNumber,
+        rentStartDate: tenantData.rentStartDate,
+        rentEndDate: tenantData.rentEndDate,
+        deposit: tenantData.deposit,
+        monthlyRent: tenantData.monthlyRent,
       })
       if (res && res.tenant) {
         setTenants((prev) => [res.tenant, ...prev])
@@ -115,6 +123,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         hometown: updatedData.hometown,
         job: updatedData.job,
         note: updatedData.notes,
+        roomId: updatedData.roomId,
+        roomNumber: updatedData.roomNumber,
+        status: updatedData.status,
       })
     } catch (e: any) {
       console.log('Mobile update tenant error:', e.message)

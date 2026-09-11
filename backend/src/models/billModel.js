@@ -41,37 +41,113 @@ async function ensureBillsTable() {
 async function createBill(data) {
   await ensureBillsTable();
   const pool = await getPool();
+
+  let targetRoomId = null;
+  let targetTenantId = null;
+
+  if (data.roomId && !isNaN(Number(data.roomId))) {
+    targetRoomId = Number(data.roomId);
+  } else if (data.roomNumber) {
+    const cleanNum = String(data.roomNumber).replace(/[^\d]/g, '');
+    const [matchingRooms] = await pool.query(
+      `SELECT r.id FROM rooms r
+       LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
+       WHERE (h.landlord_id = ? OR ? IS NULL)
+         AND (LOWER(r.title) LIKE ? OR r.id = ?)
+       LIMIT 1`,
+      [data.landlordId || 1, data.landlordId || 1, `%${String(data.roomNumber).toLowerCase()}%`, cleanNum || 0]
+    );
+    if (matchingRooms.length > 0) {
+      targetRoomId = matchingRooms[0].id;
+    }
+  }
+
+  if (data.tenantId && !isNaN(Number(data.tenantId))) {
+    targetTenantId = Number(data.tenantId);
+  } else if (targetRoomId) {
+    const [contracts] = await pool.query(
+      "SELECT tenant_id FROM contracts WHERE room_id = ? AND status = 'active' LIMIT 1",
+      [targetRoomId]
+    );
+    if (contracts.length > 0) {
+      targetTenantId = contracts[0].tenant_id;
+    }
+  }
+
+  if (!targetTenantId && (data.tenantPhone || data.tenantName)) {
+    const [tenants] = await pool.query(
+      "SELECT id FROM tenants WHERE (phone = ? OR full_name LIKE ?) LIMIT 1",
+      [data.tenantPhone || '', `%${data.tenantName || ''}%`]
+    );
+    if (tenants.length > 0) {
+      targetTenantId = tenants[0].id;
+    }
+  }
+
+  // Fallback to existing first room/tenant if none matched
+  if (!targetRoomId) {
+    const [firstRoom] = await pool.query('SELECT id FROM rooms LIMIT 1');
+    targetRoomId = firstRoom.length > 0 ? firstRoom[0].id : 101;
+  }
+  if (!targetTenantId) {
+    const [firstTenant] = await pool.query('SELECT id FROM tenants LIMIT 1');
+    targetTenantId = firstTenant.length > 0 ? firstTenant[0].id : 1;
+  }
+
+  let monthVal = data.month;
+  if (data.year && data.month && !String(data.month).includes('-')) {
+    monthVal = `${data.year}-${String(data.month).padStart(2, '0')}-01`;
+  } else if (!monthVal) {
+    monthVal = '2026-08-01';
+  }
+
+  const billNumber = data.billNumber || `BILL-${Date.now().toString().slice(-6)}`;
+  const elUnits = data.electricityUnits !== undefined ? Number(data.electricityUnits) : Math.max(0, (Number(data.newElectricMeter) || 0) - (Number(data.oldElectricMeter) || 0));
+  const elRate = Number(data.electricRate) || 3500;
+  const elAmt = data.electricityAmount !== undefined ? Number(data.electricityAmount) : elUnits * elRate;
+
+  const wUnits = data.waterUnits !== undefined ? Number(data.waterUnits) : Math.max(0, (Number(data.newWaterMeter) || 0) - (Number(data.oldWaterMeter) || 0));
+  const wRate = Number(data.waterRate) || 15000;
+  const wAmt = data.waterAmount !== undefined ? Number(data.waterAmount) : wUnits * wRate;
+
+  const rFee = Number(data.roomFee) || 0;
+  const netFee = Number(data.internetFee) || 0;
+  const trFee = Number(data.trashFee) || 0;
+  const oFee = Number(data.otherFee) || 0;
+  const totAmt = data.totalAmount ? Number(data.totalAmount) : (rFee + elAmt + wAmt + netFee + trFee + oFee);
+
   const [result] = await pool.query(
     `INSERT INTO utility_bills (
       bill_number, room_id, tenant_id, landlord_id, month,
       room_fee, old_electric_meter, new_electric_meter, electricity_units, electric_rate, electricity_amount,
       old_water_meter, new_water_meter, water_units, water_rate, water_amount,
-      internet_fee, trash_fee, other_fee, total_amount, status, due_date, note
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      internet_fee, trash_fee, other_fee, other_fee_note, total_amount, status, due_date, note
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      data.billNumber || `BILL-${Date.now()}`,
-      data.roomId || 101,
-      data.tenantId || 1,
+      billNumber,
+      targetRoomId,
+      targetTenantId,
       data.landlordId || 1,
-      data.month || '2026-08-01',
-      data.roomFee || data.amount || 2500000,
-      data.oldElectricMeter || 0,
-      data.newElectricMeter || 0,
-      data.electricityUnits || Math.max(0, (data.newElectricMeter || 0) - (data.oldElectricMeter || 0)),
-      data.electricRate || 3500,
-      data.electricityAmount || 0,
-      data.oldWaterMeter || 0,
-      data.newWaterMeter || 0,
-      data.waterUnits || Math.max(0, (data.newWaterMeter || 0) - (data.oldWaterMeter || 0)),
-      data.waterRate || 15000,
-      data.waterAmount || 0,
-      data.internetFee || 100000,
-      data.trashFee || 30000,
-      data.otherFee || 0,
-      data.totalAmount || data.amount || 2500000,
+      monthVal,
+      rFee,
+      Number(data.oldElectricMeter) || 0,
+      Number(data.newElectricMeter) || 0,
+      elUnits,
+      elRate,
+      elAmt,
+      Number(data.oldWaterMeter) || 0,
+      Number(data.newWaterMeter) || 0,
+      wUnits,
+      wRate,
+      wAmt,
+      netFee,
+      trFee,
+      oFee,
+      data.otherFeeNote || null,
+      totAmt,
       data.status || 'unpaid',
       data.dueDate || '2026-08-25',
-      data.note || data.description || null,
+      data.note || null,
     ]
   );
 
@@ -116,8 +192,8 @@ async function listBills(filters = {}) {
   const values = [];
 
   if (filters.userId) {
-    query += ' AND (l.user_id = ?)';
-    values.push(filters.userId);
+    query += ' AND (l.user_id = ? OR b.landlord_id = ?)';
+    values.push(filters.userId, filters.userId);
   } else if (filters.landlordId) {
     query += ' AND (b.landlord_id = ?)';
     values.push(filters.landlordId);
@@ -128,14 +204,20 @@ async function listBills(filters = {}) {
     values.push(filters.status);
   }
 
-  query += ' ORDER BY b.id ASC';
+  query += ' ORDER BY b.id DESC';
   const [rows] = await pool.query(query, values);
   return rows.map(formatBillRow);
 }
 
 function formatBillRow(row) {
   const monthDate = row.month ? new Date(row.month) : new Date('2026-08-01');
-  const roomNum = row.room_title ? (row.room_title.split(' - ')[0] || `P.${row.room_id}`) : `P.${row.room_id}`;
+  let roomNum = 'P.101';
+  if (row.room_title) {
+    const raw = row.room_title.split(' - ')[0].replace(/^Phòng\s+/i, '').trim();
+    roomNum = raw && raw.includes('P.') ? raw : (raw ? `P.${raw.replace(/[^\d]/g, '')}` : `P.${row.room_id}`);
+  } else if (row.room_id) {
+    roomNum = `P.${row.room_id}`;
+  }
 
   return {
     id: String(row.id),
@@ -161,6 +243,7 @@ function formatBillRow(row) {
     internetFee: Number(row.internet_fee) || 100000,
     trashFee: Number(row.trash_fee) || 30000,
     otherFee: Number(row.other_fee) || 0,
+    otherFeeNote: row.other_fee_note || '',
     totalAmount: Number(row.total_amount) || 2500000,
     status: row.status || 'unpaid',
     dueDate: row.due_date ? new Date(row.due_date).toISOString().split('T')[0] : '2026-08-25',

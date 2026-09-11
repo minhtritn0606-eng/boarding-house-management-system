@@ -112,7 +112,11 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await mobileBillApi.createBill({
         landlordId: user?.id || 1,
+        roomNumber: data.roomNumber,
+        tenantName: data.tenantName,
+        tenantPhone: data.tenantPhone,
         month: `${data.year}-${String(data.month).padStart(2, '0')}-01`,
+        year: data.year,
         roomFee: data.roomFee,
         oldElectricMeter: data.oldElectricMeter,
         newElectricMeter: data.newElectricMeter,
@@ -127,6 +131,7 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
         internetFee: data.internetFee,
         trashFee: data.trashFee,
         otherFee: other,
+        otherFeeNote: data.otherFeeNote,
         totalAmount,
         dueDate: data.dueDate,
         status: data.status,
@@ -217,13 +222,18 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
   }
 
   const getLastBillForRoom = (roomNumber: string, houseName?: string) => {
+    const cleanQuery = roomNumber.replace(/[^\d]/g, '')
     const roomBills = bills
       .filter((b) => {
-        const matchRoom = b.roomNumber.toLowerCase() === roomNumber.toLowerCase()
-        const matchHouse = !houseName || b.houseName.toLowerCase() === houseName.toLowerCase()
-        return matchRoom && matchHouse
+        const bClean = b.roomNumber.replace(/[^\d]/g, '')
+        const matchRoom =
+          b.roomNumber.toLowerCase() === roomNumber.toLowerCase() ||
+          (cleanQuery !== '' && bClean === cleanQuery) ||
+          b.roomNumber.toLowerCase().includes(roomNumber.toLowerCase()) ||
+          roomNumber.toLowerCase().includes(b.roomNumber.toLowerCase())
+        return matchRoom
       })
-      .sort((a, b) => b.year * 12 + b.month - (a.year * 12 + a.month))
+      .sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month) || (Number(b.id) || 0) - (Number(a.id) || 0))
 
     return roomBills[0]
   }

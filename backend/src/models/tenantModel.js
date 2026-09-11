@@ -112,7 +112,7 @@ function formatTenantRow(row) {
     emergencyContact: row.emergency_contact,
     roomId: row.room_id ? String(row.room_id) : `room_${row.id}`,
     roomNumber: roomNum,
-    houseName: row.house_name || 'Dãy trọ Hòa Khánh (Đà Nẵng)',
+    houseName: row.house_name || '',
     rentStartDate: row.start_date ? new Date(row.start_date).toISOString().split('T')[0] : '2026-01-01',
     rentEndDate: row.end_date ? new Date(row.end_date).toISOString().split('T')[0] : '2026-12-31',
     deposit: Number(row.deposit_amount) || Number(row.room_price) || 2500000,

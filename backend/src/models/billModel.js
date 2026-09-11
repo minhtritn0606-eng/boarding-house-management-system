@@ -142,7 +142,7 @@ function formatBillRow(row) {
     billNumber: row.bill_number || `BILL-${row.id}`,
     roomId: row.room_id,
     roomNumber: roomNum,
-    houseName: row.house_name || 'Dãy trọ Hòa Khánh (Đà Nẵng)',
+    houseName: row.house_name || '',
     tenantName: row.tenant_name || 'Khách thuê',
     tenantPhone: row.tenant_phone || '0905 888 999',
     month: monthDate.getMonth() + 1,

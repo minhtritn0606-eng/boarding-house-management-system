@@ -301,3 +301,33 @@ export const adminApi = {
     return await request<{ bills: any[] }>(`/admin/bills${qs}`)
   },
 }
+
+// ================= CHATBOT API =================
+export interface SuggestedRoom {
+  id: number
+  title: string
+  price: number
+  area: number
+  houseName: string
+  district: string
+  address: string
+  status: string
+  amenities?: string
+  image: string
+}
+
+export interface ChatbotResponse {
+  reply: string
+  suggestedRooms?: SuggestedRoom[]
+  quickReplies?: string[]
+}
+
+export const chatbotApi = {
+  sendMessage: async (message: string, currentRoomId?: number | string) => {
+    return await request<ChatbotResponse>('/chatbot/message', {
+      method: 'POST',
+      body: JSON.stringify({ message, currentRoomId }),
+    })
+  },
+}
+

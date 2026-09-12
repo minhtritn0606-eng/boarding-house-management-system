@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
 import Carousel from '../components/Carousel'
+import AppointmentBookingForm from '../components/AppointmentBookingForm'
 
 export default function DetailPage() {
   const { id } = useParams()
@@ -209,26 +210,26 @@ export default function DetailPage() {
           <div className="owner-info-card">
             <strong>Thông tin chủ trọ liên hệ</strong>
             <div className="owner-row">
-              <span className="owner-name">👤 {room.ownerName || 'Chủ trọ'}</span>
+              <span className="owner-name">{room.ownerName || 'Chủ trọ'}</span>
               {room.contact && (
                 <a href={`tel:${room.contact}`} className="owner-phone-btn">
-                  📞 {room.contact}
+                  Gọi: {room.contact}
                 </a>
               )}
             </div>
             {room.ownerEmail && (
-              <p className="owner-email">✉️ {room.ownerEmail}</p>
+              <p className="owner-email">Email: {room.ownerEmail}</p>
             )}
           </div>
+
+          <AppointmentBookingForm room={room} />
         </div>
       </div>
 
       {/* Map & Directions Section */}
       <div className="map-section">
         <div className="map-header-row">
-          <h3>
-            <span>📍</span> Vị trí & Chỉ đường đến phòng trọ
-          </h3>
+          <h3>Vị trí & Chỉ đường đến phòng trọ</h3>
 
           <div className="map-actions">
             <button
@@ -237,7 +238,7 @@ export default function DetailPage() {
               onClick={handleGetDirectionsFromMyLocation}
               disabled={geoLoading}
             >
-              {geoLoading ? '⏳ Đang định vị...' : '🧭 Chỉ đường từ vị trí của tôi'}
+              {geoLoading ? 'Đang định vị...' : 'Chỉ đường từ vị trí của tôi'}
             </button>
 
             <a
@@ -246,7 +247,7 @@ export default function DetailPage() {
               rel="noopener noreferrer"
               className="btn-open-gmaps"
             >
-              🗺️ Mở trong Google Maps ↗
+              Mở trong Google Maps ↗
             </a>
 
             {mapMode === 'directions' && (
@@ -255,7 +256,7 @@ export default function DetailPage() {
                 className="btn-reset-map"
                 onClick={handleResetToRoomLocation}
               >
-                📍 Xem vị trí phòng
+                Xem vị trí phòng
               </button>
             )}
           </div>

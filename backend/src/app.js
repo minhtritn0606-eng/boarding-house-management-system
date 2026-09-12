@@ -10,6 +10,7 @@ const contractRoutes = require('./routes/contractRoutes');
 const billRoutes = require('./routes/billRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const appointmentRoutes = require('./routes/appointmentRoutes');
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use('/api/contracts', contractRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 if (require.main === module) {
   app.listen(PORT, async () => {

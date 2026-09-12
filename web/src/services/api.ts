@@ -336,3 +336,58 @@ export const chatbotApi = {
   },
 }
 
+// ================= APPOINTMENTS / VIEWING REQUESTS API =================
+export interface ViewingAppointment {
+  id: number
+  roomId: number
+  roomTitle: string
+  roomPrice: number
+  houseName: string
+  houseAddress: string
+  visitorName: string
+  phone: string
+  viewingDate: string
+  viewingTime: string
+  note?: string
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
+  createdAt?: string
+}
+
+export const appointmentApi = {
+  createAppointment: async (data: {
+    roomId: number | string
+    visitorName: string
+    phone: string
+    viewingDate: string
+    viewingTime: string
+    note?: string
+  }) => {
+    return await request<{ message: string; appointment: ViewingAppointment }>('/appointments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  getAppointments: async (params: { roomId?: number | string; status?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (params.roomId) query.append('roomId', String(params.roomId))
+    if (params.status && params.status !== 'all') query.append('status', params.status)
+    const qs = query.toString() ? `?${query.toString()}` : ''
+    return await request<{ appointments: ViewingAppointment[] }>(`/appointments${qs}`)
+  },
+
+  updateAppointmentStatus: async (id: number | string, status: string) => {
+    return await request<{ message: string; appointment: ViewingAppointment }>(`/appointments/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    })
+  },
+
+  deleteAppointment: async (id: number | string) => {
+    return await request<{ message: string }>(`/appointments/${id}`, {
+      method: 'DELETE',
+    })
+  },
+}
+
+

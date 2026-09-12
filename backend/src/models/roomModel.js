@@ -63,6 +63,7 @@ async function findRoomById(id) {
   const [rows] = await pool.query(
     `SELECT r.*, 
             h.name AS house_name, h.address AS house_address, h.city AS house_city, h.district AS house_district,
+            h.latitude AS latitude, h.longitude AS longitude,
             u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone,
             t.id AS tenant_id, t.full_name AS tenant_name, t.phone AS tenant_phone
      FROM rooms r 
@@ -107,6 +108,8 @@ async function findRoomById(id) {
     address: row.house_address || 'Đà Nẵng',
     city: row.house_city || 'Đà Nẵng',
     district: row.house_district || 'Liên Chiểu',
+    latitude: row.latitude != null ? Number(row.latitude) : undefined,
+    longitude: row.longitude != null ? Number(row.longitude) : undefined,
     area: Number(row.area) || 20,
     floor: row.floor || 1,
     amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : [],
@@ -186,8 +189,8 @@ async function updateRoom(id, updates) {
     }
   }
 
-  // Cập nhật địa chỉ / quận / thành phố cho nhà trọ liên kết nếu có
-  if (updates.address || updates.district || updates.city) {
+  // Cập nhật địa chỉ / quận / thành phố / tọa độ cho nhà trọ liên kết nếu có
+  if (updates.address || updates.district || updates.city || updates.latitude !== undefined || updates.longitude !== undefined) {
     try {
       const [rRows] = await pool.query('SELECT boarding_house_id FROM rooms WHERE id = ?', [id]);
       if (rRows.length > 0 && rRows[0].boarding_house_id) {
@@ -197,6 +200,8 @@ async function updateRoom(id, updates) {
         if (updates.address) { bFields.push('address = ?'); bVals.push(updates.address); }
         if (updates.district) { bFields.push('district = ?'); bVals.push(updates.district); }
         if (updates.city) { bFields.push('city = ?'); bVals.push(updates.city); }
+        if (updates.latitude !== undefined) { bFields.push('latitude = ?'); bVals.push(updates.latitude); }
+        if (updates.longitude !== undefined) { bFields.push('longitude = ?'); bVals.push(updates.longitude); }
         if (bFields.length > 0) {
           bVals.push(bId);
           await pool.query(`UPDATE boarding_houses SET ${bFields.join(', ')} WHERE id = ?`, bVals);
@@ -223,6 +228,7 @@ async function listPublishedRooms(filters = {}) {
   let query = `
     SELECT r.*, 
            h.name AS house_name, h.address AS house_address, h.city AS house_city, h.district AS house_district,
+           h.latitude AS latitude, h.longitude AS longitude,
            u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone,
            t.id AS tenant_id, t.full_name AS tenant_name, t.phone AS tenant_phone
     FROM rooms r
@@ -307,6 +313,8 @@ async function listPublishedRooms(filters = {}) {
       address: row.house_address || `${row.house_name || 'Dãy trọ'}, ${row.house_city || 'Đà Nẵng'}`,
       city: row.house_city || 'Đà Nẵng',
       district: row.house_district || 'Liên Chiểu',
+      latitude: row.latitude != null ? Number(row.latitude) : undefined,
+      longitude: row.longitude != null ? Number(row.longitude) : undefined,
       area: Number(row.area) || 20,
       floor: row.floor || 1,
       amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi', 'Nóng lạnh'],

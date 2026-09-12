@@ -1,5 +1,6 @@
 export interface Room {
   id: number;
+  boardingHouseId?: number;
   title: string;
   city: string;
   price: number;
@@ -16,6 +17,8 @@ export interface Room {
   ownerEmail?: string;
   images?: string[];
   postedDate?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export const sampleRooms: Room[] = [

@@ -51,7 +51,7 @@ async function register(req, res) {
         // Insert default boarding house for this landlord
         await pool.query(
           'INSERT INTO boarding_houses (landlord_id, name, address, city, district) VALUES (?, ?, ?, ?, ?)',
-          [landlordId, `Dãy trọ ${fullName}`, '120 Ngô Thì Nhậm, Q. Liên Chiểu, Đà Nẵng', 'Đà Nẵng', 'Liên Chiểu']
+          [landlordId, `Dãy trọ ${fullName}`, 'TP. Đà Nẵng', 'Đà Nẵng', 'Liên Chiểu']
         );
       } catch (dbErr) {
         console.warn('Auto create landlord/house profile error (ignorable):', dbErr.message);

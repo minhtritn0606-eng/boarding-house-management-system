@@ -121,7 +121,7 @@ export const roomApi = {
   },
 
   createRoom: async (data: {
-    boardingHouseId: number | string
+    boardingHouseId?: number | string
     title: string
     description?: string
     price: number
@@ -129,6 +129,11 @@ export const roomApi = {
     area?: number
     amenities?: string
     images?: string[]
+    address?: string
+    city?: string
+    district?: string
+    latitude?: number
+    longitude?: number
   }) => {
     return await request<{ room: any }>('/rooms', {
       method: 'POST',

@@ -57,7 +57,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const addRoom = async (roomData: Omit<Room, 'id' | 'postedDate'>): Promise<Room> => {
     try {
       const res = await roomApi.createRoom({
-        boardingHouseId: 1, // Default house
+        boardingHouseId: roomData.boardingHouseId,
         title: roomData.title,
         description: roomData.description,
         price: Number(roomData.price),
@@ -65,6 +65,11 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         area: Number(roomData.area) || 20,
         amenities: Array.isArray(roomData.amenities) ? roomData.amenities.join(', ') : (roomData.amenities || ''),
         images: roomData.images,
+        address: roomData.address,
+        city: roomData.city,
+        district: roomData.district,
+        latitude: roomData.latitude,
+        longitude: roomData.longitude,
       })
       if (res && res.room) {
         setRooms((prev) => [res.room, ...prev.filter((r) => r.id !== res.room.id)])

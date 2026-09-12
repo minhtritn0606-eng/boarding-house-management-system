@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
+import LocationPicker from '../components/LocationPicker'
 
 const DEFAULT_AMENITIES = [
   'Wifi tốc độ cao',
@@ -60,6 +61,8 @@ export default function EditRoomPage() {
   const [area, setArea] = useState('')
   const [roomType, setRoomType] = useState<'private' | 'shared' | 'studio'>('private')
   const [status, setStatus] = useState<'available' | 'rented'>('available')
+  const [latitude, setLatitude] = useState<number | undefined>(undefined)
+  const [longitude, setLongitude] = useState<number | undefined>(undefined)
   const [amenities, setAmenities] = useState<string[]>([])
   const [images, setImages] = useState<string[]>([])
   const [customUrl, setCustomUrl] = useState('')
@@ -82,6 +85,8 @@ export default function EditRoomPage() {
       setArea(String(room.area || ''))
       setRoomType((room.roomType as any) || 'private')
       setStatus(room.status === 'rented' ? 'rented' : 'available')
+      setLatitude(room.latitude)
+      setLongitude(room.longitude)
       setAmenities(room.amenities || [])
       setImages(room.images && room.images.length > 0 ? room.images : [])
       setDescription(room.description || '')
@@ -256,6 +261,8 @@ export default function EditRoomPage() {
         area: numArea,
         roomType,
         status,
+        latitude,
+        longitude,
         amenities,
         images,
         description: description.trim() || 'Phòng sạch đẹp, thoáng mát, khu vực an ninh tốt.',
@@ -280,7 +287,7 @@ export default function EditRoomPage() {
         <Link to="/my-rooms" className="back-link">
           ← Danh sách bài đăng của tôi
         </Link>
-        <h1>✏️ Chỉnh Sửa Bài Đăng Phòng Trọ</h1>
+        <h1>Chỉnh Sửa Bài Đăng Phòng Trọ</h1>
         <p>Cập nhật lại giá thuê, hình ảnh, tiện ích hoặc thông tin mô tả cho phòng trọ #{room.id}</p>
       </div>
 
@@ -308,22 +315,53 @@ export default function EditRoomPage() {
             />
           </div>
 
-          <div className="form-row-3">
-            <div className="form-group">
-              <label htmlFor="room-type">
-                Loại phòng <span className="req">*</span>
-              </label>
-              <select
-                id="room-type"
-                value={roomType}
-                onChange={(e) => setRoomType(e.target.value as any)}
+          <div className="form-group" style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>Loại phòng <span className="req">*</span></span>
+            </label>
+            <div className="room-type-cards-grid">
+              <div
+                className={`room-type-card ${roomType === 'private' ? 'selected' : ''}`}
+                onClick={() => setRoomType('private')}
+                role="button"
+                tabIndex={0}
               >
-                <option value="private">Phòng đơn (Khép kín)</option>
-                <option value="shared">Phòng đôi / Ở ghép</option>
-                <option value="studio">Căn hộ mini / Studio</option>
-              </select>
-            </div>
+                <div className="room-type-card-header">
+                  <span className="room-type-title">Phòng đơn</span>
+                  <span className="room-type-radio-circle"></span>
+                </div>
+                <div className="room-type-desc">Phòng khép kín riêng tư cho 1-2 người, WC riêng</div>
+              </div>
 
+              <div
+                className={`room-type-card ${roomType === 'shared' ? 'selected' : ''}`}
+                onClick={() => setRoomType('shared')}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="room-type-card-header">
+                  <span className="room-type-title">Phòng đôi / Ở ghép</span>
+                  <span className="room-type-radio-circle"></span>
+                </div>
+                <div className="room-type-desc">Dành cho 2+ người hoặc tìm bạn ở ghép</div>
+              </div>
+
+              <div
+                className={`room-type-card ${roomType === 'studio' ? 'selected' : ''}`}
+                onClick={() => setRoomType('studio')}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="room-type-card-header">
+                  <span className="room-type-title">Căn hộ / Studio</span>
+                  <span className="room-type-radio-circle"></span>
+                </div>
+                <div className="room-type-desc">Full nội thất, có bếp và không gian riêng</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-row-2">
             <div className="form-group">
               <label htmlFor="room-status">
                 Trạng thái phòng <span className="req">*</span>
@@ -386,6 +424,18 @@ export default function EditRoomPage() {
               />
             </div>
           </div>
+
+          <LocationPicker
+            address={address}
+            district={district}
+            city={city}
+            latitude={latitude}
+            longitude={longitude}
+            onChange={(coords) => {
+              setLatitude(coords?.latitude)
+              setLongitude(coords?.longitude)
+            }}
+          />
 
           <div className="form-row-2">
             <div className="form-group">

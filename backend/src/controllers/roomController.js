@@ -10,7 +10,7 @@ const { getPool } = require('../config/database');
 async function createRoomHandler(req, res) {
   try {
     const userId = req.user?.id || 2;
-    const { boardingHouseId, title, description, price, roomType, area, floor, amenities, images } = req.body;
+    const { boardingHouseId, title, description, price, roomType, area, floor, amenities, images, address, city, district, latitude, longitude } = req.body;
 
     if (!title || price === undefined) {
       return res.status(400).json({ message: 'Tiêu đề và giá thuê là bắt buộc' });
@@ -26,7 +26,7 @@ async function createRoomHandler(req, res) {
     } else {
       const [lRes] = await pool.query(
         'INSERT INTO landlords (user_id, company_name, address) VALUES (?, ?, ?)',
-        [userId, 'Chủ trọ', 'TP. Đà Nẵng']
+        [userId, 'Chủ trọ', address || 'TP. Đà Nẵng']
       );
       landlordId = lRes.insertId;
     }
@@ -40,22 +40,58 @@ async function createRoomHandler(req, res) {
       );
       if (validHouses.length > 0) {
         targetHouseId = validHouses[0].id;
+        if (address || city || district || latitude !== undefined || longitude !== undefined) {
+          const uFields = [];
+          const uVals = [];
+          if (address) { uFields.push('address = ?'); uVals.push(address); }
+          if (city) { uFields.push('city = ?'); uVals.push(city); }
+          if (district) { uFields.push('district = ?'); uVals.push(district); }
+          if (latitude !== undefined) { uFields.push('latitude = ?'); uVals.push(latitude); }
+          if (longitude !== undefined) { uFields.push('longitude = ?'); uVals.push(longitude); }
+          uVals.push(targetHouseId);
+          await pool.query(`UPDATE boarding_houses SET ${uFields.join(', ')} WHERE id = ?`, uVals);
+        }
       }
     }
 
     if (!targetHouseId) {
-      const [houses] = await pool.query(
-        'SELECT id FROM boarding_houses WHERE landlord_id = ? ORDER BY id ASC LIMIT 1',
-        [landlordId]
-      );
-      if (houses.length > 0) {
-        targetHouseId = houses[0].id;
-      } else {
-        const [hRes] = await pool.query(
-          'INSERT INTO boarding_houses (landlord_id, name, address, city, district) VALUES (?, ?, ?, ?, ?)',
-          [landlordId, 'Dãy trọ chính', 'TP. Đà Nẵng', 'Đà Nẵng', 'Liên Chiểu']
+      if (address) {
+        const [existingHouses] = await pool.query(
+          'SELECT id FROM boarding_houses WHERE landlord_id = ? AND address = ? LIMIT 1',
+          [landlordId, address]
         );
-        targetHouseId = hRes.insertId;
+        if (existingHouses.length > 0) {
+          targetHouseId = existingHouses[0].id;
+          if (latitude !== undefined || longitude !== undefined) {
+            const uFields = [];
+            const uVals = [];
+            if (latitude !== undefined) { uFields.push('latitude = ?'); uVals.push(latitude); }
+            if (longitude !== undefined) { uFields.push('longitude = ?'); uVals.push(longitude); }
+            uVals.push(targetHouseId);
+            await pool.query(`UPDATE boarding_houses SET ${uFields.join(', ')} WHERE id = ?`, uVals);
+          }
+        } else {
+          const houseName = address.length > 35 ? address.substring(0, 35) + '...' : `Nhà trọ ${address}`;
+          const [hRes] = await pool.query(
+            'INSERT INTO boarding_houses (landlord_id, name, address, city, district, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [landlordId, houseName, address, city || 'Đà Nẵng', district || 'Liên Chiểu', latitude || null, longitude || null]
+          );
+          targetHouseId = hRes.insertId;
+        }
+      } else {
+        const [houses] = await pool.query(
+          'SELECT id FROM boarding_houses WHERE landlord_id = ? ORDER BY id ASC LIMIT 1',
+          [landlordId]
+        );
+        if (houses.length > 0) {
+          targetHouseId = houses[0].id;
+        } else {
+          const [hRes] = await pool.query(
+            'INSERT INTO boarding_houses (landlord_id, name, address, city, district, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [landlordId, 'Dãy trọ chính', 'TP. Đà Nẵng', 'Đà Nẵng', 'Liên Chiểu', latitude || null, longitude || null]
+          );
+          targetHouseId = hRes.insertId;
+        }
       }
     }
 

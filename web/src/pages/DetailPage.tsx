@@ -101,22 +101,26 @@ export default function DetailPage() {
     setGeoError('')
   }
 
+  const roomDestTarget = (room.latitude && room.longitude)
+    ? `${room.latitude},${room.longitude}`
+    : encodeURIComponent(room.address)
+
   // Compute map embed URL
-  let mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(room.address)}&output=embed`
+  let mapEmbedUrl = `https://maps.google.com/maps?q=${roomDestTarget}&output=embed`
   if (mapMode === 'directions') {
     if (originCoords) {
-      mapEmbedUrl = `https://maps.google.com/maps?saddr=${originCoords.lat},${originCoords.lng}&daddr=${encodeURIComponent(room.address)}&output=embed`
+      mapEmbedUrl = `https://maps.google.com/maps?saddr=${originCoords.lat},${originCoords.lng}&daddr=${roomDestTarget}&output=embed`
     } else if (activeOriginText) {
-      mapEmbedUrl = `https://maps.google.com/maps?saddr=${encodeURIComponent(activeOriginText)}&daddr=${encodeURIComponent(room.address)}&output=embed`
+      mapEmbedUrl = `https://maps.google.com/maps?saddr=${encodeURIComponent(activeOriginText)}&daddr=${roomDestTarget}&output=embed`
     }
   }
 
   // External Google Maps directions URL for opening in native tab/app
   const googleMapsExternalUrl = originCoords
-    ? `https://www.google.com/maps/dir/?api=1&origin=${originCoords.lat},${originCoords.lng}&destination=${encodeURIComponent(room.address)}`
+    ? `https://www.google.com/maps/dir/?api=1&origin=${originCoords.lat},${originCoords.lng}&destination=${roomDestTarget}`
     : activeOriginText
-    ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeOriginText)}&destination=${encodeURIComponent(room.address)}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(room.address)}`
+    ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeOriginText)}&destination=${roomDestTarget}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${roomDestTarget}`
 
   const isOwner = Boolean(user && (user.email === room.ownerEmail || user.role === 'admin'))
 

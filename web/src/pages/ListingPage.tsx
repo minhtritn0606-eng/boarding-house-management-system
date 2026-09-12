@@ -43,7 +43,6 @@ export default function ListingPage() {
     <div>
       <div className="listing-header">
         <h2>Danh sách phòng ({filtered.length} phòng)</h2>
-        <p className="listing-subtitle">Tối đa 30 phòng mỗi trang</p>
       </div>
 
       <section className="filters">

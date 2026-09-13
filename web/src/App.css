@@ -2661,36 +2661,6 @@ body {
 }
 
 /* ==========================================================================
-   Contact Page Form
-   ========================================================================== */
-.contact-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 560px;
-  background: white;
-  padding: 28px;
-  border-radius: 20px;
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
-}
-
-.contact-form input,
-.contact-form textarea {
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid #cbd5e1;
-  font-family: inherit;
-  font-size: 0.95rem;
-}
-
-.contact-form input:focus,
-.contact-form textarea:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-/* ==========================================================================
    Site Footer
    ========================================================================== */
 .site-footer {

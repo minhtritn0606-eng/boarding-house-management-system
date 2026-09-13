@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { sampleRooms, type Room } from '../data/sampleRooms'
+import type { Room } from '../data/sampleRooms'
 import { roomApi } from '../services/api'
 
 interface RoomContextType {
@@ -15,24 +15,9 @@ interface RoomContextType {
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined)
 
-const ROOMS_STORAGE_KEY = 'boarding_house_rooms_data_v2'
-
 export function RoomProvider({ children }: { children: ReactNode }) {
-  const [rooms, setRooms] = useState<Room[]>(() => {
-    try {
-      const saved = localStorage.getItem(ROOMS_STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed
-        }
-      }
-    } catch (e) {
-      console.error('Failed to parse rooms from localStorage', e)
-    }
-    return sampleRooms
-  })
-  const [isLoading, setIsLoading] = useState(false)
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(true)
 
   // Fetch live rooms from MySQL Backend API
   const refreshRooms = async () => {
@@ -41,10 +26,12 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       const res = await roomApi.getPublishedRooms()
       if (res && Array.isArray(res.rooms)) {
         setRooms(res.rooms)
-        localStorage.setItem(ROOMS_STORAGE_KEY, JSON.stringify(res.rooms))
+      } else {
+        setRooms([])
       }
     } catch (err: any) {
-      console.warn('Backend API fetch warning:', err.message)
+      console.error('Lỗi khi tải danh sách phòng từ CSDL:', err.message)
+      setRooms([])
     } finally {
       setIsLoading(false)
     }
@@ -55,6 +42,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addRoom = async (roomData: Omit<Room, 'id' | 'postedDate'>): Promise<Room> => {
+    setIsLoading(true)
     try {
       const res = await roomApi.createRoom({
         boardingHouseId: roomData.boardingHouseId,
@@ -76,33 +64,33 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         return res.room
       }
     } catch (e: any) {
-      console.warn('Backend createRoom error:', e.message)
+      console.error('Lỗi tạo phòng trong CSDL:', e.message)
+      throw e
+    } finally {
+      setIsLoading(false)
     }
 
     const today = new Date().toISOString().split('T')[0]
-    const nextId = rooms.length > 0 ? Math.max(...rooms.map((r) => Number(r.id) || 0)) + 1 : 101
-    const newLocalRoom: Room = {
+    const fallbackRoom: Room = {
       ...roomData,
-      id: nextId,
+      id: Date.now(),
       postedDate: today,
       status: roomData.status || 'available',
     }
-    setRooms((prev) => [newLocalRoom, ...prev])
-    return newLocalRoom
+    return fallbackRoom
   }
 
   const updateRoom = async (id: number, roomData: Partial<Room>) => {
-    setRooms((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...roomData } : r))
-    )
-
     try {
       const res = await roomApi.updateRoom(id, roomData)
       if (res && res.room) {
         setRooms((prev) => prev.map((r) => (r.id === id ? res.room : r)))
+      } else {
+        setRooms((prev) => prev.map((r) => (r.id === id ? { ...r, ...roomData } : r)))
       }
     } catch (e: any) {
-      console.warn('Backend updateRoom error:', e.message)
+      console.error('Lỗi cập nhật phòng trong CSDL:', e.message)
+      throw e
     }
   }
 
@@ -111,7 +99,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     try {
       await roomApi.deleteRoom(id)
     } catch (e: any) {
-      console.warn('Backend deleteRoom error:', e.message)
+      console.error('Lỗi xóa phòng trong CSDL:', e.message)
+      await refreshRooms()
+      throw e
     }
   }
 
@@ -130,16 +120,16 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         setRooms((prev) => prev.map((r) => (r.id === id ? res.room : r)))
       }
     } catch (e: any) {
-      console.warn('Backend toggle status error:', e.message)
+      console.error('Lỗi đổi trạng thái phòng trong CSDL:', e.message)
+      await refreshRooms()
     }
   }
 
   const getRoomsByOwner = (ownerEmail?: string): Room[] => {
     if (!ownerEmail) return rooms
-    const filtered = rooms.filter(
+    return rooms.filter(
       (r) => (r.ownerEmail || '').toLowerCase() === ownerEmail.toLowerCase()
     )
-    return filtered.length > 0 ? filtered : rooms
   }
 
   return (

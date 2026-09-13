@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middlewares/authMiddleware');
 const {
   createAppointmentHandler,
   listAppointmentsHandler,
@@ -8,8 +8,8 @@ const {
   deleteAppointmentHandler,
 } = require('../controllers/appointmentController');
 
-// Public route: any visitor on Web can book a viewing appointment
-router.post('/', createAppointmentHandler);
+// Public route: any visitor on Web can book a viewing appointment (optional auth if logged in)
+router.post('/', optionalAuth, createAppointmentHandler);
 
 // Authenticated routes: landlord manages appointments
 router.get('/', authenticateToken, listAppointmentsHandler);

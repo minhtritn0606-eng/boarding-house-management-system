@@ -21,29 +21,6 @@ const DEFAULT_AMENITIES = [
   'Bảo vệ 24/7',
 ]
 
-const SAMPLE_IMAGE_PRESETS = [
-  {
-    name: 'Phòng hiện đại & Giường ấm',
-    url: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    name: 'Studio đầy đủ ánh sáng',
-    url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    name: 'Phòng tối giản Bắc Âu',
-    url: 'https://images.unsplash.com/photo-1493666438817-866a91353ca9?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    name: 'Căn hộ mini ban công view đẹp',
-    url: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    name: 'Phòng duplex có gác sang trọng',
-    url: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80',
-  },
-]
-
 export default function CreateRoomPage() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
@@ -61,7 +38,6 @@ export default function CreateRoomPage() {
   const [longitude, setLongitude] = useState<number | undefined>(undefined)
   const [amenities, setAmenities] = useState<string[]>([])
   const [images, setImages] = useState<string[]>([])
-  const [customUrl, setCustomUrl] = useState('')
   const [description, setDescription] = useState('')
   const [ownerName, setOwnerName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
@@ -183,21 +159,6 @@ export default function CreateRoomPage() {
     })
   }
 
-  // Add custom URL
-  const handleAddUrl = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!customUrl.trim()) return
-    setImages((prev) => [...prev, customUrl.trim()])
-    setCustomUrl('')
-  }
-
-  // Add preset sample image
-  const handleAddPreset = (url: string) => {
-    if (!images.includes(url)) {
-      setImages((prev) => [...prev, url])
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -294,7 +255,6 @@ export default function CreateRoomPage() {
               <span>Loại phòng <span className="req">*</span></span>
               {!roomType && (
                 <span style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 500 }}>
-                  (Vui lòng chọn 1 loại phòng)
                 </span>
               )}
             </label>
@@ -500,21 +460,11 @@ export default function CreateRoomPage() {
             >
               <div className="upload-icon-circle">📸</div>
               <div className="upload-instructions">
-                <strong>Nhấn để chọn ảnh từ máy tính/điện thoại</strong> hoặc kéo thả vào đây
+                Nhấn để chọn ảnh từ máy tính/điện thoại hoặc kéo thả vào đây
               </div>
               <p className="upload-hint">
                 Hỗ trợ tệp JPG, PNG, WEBP (Tối đa 10 ảnh, dung lượng ≤ 5MB/ảnh)
               </p>
-              <button
-                type="button"
-                className="btn-upload-trigger"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  fileInputRef.current?.click()
-                }}
-              >
-                📁 Tải ảnh từ thiết bị
-              </button>
             </div>
 
             {/* Uploaded Images Gallery */}
@@ -564,45 +514,7 @@ export default function CreateRoomPage() {
               </div>
             )}
 
-            {/* Alternative: Add Sample Photos or URL */}
-            <details className="alternative-upload-details">
-              <summary>Hoặc chọn ảnh mẫu có sẵn / Nhập URL ảnh</summary>
-              <div className="alternative-box">
-                <div className="sample-presets-box">
-                  <span className="preset-label">💡 Chọn nhanh ảnh mẫu:</span>
-                  <div className="preset-grid">
-                    {SAMPLE_IMAGE_PRESETS.map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        className="preset-btn"
-                        onClick={() => handleAddPreset(preset.url)}
-                      >
-                        <img src={preset.url} alt={preset.name} />
-                        <span>{preset.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                <div className="custom-url-row">
-                  <input
-                    type="url"
-                    placeholder="Nhập đường link URL hình ảnh..."
-                    value={customUrl}
-                    onChange={(e) => setCustomUrl(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddUrl}
-                    className="btn-secondary"
-                    disabled={!customUrl.trim()}
-                  >
-                    + Thêm URL
-                  </button>
-                </div>
-              </div>
-            </details>
           </div>
 
           <div className="form-group" style={{ marginTop: '16px' }}>
@@ -655,7 +567,7 @@ export default function CreateRoomPage() {
             className="btn-primary submit-create-btn"
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Đang đăng tin...' : '🚀 Hoàn tất & Đăng phòng ngay'}
+            {isSubmitting ? 'Đang đăng tin...' : 'Hoàn tất & Đăng phòng ngay'}
           </button>
         </div>
       </form>

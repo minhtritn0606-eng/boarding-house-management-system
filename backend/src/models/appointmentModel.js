@@ -14,10 +14,15 @@ async function ensureAppointmentsTable() {
       note TEXT,
       status VARCHAR(50) NOT NULL DEFAULT 'pending',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      CONSTRAINT fk_viewing_requests_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  try {
+    await pool.query('ALTER TABLE viewing_requests DROP FOREIGN KEY fk_viewing_requests_room');
+  } catch (e) {
+    // ignore if not exists
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notifications (

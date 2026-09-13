@@ -3,7 +3,7 @@ export default function Footer() {
     <footer className="site-footer">
       <div>© {new Date().getFullYear()} BoardingHouse</div>
       <div>
-        Email: support@boardinghouse.example | Hotline: 0123 456 789
+        Email: minhtritn0606@gmail.com | Hotline: 0333736158
       </div>
     </footer>
   )

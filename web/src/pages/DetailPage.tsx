@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
+import { roomApi } from '../services/api'
+import type { Room } from '../data/sampleRooms'
 import Carousel from '../components/Carousel'
 import AppointmentBookingForm from '../components/AppointmentBookingForm'
 
@@ -9,8 +11,10 @@ export default function DetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { rooms } = useRooms()
+  const { rooms, isLoading: isContextLoading } = useRooms()
 
+  const [directRoom, setDirectRoom] = useState<Room | null>(null)
+  const [isDirectLoading, setIsDirectLoading] = useState(false)
   const [mapMode, setMapMode] = useState<'location' | 'directions'>('location')
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [customOrigin, setCustomOrigin] = useState('')
@@ -18,13 +22,42 @@ export default function DetailPage() {
   const [geoLoading, setGeoLoading] = useState(false)
   const [geoError, setGeoError] = useState('')
 
-  const room = rooms.find((r) => String(r.id) === String(id))
+  const contextRoom = rooms.find((r) => String(r.id) === String(id))
+  const room = contextRoom || directRoom
+
+  useEffect(() => {
+    if (!contextRoom && id) {
+      setIsDirectLoading(true)
+      roomApi
+        .getRoomDetails(id)
+        .then((res) => {
+          if (res && res.room) {
+            setDirectRoom(res.room)
+          }
+        })
+        .catch((err) => {
+          console.warn('Lỗi tải chi tiết phòng từ CSDL:', err.message)
+        })
+        .finally(() => {
+          setIsDirectLoading(false)
+        })
+    }
+  }, [id, contextRoom])
+
+  if (isContextLoading || isDirectLoading) {
+    return (
+      <div className="empty-state" style={{ minHeight: '350px' }}>
+        <h3>Đang tải thông tin phòng từ CSDL...</h3>
+        <p>Vui lòng chờ trong giây lát.</p>
+      </div>
+    )
+  }
 
   if (!room) {
     return (
       <div className="empty-state">
         <h3>Không tìm thấy phòng</h3>
-        <p>Phòng này có thể đã bị xóa hoặc không tồn tại.</p>
+        <p>Phòng này có thể đã bị xóa hoặc không tồn tại trong CSDL.</p>
         <Link
           to="/rooms"
           className="btn-primary"
@@ -120,8 +153,8 @@ export default function DetailPage() {
   const googleMapsExternalUrl = originCoords
     ? `https://www.google.com/maps/dir/?api=1&origin=${originCoords.lat},${originCoords.lng}&destination=${roomDestTarget}`
     : activeOriginText
-    ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeOriginText)}&destination=${roomDestTarget}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${roomDestTarget}`
+      ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(activeOriginText)}&destination=${roomDestTarget}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${roomDestTarget}`
 
   const isOwner = Boolean(user && (user.email === room.ownerEmail || user.role === 'admin'))
 
@@ -138,25 +171,7 @@ export default function DetailPage() {
         )}
       </div>
 
-      {isOwner && (
-        <div className="owner-manage-banner">
-          <div className="owner-manage-info">
-            <span className="owner-icon">👑</span>
-            <div>
-              <strong>Bạn là người quản lý bài đăng này</strong>
-              <p>Bạn có thể cập nhật thông tin phòng, giá thuê hoặc đổi trạng thái còn/hết phòng</p>
-            </div>
-          </div>
-          <div className="owner-manage-actions">
-            <Link to={`/rooms/${room.id}/edit`} className="btn-edit-post">
-              ✏️ Chỉnh sửa bài đăng
-            </Link>
-            <Link to="/my-rooms" className="btn-my-rooms">
-              📋 Quản lý tất cả phòng
-            </Link>
-          </div>
-        </div>
-      )}
+
 
       {/* Main Room Detail Card */}
       <div className="room-detail-card">
@@ -199,7 +214,7 @@ export default function DetailPage() {
           <div className="amenities">
             <strong>Tiện nghi nổi bật</strong>
             <div className="detail-amenities-tags">
-              {(room.amenities || []).map((a) => (
+              {(room.amenities || []).map((a: string) => (
                 <span key={a} className="amenity-chip">
                   {a}
                 </span>

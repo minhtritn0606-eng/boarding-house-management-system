@@ -26,9 +26,6 @@ export default function Navbar() {
         <li>
           <NavLink to="/rooms">Danh sách phòng</NavLink>
         </li>
-        <li>
-          <NavLink to="/contact">Liên hệ</NavLink>
-        </li>
       </ul>
 
       <div className="nav-actions">

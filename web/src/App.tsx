@@ -7,7 +7,6 @@ import Footer from './components/Footer'
 import HomePage from './pages/HomePage'
 import ListingPage from './pages/ListingPage'
 import DetailPage from './pages/DetailPage'
-import ContactPage from './pages/ContactPage'
 import LoginPage from './pages/LoginPage'
 import CreateRoomPage from './pages/CreateRoomPage'
 import EditRoomPage from './pages/EditRoomPage'
@@ -36,7 +35,6 @@ export default function App() {
                       <Route path="/rooms" element={<ListingPage />} />
                       <Route path="/rooms/:id" element={<DetailPage />} />
                       <Route path="/rooms/:id/edit" element={<EditRoomPage />} />
-                      <Route path="/contact" element={<ContactPage />} />
                       <Route path="/login" element={<LoginPage />} />
                       <Route path="/create-room" element={<CreateRoomPage />} />
                       <Route path="/my-rooms" element={<MyRoomsPage />} />

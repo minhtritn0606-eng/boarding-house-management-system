@@ -51,3 +51,33 @@ ALTER TABLE utility_bills
 CREATE INDEX IF NOT EXISTS idx_rooms_boarding_house ON rooms(boarding_house_id);
 CREATE INDEX IF NOT EXISTS idx_contracts_tenant_room ON contracts(tenant_id, room_id);
 CREATE INDEX IF NOT EXISTS idx_utility_bills_status ON utility_bills(status);
+
+-- 6. BẢNG ĐẶT LỊCH HẸN XEM PHÒNG (viewing_requests) & THÔNG BÁO (notifications)
+CREATE TABLE IF NOT EXISTS viewing_requests (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    room_id BIGINT NOT NULL,
+    landlord_id BIGINT DEFAULT NULL,
+    visitor_name VARCHAR(150) NOT NULL COMMENT 'Họ và tên khách xem phòng',
+    phone VARCHAR(30) NOT NULL COMMENT 'Số điện thoại / Zalo liên hệ',
+    viewing_date DATE NOT NULL COMMENT 'Ngày muốn đến xem',
+    viewing_time VARCHAR(50) NOT NULL COMMENT 'Khung giờ hẹn (Sáng/Chiều/Tối/Tự thỏa thuận)',
+    note TEXT DEFAULT NULL COMMENT 'Ghi chú hoặc câu hỏi từ khách',
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' COMMENT 'pending (chờ), confirmed (đã liên hệ), completed (đã xem), cancelled (hủy)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_viewing_requests_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL COMMENT 'ID của user nhận thông báo (chủ trọ/admin)',
+    title VARCHAR(150) NOT NULL COMMENT 'Tiêu đề thông báo',
+    message TEXT NOT NULL COMMENT 'Nội dung chi tiết thông báo',
+    is_read BOOLEAN DEFAULT FALSE COMMENT 'Trạng thái đã đọc',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_viewing_requests_landlord ON viewing_requests(landlord_id);
+CREATE INDEX IF NOT EXISTS idx_viewing_requests_status ON viewing_requests(status);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, is_read);
+

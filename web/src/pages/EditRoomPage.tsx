@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
+import { roomApi } from '../services/api'
 import LocationPicker from '../components/LocationPicker'
 
 const DEFAULT_AMENITIES = [
@@ -21,37 +22,18 @@ const DEFAULT_AMENITIES = [
   'Bảo vệ 24/7',
 ]
 
-const SAMPLE_IMAGE_PRESETS = [
-  {
-    name: 'Phòng hiện đại & Giường ấm',
-    url: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    name: 'Studio đầy đủ ánh sáng',
-    url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    name: 'Phòng tối giản Bắc Âu',
-    url: 'https://images.unsplash.com/photo-1493666438817-866a91353ca9?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    name: 'Căn hộ mini ban công view đẹp',
-    url: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    name: 'Phòng duplex có gác sang trọng',
-    url: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80',
-  },
-]
-
 export default function EditRoomPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
-  const { rooms, updateRoom } = useRooms()
+  const { rooms, updateRoom, isLoading: isContextLoading } = useRooms()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const room = rooms.find((r) => String(r.id) === String(id))
+  const [directRoom, setDirectRoom] = useState<any>(null)
+  const [isDirectLoading, setIsDirectLoading] = useState(false)
+
+  const contextRoom = rooms.find((r) => String(r.id) === String(id))
+  const room = contextRoom || directRoom
 
   const [title, setTitle] = useState('')
   const [city, setCity] = useState('Đà Nẵng')
@@ -65,7 +47,6 @@ export default function EditRoomPage() {
   const [longitude, setLongitude] = useState<number | undefined>(undefined)
   const [amenities, setAmenities] = useState<string[]>([])
   const [images, setImages] = useState<string[]>([])
-  const [customUrl, setCustomUrl] = useState('')
   const [description, setDescription] = useState('')
   const [ownerName, setOwnerName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
@@ -73,6 +54,25 @@ export default function EditRoomPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+
+  useEffect(() => {
+    if (!contextRoom && id) {
+      setIsDirectLoading(true)
+      roomApi
+        .getRoomDetails(id)
+        .then((res) => {
+          if (res && res.room) {
+            setDirectRoom(res.room)
+          }
+        })
+        .catch((err) => {
+          console.warn('Lỗi tải phòng từ CSDL:', err.message)
+        })
+        .finally(() => {
+          setIsDirectLoading(false)
+        })
+    }
+  }, [id, contextRoom])
 
   // Điền dữ liệu ban đầu từ phòng cần chỉnh sửa
   useEffect(() => {
@@ -119,11 +119,20 @@ export default function EditRoomPage() {
     )
   }
 
+  if (isContextLoading || isDirectLoading) {
+    return (
+      <div className="empty-state" style={{ minHeight: '350px' }}>
+        <h3>Đang tải dữ liệu bài đăng từ CSDL...</h3>
+        <p>Vui lòng chờ trong giây lát.</p>
+      </div>
+    )
+  }
+
   if (!room) {
     return (
       <div className="empty-state">
         <h3>Không tìm thấy bài đăng phòng trọ</h3>
-        <p>Phòng này có thể đã bị xóa hoặc đường dẫn không chính xác.</p>
+        <p>Phòng này có thể đã bị xóa hoặc không tồn tại trong CSDL.</p>
         <Link to="/my-rooms" className="btn-primary" style={{ display: 'inline-block', marginTop: '12px' }}>
           ← Về danh sách phòng của tôi
         </Link>
@@ -206,19 +215,6 @@ export default function EditRoomPage() {
       const rest = prev.filter((_, idx) => idx !== index)
       return [selected, ...rest]
     })
-  }
-
-  const handleAddUrl = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!customUrl.trim()) return
-    setImages((prev) => [...prev, customUrl.trim()])
-    setCustomUrl('')
-  }
-
-  const handleAddPreset = (url: string) => {
-    if (!images.includes(url)) {
-      setImages((prev) => [...prev, url])
-    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -574,35 +570,6 @@ export default function EditRoomPage() {
               ))}
             </div>
           )}
-
-          {/* Presets & URL link */}
-          <div className="preset-gallery-box">
-            <div className="preset-title">💡 Hoặc chọn nhanh ảnh mẫu chất lượng cao:</div>
-            <div className="preset-chips">
-              {SAMPLE_IMAGE_PRESETS.map((preset) => (
-                <button
-                  type="button"
-                  key={preset.url}
-                  className="preset-btn"
-                  onClick={() => handleAddPreset(preset.url)}
-                >
-                  ➕ {preset.name}
-                </button>
-              ))}
-            </div>
-
-            <div className="custom-url-row">
-              <input
-                type="url"
-                placeholder="Hoặc dán liên kết URL ảnh trực tiếp từ internet..."
-                value={customUrl}
-                onChange={(e) => setCustomUrl(e.target.value)}
-              />
-              <button type="button" onClick={handleAddUrl} className="btn-secondary">
-                Thêm URL
-              </button>
-            </div>
-          </div>
         </section>
 
         {/* Section 4: Mô tả & Thông tin liên hệ */}
@@ -648,16 +615,16 @@ export default function EditRoomPage() {
         </section>
 
         {/* Form Actions */}
-        <div className="form-submit-row">
-          <Link to={`/rooms/${room.id}`} className="btn-cancel">
+        <div className="form-actions">
+          <Link to={`/rooms/${room.id}`} className="btn-secondary">
             Hủy bỏ
           </Link>
           <button
             type="submit"
-            className="btn-submit-room"
+            className="btn-primary submit-create-btn"
             disabled={isSubmitting}
           >
-            {isSubmitting ? '⏳ Đang lưu thay đổi...' : '💾 Lưu cập nhật bài đăng'}
+            {isSubmitting ? 'Đang lưu thay đổi...' : 'Lưu cập nhật bài đăng'}
           </button>
         </div>
       </form>

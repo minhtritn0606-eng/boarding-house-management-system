@@ -159,14 +159,34 @@ async function listTenants(filters = {}) {
   return rows.map(formatTenantRow);
 }
 
-function formatTenantRow(row) {
-  let roomNum = 'Chưa xếp phòng';
-  if (row.room_title) {
-    const titlePart = row.room_title.split(' - ')[0];
-    roomNum = titlePart && titlePart.includes('P.') ? titlePart : `P.${row.room_id || row.id}`;
-  } else if (row.room_id) {
-    roomNum = `P.${row.room_id}`;
+function parseRoomNumber(title, roomId) {
+  if (!title) return roomId ? `P.${roomId}` : 'Chưa xếp phòng';
+  const t = String(title).trim();
+
+  // 1. Format "SốPhòng - Tiêu đề" (VD: "201 - Phòng 201", "P.101 - Studio", "Ps2 - Q", "1 - 1")
+  if (t.includes(' - ')) {
+    const prefix = t.split(' - ')[0].trim();
+    const stripped = prefix.replace(/^Phòng\s+/i, '').trim();
+    if (stripped) return stripped;
+    if (prefix) return prefix;
   }
+
+  // 2. Format "Phòng 101", "P.102", "Phòng A1"
+  const prefixMatch = t.match(/^(?:Phòng\s*)?([A-Za-z0-9._-]+)/i);
+  if (prefixMatch && prefixMatch[1]) {
+    return prefixMatch[1].trim();
+  }
+
+  // 3. Nếu tên phòng ngắn (VD: "201", "A1", "P1")
+  if (t.length <= 15) {
+    return t;
+  }
+
+  return roomId ? `P.${roomId}` : t.slice(0, 15);
+}
+
+function formatTenantRow(row) {
+  const roomNum = parseRoomNumber(row.room_title, row.room_id);
 
   return {
     id: String(row.id),
@@ -182,6 +202,7 @@ function formatTenantRow(row) {
     emergencyContact: row.emergency_contact,
     roomId: row.room_id ? String(row.room_id) : `room_${row.id}`,
     roomNumber: roomNum,
+    roomTitle: row.room_title || '',
     houseName: row.house_name || '',
     rentStartDate: row.start_date ? new Date(row.start_date).toISOString().split('T')[0] : '2026-01-01',
     rentEndDate: row.end_date ? new Date(row.end_date).toISOString().split('T')[0] : '2026-12-31',

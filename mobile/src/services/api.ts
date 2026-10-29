@@ -3,17 +3,61 @@
  * Connects React Native (Expo) App to Express Backend RESTful APIs
  */
 
-import { Platform } from 'react-native'
+import { Platform, NativeModules } from 'react-native'
+import Constants from 'expo-constants'
 
-// Host IP of backend server (your PC's LAN IP: 192.168.106.94)
-const LAN_HOST = '192.168.106.94'
+// Host IP of backend server on current network (Realme 2 Hotspot: 192.168.111.41)
+const LAN_HOST = '192.168.111.41'
 
-const getDefaultHost = () => {
-  // If running on web
+/**
+ * Trích xuất địa chỉ IP của máy tính từ bất kỳ định dạng URL nào của Expo / React Native:
+ * - hostUri: "192.168.x.x:8081"
+ * - experienceUrl: "exp://192.168.x.x:8081"
+ * - linkingUri: "exp://192.168.x.x:8081"
+ * - scriptURL: "http://192.168.x.x:8081/index.bundle?..."
+ */
+const extractHost = (urlOrUri: string | undefined | null): string | null => {
+  if (!urlOrUri || typeof urlOrUri !== 'string') return null
+  const cleaned = urlOrUri.replace(/^[a-zA-Z]+:\/\//, '').split('/')[0]
+  const host = cleaned.split(':')[0]
+  if (host && host !== 'localhost' && host !== '127.0.0.1' && host !== '0.0.0.0') {
+    return host
+  }
+  return null
+}
+
+export const getDevServerHost = (): string | null => {
+  try {
+    const candidate =
+      extractHost(Constants.expoConfig?.hostUri) ||
+      extractHost((Constants as any).manifest2?.extra?.expoClient?.hostUri) ||
+      extractHost((Constants as any).manifest?.debuggerHost) ||
+      extractHost((Constants as any).experienceUrl) ||
+      extractHost((Constants as any).linkingUri) ||
+      extractHost(NativeModules?.SourceCode?.scriptURL)
+
+    if (candidate) {
+      return candidate
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+export const getDefaultHost = () => {
+  // If running on web browser
   if (Platform.OS === 'web') {
     return 'http://localhost:5000/api'
   }
-  // For real mobile device on Wi-Fi or emulator
+
+  // 1. Tự động nhận diện IP máy tính từ mã QR Expo / Metro Bundler
+  const autoHost = getDevServerHost()
+  if (autoHost) {
+    return `http://${autoHost}:5000/api`
+  }
+
+  // 2. Dự phòng IP khi chạy không có kết nối Metro
   return `http://${LAN_HOST}:5000/api`
 }
 
@@ -49,18 +93,23 @@ async function mobileRequest<T>(endpoint: string, options: RequestInit = {}): Pr
 
   const url = `${getApiBaseUrl()}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  })
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    })
 
-  const data = await response.json().catch(() => ({}))
+    const data = await response.json().catch(() => ({}))
 
-  if (!response.ok) {
-    throw new Error(data.message || `Lỗi yêu cầu máy chủ (${response.status})`)
+    if (!response.ok) {
+      throw new Error(data.message || `Lỗi yêu cầu máy chủ (${response.status})`)
+    }
+
+    return data as T
+  } catch (error: any) {
+    console.log(`[API Connection] Lỗi kết nối tới: ${url} (${error.message})`)
+    throw error
   }
-
-  return data as T
 }
 
 // ================= AUTH =================

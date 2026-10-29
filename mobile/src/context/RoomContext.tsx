@@ -19,6 +19,32 @@ interface RoomContextType {
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined)
 
+export const parseRoomNumber = (title: string | undefined, id: any): string => {
+  if (!title) return `P.${id}`
+  const t = title.trim()
+
+  // 1. Format "SốPhòng - Tiêu đề" (VD: "201 - Phòng 201", "P.101 - Studio", "Ps2 - Q", "1 - 1")
+  if (t.includes(' - ')) {
+    const prefix = t.split(' - ')[0].trim()
+    const stripped = prefix.replace(/^Phòng\s+/i, '').trim()
+    if (stripped) return stripped
+    if (prefix) return prefix
+  }
+
+  // 2. Format "Phòng 101", "P.102", "Phòng A1"
+  const prefixMatch = t.match(/^(?:Phòng\s*)?([A-Za-z0-9._-]+)/i)
+  if (prefixMatch && prefixMatch[1]) {
+    return prefixMatch[1].trim()
+  }
+
+  // 3. Nếu tên phòng ngắn (VD: "c", "101", "A1") -> lấy nguyên tên người dùng đặt
+  if (t.length <= 15) {
+    return t
+  }
+
+  return t.slice(0, 15)
+}
+
 export function RoomProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated } = useAuth()
   const [rooms, setRooms] = useState<MobileRoom[]>([])
@@ -34,7 +60,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         const mapped: MobileRoom[] = res.rooms.map((r: any) => ({
           id: String(r.id),
           houseName: r.houseName || r.house_name || (r.address ? r.address.split(',')[0] : 'Dãy trọ chính'),
-          roomNumber: r.title && r.title.includes('P.') ? r.title.split(' - ')[0] || `P.${r.id}` : `P.${r.id}`,
+          roomNumber: parseRoomNumber(r.title, r.id),
           title: r.title,
           price: Number(r.price) || 2500000,
           area: Number(r.area) || 20,

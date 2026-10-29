@@ -69,6 +69,7 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
       })
 
       setIsSuccess(true)
+      window.dispatchEvent(new Event('appointment-updated'))
     } catch (err: any) {
       setError(err.message || 'Không thể gửi yêu cầu đặt lịch. Vui lòng thử lại.')
     } finally {

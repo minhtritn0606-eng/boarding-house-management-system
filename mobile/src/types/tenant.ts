@@ -10,6 +10,7 @@ export interface Tenant {
   job?: string
   roomId: string
   roomNumber: string
+  roomTitle?: string
   houseName: string
   rentStartDate: string
   rentEndDate: string

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { Tenant, ContractStatus } from '../types/tenant'
 import { mobileTenantApi } from '../services/api'
 import { useAuth } from './AuthContext'
-import { useRooms } from './RoomContext'
+import { useRooms, parseRoomNumber } from './RoomContext'
 
 interface TenantContextType {
   tenants: Tenant[]
@@ -19,7 +19,7 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined)
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated } = useAuth()
-  const { occupyRoom, vacateRoom } = useRooms()
+  const { rooms, occupyRoom, vacateRoom } = useRooms()
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
@@ -28,25 +28,38 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await mobileTenantApi.getTenants()
       if (res && Array.isArray(res.tenants)) {
-        const mapped: Tenant[] = res.tenants.map((t: any) => ({
-          id: String(t.id),
-          contractNumber: t.contractNumber || `HD-2026-${String(t.id).padStart(3, '0')}`,
-          name: t.name || t.fullName || 'Khách thuê',
-          phone: t.phone || '',
-          email: t.email || '',
-          idCard: t.identityNumber || t.idCard || '',
-          hometown: t.hometown || '',
-          job: t.job || '',
-          roomId: String(t.roomId || t.id),
-          roomNumber: t.roomNumber || `P.${t.id}`,
-          houseName: t.houseName || 'Nhà trọ',
-          rentStartDate: t.rentStartDate || '2026-01-01',
-          rentEndDate: t.rentEndDate || '2026-12-31',
-          deposit: Number(t.deposit) || 0,
-          monthlyRent: Number(t.monthlyRent) || 0,
-          status: t.status || 'active',
-          notes: t.notes || t.note || '',
-        }))
+        const mapped: Tenant[] = res.tenants.map((t: any) => {
+          let resolvedRoomNum = t.roomNumber || ''
+          const matchedRoom = rooms.find((r) => String(r.id) === String(t.roomId))
+          if (matchedRoom) {
+            resolvedRoomNum = matchedRoom.roomNumber
+          } else if (t.roomTitle) {
+            resolvedRoomNum = parseRoomNumber(t.roomTitle, t.roomId)
+          } else if (resolvedRoomNum.startsWith('P.') && String(t.roomId) && resolvedRoomNum === `P.${t.roomId}`) {
+            resolvedRoomNum = parseRoomNumber(t.roomTitle, t.roomId)
+          }
+
+          return {
+            id: String(t.id),
+            contractNumber: t.contractNumber || `HD-2026-${String(t.id).padStart(3, '0')}`,
+            name: t.name || t.fullName || 'Khách thuê',
+            phone: t.phone || '',
+            email: t.email || '',
+            idCard: t.identityNumber || t.idCard || '',
+            hometown: t.hometown || '',
+            job: t.job || '',
+            roomId: String(t.roomId || t.id),
+            roomNumber: resolvedRoomNum || t.roomNumber || `P.${t.id}`,
+            roomTitle: t.roomTitle || (matchedRoom ? matchedRoom.title : ''),
+            houseName: t.houseName || (matchedRoom ? matchedRoom.houseName : 'Nhà trọ'),
+            rentStartDate: t.rentStartDate || '2026-01-01',
+            rentEndDate: t.rentEndDate || '2026-12-31',
+            deposit: Number(t.deposit) || 0,
+            monthlyRent: Number(t.monthlyRent) || 0,
+            status: t.status || 'active',
+            notes: t.notes || t.note || '',
+          }
+        })
         setTenants(mapped)
       } else {
         setTenants([])
@@ -61,7 +74,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshTenants()
-  }, [user?.id, isAuthenticated])
+  }, [user?.id, isAuthenticated, rooms])
 
   const getTenantsByHouse = (houseName?: string) => {
     if (!houseName || houseName === 'all') return tenants

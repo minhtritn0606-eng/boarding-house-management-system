@@ -1,5 +1,6 @@
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import NotificationBell from './NotificationBell'
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth()
@@ -35,6 +36,7 @@ export default function Navbar() {
 
         {isAuthenticated && user ? (
           <div className="nav-user-menu">
+            <NotificationBell />
             {user.role === 'admin' ? (
               <Link to="/admin" className="nav-user-profile" title="Mở trang Quản trị">
                 <img

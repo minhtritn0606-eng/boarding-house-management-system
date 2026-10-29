@@ -209,21 +209,41 @@ async function listBills(filters = {}) {
   return rows.map(formatBillRow);
 }
 
+function parseRoomNumber(title, roomId) {
+  if (!title) return roomId ? `P.${roomId}` : 'P.101';
+  const t = String(title).trim();
+
+  // 1. Format "SốPhòng - Tiêu đề" (VD: "201 - Phòng 201", "P.101 - Studio", "Ps2 - Q")
+  if (t.includes(' - ')) {
+    const prefix = t.split(' - ')[0].trim();
+    const stripped = prefix.replace(/^Phòng\s+/i, '').trim();
+    if (stripped) return stripped;
+    if (prefix) return prefix;
+  }
+
+  // 2. Format "Phòng 101", "P.102", "Phòng A1"
+  const prefixMatch = t.match(/^(?:Phòng\s*)?([A-Za-z0-9._-]+)/i);
+  if (prefixMatch && prefixMatch[1]) {
+    return prefixMatch[1].trim();
+  }
+
+  if (t.length <= 15) {
+    return t;
+  }
+
+  return roomId ? `P.${roomId}` : t.slice(0, 15);
+}
+
 function formatBillRow(row) {
   const monthDate = row.month ? new Date(row.month) : new Date('2026-08-01');
-  let roomNum = 'P.101';
-  if (row.room_title) {
-    const raw = row.room_title.split(' - ')[0].replace(/^Phòng\s+/i, '').trim();
-    roomNum = raw && raw.includes('P.') ? raw : (raw ? `P.${raw.replace(/[^\d]/g, '')}` : `P.${row.room_id}`);
-  } else if (row.room_id) {
-    roomNum = `P.${row.room_id}`;
-  }
+  const roomNum = parseRoomNumber(row.room_title, row.room_id);
 
   return {
     id: String(row.id),
     billNumber: row.bill_number || `BILL-${row.id}`,
     roomId: row.room_id,
     roomNumber: roomNum,
+    roomTitle: row.room_title || '',
     houseName: row.house_name || '',
     tenantName: row.tenant_name || 'Khách thuê',
     tenantPhone: row.tenant_phone || '0905 888 999',

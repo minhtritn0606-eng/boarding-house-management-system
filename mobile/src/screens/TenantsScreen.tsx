@@ -11,6 +11,7 @@ import {
   Modal,
   Alert,
   Linking,
+  Platform,
 } from 'react-native'
 import { useTenants } from '../context/TenantContext'
 import { useRooms } from '../context/RoomContext'
@@ -335,7 +336,14 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                   {/* Room banner */}
                   <View style={styles.roomBanner}>
                     <Text style={styles.roomBannerText}>
-                      🏠 <Text style={styles.roomHighlight}>Phòng {item.roomNumber}</Text>
+                      🏠{' '}
+                      <Text style={styles.roomHighlight}>
+                        {item.roomNumber === 'Chưa xếp phòng'
+                          ? 'Chưa xếp phòng'
+                          : item.roomNumber.toLowerCase().startsWith('phòng')
+                          ? item.roomNumber
+                          : `Phòng ${item.roomNumber}`}
+                      </Text>
                     </Text>
                   </View>
 
@@ -662,7 +670,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#0f172a',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 16,
     paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',

@@ -7,6 +7,7 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
+  Platform,
 } from 'react-native'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#0f172a',
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 24,
     paddingBottom: 28,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,

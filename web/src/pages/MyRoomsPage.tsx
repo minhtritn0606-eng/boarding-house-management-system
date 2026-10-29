@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
 import { appointmentApi, type ViewingAppointment } from '../services/api'
@@ -7,12 +7,21 @@ import { appointmentApi, type ViewingAppointment } from '../services/api'
 export default function MyRoomsPage() {
   const { user, isAuthenticated } = useAuth()
   const { getRoomsByOwner, toggleRoomStatus, deleteRoom } = useRooms()
-  const [activeTab, setActiveTab] = useState<'rooms' | 'appointments'>('rooms')
+  const location = useLocation()
+  const [activeTab, setActiveTab] = useState<'rooms' | 'appointments'>(() => {
+    return (location.state as any)?.tab === 'appointments' ? 'appointments' : 'rooms'
+  })
   const [appointments, setAppointments] = useState<ViewingAppointment[]>([])
   const [loadingAppointments, setLoadingAppointments] = useState(false)
   const [updatingId, setUpdatingId] = useState<number | null>(null)
 
   const myRooms = user ? getRoomsByOwner(user.email) : []
+
+  useEffect(() => {
+    if ((location.state as any)?.tab) {
+      setActiveTab((location.state as any).tab)
+    }
+  }, [location.state])
 
   useEffect(() => {
     if (isAuthenticated && activeTab === 'appointments') {
@@ -39,6 +48,7 @@ export default function MyRoomsPage() {
       setAppointments((prev) =>
         prev.map((app) => (app.id === id ? { ...app, status: newStatus } : app))
       )
+      window.dispatchEvent(new Event('appointment-updated'))
     } catch (err) {
       console.error('Không thể cập nhật trạng thái:', err)
       alert('Có lỗi xảy ra khi cập nhật trạng thái lịch hẹn.')
@@ -52,6 +62,7 @@ export default function MyRoomsPage() {
       try {
         await appointmentApi.deleteAppointment(id)
         setAppointments((prev) => prev.filter((app) => app.id !== id))
+        window.dispatchEvent(new Event('appointment-updated'))
       } catch (err) {
         console.error('Không thể xóa lịch hẹn:', err)
       }
@@ -173,13 +184,13 @@ export default function MyRoomsPage() {
                 <table className="my-rooms-table">
                   <thead>
                     <tr>
-                      <th>Phòng</th>
-                      <th>Khu vực</th>
-                      <th>Giá thuê</th>
-                      <th>Diện tích</th>
-                      <th>Trạng thái</th>
-                      <th>Ngày đăng</th>
-                      <th>Thao tác</th>
+                      <th style={{ width: '130px' }}>Phòng</th>
+                      <th style={{ width: '130px' }}>Khu vực</th>
+                      <th style={{ width: '95px' }}>Giá thuê</th>
+                      <th style={{ width: '65px' }}>Diện tích</th>
+                      <th style={{ width: '105px' }}>Trạng thái</th>
+                      <th style={{ width: '85px' }}>Ngày đăng</th>
+                      <th style={{ width: '100px' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -197,8 +208,8 @@ export default function MyRoomsPage() {
                                 alt={room.title}
                                 className="room-cell-thumb"
                               />
-                              <div>
-                                <Link to={`/rooms/${room.id}`} className="room-cell-title">
+                              <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                                <Link to={`/rooms/${room.id}`} className="room-cell-title" title={room.title}>
                                   {room.title}
                                 </Link>
                                 <div className="room-cell-type">{room.roomType}</div>
@@ -211,13 +222,13 @@ export default function MyRoomsPage() {
                               {room.city}
                             </span>
                           </td>
-                          <td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
                             <strong className="price-text">
                               {room.price.toLocaleString('vi-VN')}₫
                             </strong>
                           </td>
-                          <td>{room.area} m²</td>
-                          <td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{room.area} m²</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
                             <button
                               type="button"
                               className={`status-toggle-btn ${isAvailable ? 'available' : 'rented'}`}
@@ -228,8 +239,8 @@ export default function MyRoomsPage() {
                               {isAvailable ? 'Còn phòng' : 'Đã thuê'}
                             </button>
                           </td>
-                          <td>{room.postedDate || '—'}</td>
-                          <td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{room.postedDate || '—'}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
                             <div className="table-actions">
                               <Link
                                 to={`/rooms/${room.id}`}
@@ -293,16 +304,16 @@ export default function MyRoomsPage() {
           ) : (
             <div className="my-rooms-table-card">
               <div className="table-responsive">
-                <table className="my-rooms-table">
+                <table className="my-rooms-table appointments-table">
                   <thead>
                     <tr>
-                      <th>Khách xem phòng</th>
-                      <th>Số điện thoại / Zalo</th>
-                      <th>Phòng quan tâm</th>
-                      <th>Lịch hẹn</th>
-                      <th>Ghi chú</th>
-                      <th>Trạng thái</th>
-                      <th>Thao tác</th>
+                      <th style={{ width: '15%' }}>Khách xem</th>
+                      <th style={{ width: '14%' }}>SĐT / Zalo</th>
+                      <th style={{ width: '21%' }}>Phòng quan tâm</th>
+                      <th style={{ width: '17%' }}>Lịch hẹn</th>
+                      <th style={{ width: '13%' }}>Ghi chú</th>
+                      <th style={{ width: '14%' }}>Trạng thái</th>
+                      <th style={{ width: '6%', textAlign: 'center' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -310,33 +321,47 @@ export default function MyRoomsPage() {
                       return (
                         <tr key={app.id}>
                           <td>
-                            <strong>{app.visitorName}</strong>
+                            <strong style={{ color: '#0f172a' }}>{app.visitorName}</strong>
                           </td>
-                          <td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
                             <a
                               href={`tel:${app.phone}`}
-                              style={{ color: 'var(--primary-color)', fontWeight: 600 }}
+                              style={{ color: 'var(--primary-color)', fontWeight: 600, textDecoration: 'none' }}
                             >
                               {app.phone}
                             </a>
                           </td>
                           <td>
-                            <Link to={`/rooms/${app.roomId}`} className="room-cell-title">
+                            <Link
+                              to={`/rooms/${app.roomId}`}
+                              className="room-cell-title"
+                              title={app.roomTitle || `Phòng #${app.roomId}`}
+                            >
                               {app.roomTitle || `Phòng #${app.roomId}`}
                             </Link>
                           </td>
                           <td>
-                            <div>
-                              <strong>{app.viewingDate}</strong>
+                            <div style={{ fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                              {app.viewingDate}
                             </div>
-                            <span style={{ fontSize: '12px', color: '#64748b' }}>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap', marginTop: '2px' }}>
                               {app.viewingTime}
-                            </span>
+                            </div>
                           </td>
                           <td>
-                            <span style={{ fontSize: '13px', color: '#475569' }}>
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: '#475569',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}
+                              title={app.note || '—'}
+                            >
                               {app.note || '—'}
-                            </span>
+                            </div>
                           </td>
                           <td>
                             <select
@@ -349,41 +374,46 @@ export default function MyRoomsPage() {
                                 )
                               }
                               style={{
-                                padding: '6px 10px',
+                                width: '100%',
+                                maxWidth: '120px',
+                                boxSizing: 'border-box',
+                                padding: '4px 6px',
                                 borderRadius: '6px',
                                 border: '1px solid #cbd5e1',
-                                fontSize: '13px',
+                                fontSize: '0.75rem',
                                 background:
                                   app.status === 'confirmed'
                                     ? '#ecfdf5'
                                     : app.status === 'cancelled'
-                                    ? '#fef2f2'
-                                    : app.status === 'completed'
-                                    ? '#eff6ff'
-                                    : '#fff',
+                                      ? '#fef2f2'
+                                      : app.status === 'completed'
+                                        ? '#eff6ff'
+                                        : '#fff',
                                 color:
                                   app.status === 'confirmed'
                                     ? '#065f46'
                                     : app.status === 'cancelled'
-                                    ? '#991b1b'
-                                    : app.status === 'completed'
-                                    ? '#1e40af'
-                                    : '#334155',
-                                fontWeight: 500,
+                                      ? '#991b1b'
+                                      : app.status === 'completed'
+                                        ? '#1e40af'
+                                        : '#334155',
+                                fontWeight: 600,
+                                cursor: 'pointer',
                               }}
                             >
                               <option value="pending">Chờ xác nhận</option>
-                              <option value="confirmed">Đã liên hệ / Đã hẹn</option>
-                              <option value="completed">Đã xem phòng xong</option>
+                              <option value="confirmed">Đã xác nhận</option>
+                              <option value="completed">Đã xem phòng</option>
                               <option value="cancelled">Đã hủy</option>
                             </select>
                           </td>
-                          <td>
+                          <td style={{ textAlign: 'center' }}>
                             <button
                               type="button"
                               className="btn-action delete"
                               onClick={() => handleDeleteAppointment(app.id)}
                               title="Xóa lịch hẹn"
+                              style={{ padding: '3px 8px', fontSize: '0.75rem' }}
                             >
                               Xóa
                             </button>

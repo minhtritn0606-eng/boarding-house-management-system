@@ -11,6 +11,7 @@ import {
   Modal,
   Alert,
   Share,
+  Platform,
 } from 'react-native'
 import { useBills } from '../context/BillContext'
 import { useTenants } from '../context/TenantContext'
@@ -366,11 +367,15 @@ Vui lòng thanh toán qua STK chủ trọ.`
         <View style={styles.statsBanner}>
           <View style={[styles.statCol, { borderRightWidth: 1, borderRightColor: '#e2e8f0' }]}>
             <Text style={styles.statColLabel}>🟢 ĐÃ THU ĐƯỢC</Text>
-            <Text style={[styles.statColValue, { color: '#16a34a' }]}>{formatVND(totalPaidAmount)}</Text>
+            <Text style={[styles.statColValue, { color: '#16a34a' }]} numberOfLines={1} adjustsFontSizeToFit>
+              {formatVND(totalPaidAmount)}
+            </Text>
           </View>
           <View style={styles.statCol}>
             <Text style={styles.statColLabel}>🔴 CẦN THU / CÒN NỢ</Text>
-            <Text style={[styles.statColValue, { color: '#dc2626' }]}>{formatVND(totalUnpaidAmount)}</Text>
+            <Text style={[styles.statColValue, { color: '#dc2626' }]} numberOfLines={1} adjustsFontSizeToFit>
+              {formatVND(totalUnpaidAmount)}
+            </Text>
           </View>
         </View>
 
@@ -454,31 +459,34 @@ Vui lòng thanh toán qua STK chủ trọ.`
                 <View key={bill.id} style={styles.billCard}>
                   {/* Bill Top Bar */}
                   <View style={styles.billCardHeader}>
-                    <View>
-                      <View style={styles.roomTagRow}>
-                        <Text style={styles.billRoomNumber}>{bill.roomNumber}</Text>
-                        <View style={[styles.billStatusBadge, isPaid ? styles.badgePaid : styles.badgeUnpaid]}>
-                          <Text style={[styles.billStatusText, isPaid ? styles.textPaid : styles.textUnpaid]}>
-                            {isPaid ? '✓ ĐÃ THU TIỀN' : 'CHƯA THANH TOÁN'}
-                          </Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() =>
-                          onNavigateTab &&
-                          onNavigateTab('tenants', { searchQuery: bill.roomNumber })
-                        }
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.billTenantName}>
-                          Khách: <Text style={{ fontWeight: '700', color: '#1d4ed8' }}>{bill.tenantName}</Text> •{' '}
-                          {bill.tenantPhone} <Text style={{ color: '#2563eb', fontSize: 11 }}>[Xem hồ sơ ➔]</Text>
+                    <View style={styles.roomTagRow}>
+                      <Text style={styles.billRoomNumber}>{bill.roomNumber}</Text>
+                      <View style={[styles.billStatusBadge, isPaid ? styles.badgePaid : styles.badgeUnpaid]}>
+                        <Text style={[styles.billStatusText, isPaid ? styles.textPaid : styles.textUnpaid]}>
+                          {isPaid ? '✓ ĐÃ THU TIỀN' : 'CHƯA THANH TOÁN'}
                         </Text>
-                      </TouchableOpacity>
+                      </View>
                     </View>
 
-                    <Text style={styles.totalPriceHighlight}>{formatVND(bill.totalAmount)}</Text>
+                    <Text style={styles.totalPriceHighlight} numberOfLines={1}>
+                      {formatVND(bill.totalAmount)}
+                    </Text>
                   </View>
+
+                  {/* Tenant Info Sub-row */}
+                  <TouchableOpacity
+                    style={styles.billTenantRow}
+                    onPress={() =>
+                      onNavigateTab &&
+                      onNavigateTab('tenants', { searchQuery: bill.roomNumber })
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.billTenantName} numberOfLines={1} ellipsizeMode="tail">
+                      Khách: <Text style={{ fontWeight: '700', color: '#1d4ed8' }}>{bill.tenantName}</Text> •{' '}
+                      {bill.tenantPhone} <Text style={{ color: '#2563eb', fontSize: 11 }}>[Xem hồ sơ ➔]</Text>
+                    </Text>
+                  </TouchableOpacity>
 
                   {/* Breakdown Table */}
                   <View style={styles.breakdownBox}>
@@ -848,7 +856,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#0f172a',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 16,
     paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1011,14 +1019,15 @@ const styles = StyleSheet.create({
   billCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   roomTagRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
   },
   billRoomNumber: {
     fontSize: 18,
@@ -1046,6 +1055,9 @@ const styles = StyleSheet.create({
   textUnpaid: {
     color: '#b91c1c',
   },
+  billTenantRow: {
+    marginBottom: 10,
+  },
   billTenantName: {
     fontSize: 12,
     color: '#64748b',
@@ -1054,6 +1066,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#2563eb',
+    textAlign: 'right',
+    flexShrink: 0,
   },
   breakdownBox: {
     backgroundColor: '#f8fafc',
@@ -1065,15 +1079,20 @@ const styles = StyleSheet.create({
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   itemLabel: {
     fontSize: 12,
     color: '#475569',
+    flex: 1,
+    marginRight: 8,
   },
   itemVal: {
     fontSize: 12,
     fontWeight: '600',
     color: '#1e293b',
+    textAlign: 'right',
+    flexShrink: 0,
   },
   dueDateRow: {
     marginTop: 6,

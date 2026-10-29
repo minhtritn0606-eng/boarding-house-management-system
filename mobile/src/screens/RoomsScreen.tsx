@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  Platform,
 } from 'react-native'
 import { useRooms } from '../context/RoomContext'
 import { useAuth } from '../context/AuthContext'
@@ -658,7 +659,7 @@ const styles = StyleSheet.create({
   topHeader: {
     backgroundColor: '#0f172a',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 16,
     paddingBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',

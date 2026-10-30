@@ -21,13 +21,14 @@ async function ensureRoomsTable() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+  // Table rooms is ensured for internal management
 }
 
-async function createRoom({ boardingHouseId, title, description, price, roomType = 'standard', area, floor = 1, amenities, images = [] }) {
+async function createRoom({ boardingHouseId, title, description, price, roomType = 'standard', area, floor = 1, amenities, images = [], isPublished = false }) {
   await ensureRoomsTable();
   const pool = await getPool();
   const [result] = await pool.query(
-    'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, floor, amenities, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)',
+    'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, floor, amenities, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       boardingHouseId,
       title,
@@ -37,22 +38,11 @@ async function createRoom({ boardingHouseId, title, description, price, roomType
       area || null,
       floor || 1,
       Array.isArray(amenities) ? amenities.join(', ') : amenities || null,
+      isPublished ? 1 : 0,
     ]
   );
 
   const roomId = result.insertId;
-
-  // Insert images if provided
-  if (Array.isArray(images) && images.length > 0) {
-    for (let i = 0; i < images.length; i++) {
-      try {
-        await pool.query(
-          'INSERT INTO room_images (room_id, image_url, is_primary) VALUES (?, ?, ?)',
-          [roomId, images[i], i === 0]
-        );
-      } catch (e) {}
-    }
-  }
 
   return await findRoomById(roomId);
 }
@@ -81,19 +71,7 @@ async function findRoomById(id) {
 
   const row = rows[0];
 
-  // Fetch images
-  let images = [];
-  try {
-    const [imgRows] = await pool.query(
-      'SELECT image_url FROM room_images WHERE room_id = ? ORDER BY is_primary DESC, id ASC',
-      [id]
-    );
-    images = imgRows.map((img) => img.image_url);
-  } catch (e) {}
-
-  if (images.length === 0) {
-    images = ['https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800'];
-  }
+  const images = [];
 
   return {
     id: row.id,
@@ -151,6 +129,14 @@ async function updateRoom(id, updates) {
   if (updates.status) {
     fields.push('status = ?');
     values.push(updates.status);
+
+    if (updates.status === 'available') {
+      try {
+        await pool.query("UPDATE contracts SET status = 'cancelled' WHERE room_id = ? AND status = 'active'", [id]);
+      } catch (err) {
+        console.warn('Could not cancel active contracts for available room:', err.message);
+      }
+    }
   }
   if (updates.isPublished !== undefined) {
     fields.push('is_published = ?');
@@ -174,20 +160,7 @@ async function updateRoom(id, updates) {
     await pool.query(`UPDATE rooms SET ${fields.join(', ')} WHERE id = ?`, values);
   }
 
-  // Cập nhật lại danh sách hình ảnh nếu được cung cấp
-  if (Array.isArray(updates.images)) {
-    try {
-      await pool.query('DELETE FROM room_images WHERE room_id = ?', [id]);
-      for (let i = 0; i < updates.images.length; i++) {
-        await pool.query(
-          'INSERT INTO room_images (room_id, image_url, is_primary) VALUES (?, ?, ?)',
-          [id, updates.images[i], i === 0]
-        );
-      }
-    } catch (e) {
-      console.warn('Could not update room images:', e.message);
-    }
-  }
+
 
   // Cập nhật địa chỉ / quận / thành phố / tọa độ cho nhà trọ liên kết nếu có
   if (updates.address || updates.district || updates.city || updates.latitude !== undefined || updates.longitude !== undefined) {
@@ -237,9 +210,18 @@ async function listPublishedRooms(filters = {}) {
     LEFT JOIN users u ON l.user_id = u.id
     LEFT JOIN contracts c ON r.id = c.room_id AND c.status = 'active'
     LEFT JOIN tenants t ON c.tenant_id = t.id
-    WHERE (r.is_published = TRUE OR r.is_published IS NULL)
+    WHERE 1=1
   `;
   const values = [];
+
+  // 1. Phân biệt ngữ cảnh: BÀI ĐĂNG CÔNG KHAI (Web) vs QUẢN LÝ NỘI BỘ (Mobile/Chủ trọ)
+  if (filters.isPublic) {
+    // Chỉ lấy phòng được CHỦ TRỌ BẬT ĐĂNG TIN CÔNG KHAI và ĐANG CÒN TRỐNG
+    query += ' AND r.is_published = 1 AND r.status = "available"';
+  } else if (filters.published !== undefined) {
+    query += ' AND r.is_published = ?';
+    values.push(filters.published ? 1 : 0);
+  }
 
   if (filters.search) {
     query += ' AND (LOWER(r.title) LIKE ? OR LOWER(r.description) LIKE ? OR LOWER(h.name) LIKE ? OR LOWER(h.address) LIKE ?)';
@@ -287,18 +269,7 @@ async function listPublishedRooms(filters = {}) {
 
   const [rows] = await pool.query(query, values);
 
-  let allImages = [];
-  try {
-    const [imgRows] = await pool.query('SELECT room_id, image_url FROM room_images ORDER BY is_primary DESC, id ASC');
-    allImages = imgRows;
-  } catch (e) {}
-
   return rows.map((row) => {
-    const roomImgs = allImages.filter((img) => img.room_id === row.id).map((img) => img.image_url);
-    const defaultImages = [
-      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800',
-      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
-    ];
 
     return {
       id: row.id,
@@ -324,7 +295,7 @@ async function listPublishedRooms(filters = {}) {
       tenantId: row.tenant_id ? String(row.tenant_id) : undefined,
       tenantName: row.tenant_name || (row.status === 'rented' ? 'Khách thuê' : undefined),
       tenantPhone: row.tenant_phone || undefined,
-      images: roomImgs.length > 0 ? roomImgs : defaultImages,
+      images: [],
       postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
       createdAt: row.created_at,
       updatedAt: row.updated_at,

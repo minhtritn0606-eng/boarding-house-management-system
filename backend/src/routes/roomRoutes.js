@@ -11,7 +11,7 @@ const { optionalAuth } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-router.get('/', listPublishedRoomsHandler);
+router.get('/', optionalAuth, listPublishedRoomsHandler);
 router.get('/:id', getRoomDetailsHandler);
 router.post('/', optionalAuth, createRoomHandler);
 router.put('/:id', optionalAuth, updateRoomHandler);

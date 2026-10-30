@@ -24,11 +24,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
     try {
       const res = await roomApi.getPublishedRooms()
-      if (res && Array.isArray(res.rooms)) {
-        setRooms(res.rooms)
-      } else {
-        setRooms([])
-      }
+      const list = res?.posts || res?.rooms || []
+      setRooms(Array.isArray(list) ? list : [])
     } catch (err: any) {
       console.error('Lỗi khi tải danh sách phòng từ CSDL:', err.message)
       setRooms([])
@@ -58,10 +55,12 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         district: roomData.district,
         latitude: roomData.latitude,
         longitude: roomData.longitude,
+        isPublished: true, // Đăng tin cho thuê trên website thì luôn công khai
       })
-      if (res && res.room) {
-        setRooms((prev) => [res.room, ...prev.filter((r) => r.id !== res.room.id)])
-        return res.room
+      const createdItem = res?.room || res?.post
+      if (createdItem) {
+        setRooms((prev) => [createdItem, ...prev.filter((r) => r.id !== createdItem.id)])
+        return createdItem
       }
     } catch (e: any) {
       console.error('Lỗi tạo phòng trong CSDL:', e.message)

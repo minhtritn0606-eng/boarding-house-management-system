@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
 import LocationPicker from '../components/LocationPicker'
+import { compressImageFile } from '../utils/imageCompressor'
 
 const DEFAULT_AMENITIES = [
   'Wifi tốc độ cao',
@@ -83,7 +84,7 @@ export default function CreateRoomPage() {
   }
 
   // Handle file uploads from device
-  const processFiles = (files: FileList | File[]) => {
+  const processFiles = async (files: FileList | File[]) => {
     setError('')
     const fileArray = Array.from(files)
     const validImageFiles = fileArray.filter((file) => file.type.startsWith('image/'))
@@ -99,22 +100,18 @@ export default function CreateRoomPage() {
       return
     }
 
-    validImageFiles.forEach((file) => {
-      // Check file size (e.g. 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError(`Ảnh "${file.name}" vượt quá kích thước 5MB. Vui lòng chọn ảnh nhỏ hơn.`)
-        return
+    try {
+      const compressedList = await Promise.all(
+        validImageFiles.map((file) => compressImageFile(file))
+      )
+      const validResults = compressedList.filter(Boolean)
+      if (validResults.length > 0) {
+        setImages((prev) => [...prev, ...validResults].slice(0, 10))
       }
-
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const result = event.target?.result as string
-        if (result) {
-          setImages((prev) => [...prev, result])
-        }
-      }
-      reader.readAsDataURL(file)
-    })
+    } catch (err) {
+      console.error('Lỗi khi nén ảnh:', err)
+      setError('Không thể xử lý hình ảnh được chọn. Vui lòng thử lại.')
+    }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

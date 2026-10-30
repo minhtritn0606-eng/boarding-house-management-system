@@ -151,6 +151,11 @@ export const mobileRoomApi = {
     if (filters.search) query.append('search', filters.search)
     if (filters.city) query.append('city', filters.city)
     if (filters.status && filters.status !== 'all') query.append('status', filters.status)
+    if (filters.mine !== undefined) {
+      query.append('mine', String(filters.mine))
+    } else {
+      query.append('mine', 'true') // Default for mobile app: landlord's own rooms
+    }
 
     const queryString = query.toString() ? `?${query.toString()}` : ''
     return await mobileRequest<{ rooms: any[] }>(`/rooms${queryString}`)
@@ -167,6 +172,13 @@ export const mobileRoomApi = {
     return await mobileRequest<{ room: any }>(`/rooms/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    })
+  },
+
+  publishRoom: async (id: number | string, isPublished?: boolean) => {
+    return await mobileRequest<{ message: string; room: any }>(`/rooms/${id}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ isPublished }),
     })
   },
 

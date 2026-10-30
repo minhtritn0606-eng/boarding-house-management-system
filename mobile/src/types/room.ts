@@ -17,6 +17,7 @@ export interface MobileRoom {
   amenities: string[]
   floor?: number
   note?: string
+  isPublished?: boolean
 }
 
 export interface HouseBranch {

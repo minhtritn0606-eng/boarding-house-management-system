@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   ScrollView,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import {
   Linking,
   Platform,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTenants } from '../context/TenantContext'
 import { useRooms } from '../context/RoomContext'
 import { useAuth } from '../context/AuthContext'
@@ -220,15 +220,15 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
   const handleDeleteTenant = (tenant: Tenant) => {
     Alert.alert(
       'Xóa hồ sơ khách thuê',
-      `Bạn có chắc chắn muốn xóa khách ${tenant.name} khỏi danh sách?`,
+      `Bạn có chắc chắn muốn xóa vĩnh viễn hồ sơ của khách ${tenant.name}?`,
       [
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Xóa vĩnh viễn',
           style: 'destructive',
-          onPress: () => {
-            deleteTenant(tenant.id)
-            Alert.alert('Đã xóa', 'Đã xóa hồ sơ khách thuê thành công.')
+          onPress: async () => {
+            await deleteTenant(tenant.id)
+            Alert.alert('Đã xóa', `Đã xóa hồ sơ của khách ${tenant.name} thành công.`)
           },
         },
       ]
@@ -239,7 +239,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <StatusBar barStyle="light-content" />
 
       {/* Header */}
       <View style={styles.header}>
@@ -303,6 +303,81 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
           <View style={styles.listContainer}>
             {filteredTenants.map((item) => {
               const isActive = item.status === 'active'
+
+              if (!isActive) {
+                return (
+                  <View key={item.id} style={[styles.tenantCard, styles.tenantCardTerminated]}>
+                    {/* Header */}
+                    <View style={styles.cardHeader}>
+                      <View style={[styles.avatarCircle, { backgroundColor: '#cbd5e1' }]}>
+                        <Text style={styles.avatarText}>👤</Text>
+                      </View>
+                      <View style={styles.cardHeaderInfo}>
+                        <View style={styles.nameRow}>
+                          <Text style={[styles.tenantName, { color: '#64748b' }]}>{item.name}</Text>
+                          <View style={[styles.statusBadge, styles.statusBadgeTerminated]}>
+                            <Text style={[styles.statusBadgeText, styles.statusBadgeTextTerminated]}>
+                              ĐÃ THANH LÝ
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.contractCode}>HĐ cũ: {item.contractNumber}</Text>
+                      </View>
+                    </View>
+
+                    {/* Compact info box */}
+                    <View style={styles.terminatedDetailsBox}>
+                      <View style={styles.terminatedRow}>
+                        <Text style={styles.terminatedLabel}>🏠 Phòng từng ở:</Text>
+                        <Text style={styles.terminatedValueBold}>
+                          {item.roomNumber === 'Chưa xếp phòng'
+                            ? 'Chưa xếp phòng'
+                            : item.roomNumber.toLowerCase().startsWith('phòng')
+                            ? item.roomNumber
+                            : `Phòng ${item.roomNumber}`}
+                        </Text>
+                      </View>
+
+                      <View style={styles.terminatedRow}>
+                        <Text style={styles.terminatedLabel}>📞 Số điện thoại:</Text>
+                        <Text style={styles.terminatedValueBold}>{item.phone}</Text>
+                      </View>
+
+                      {item.idCard ? (
+                        <View style={styles.terminatedRow}>
+                          <Text style={styles.terminatedLabel}>🪪 CCCD/CMND:</Text>
+                          <Text style={styles.terminatedValue}>{item.idCard}</Text>
+                        </View>
+                      ) : null}
+
+                      <View style={styles.terminatedRow}>
+                        <Text style={styles.terminatedLabel}>📅 Ngày kết thúc:</Text>
+                        <Text style={styles.terminatedValue}>{item.rentEndDate || 'Đã trả phòng'}</Text>
+                      </View>
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.terminatedActionsRow}>
+                      <TouchableOpacity
+                        style={styles.actionCallBtn}
+                        onPress={() => handleCallTenant(item.phone)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.actionCallBtnText}>📞 Gọi lại</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionDeleteBtn, { flex: 2, marginLeft: 8 }]}
+                        onPress={() => handleDeleteTenant(item)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.actionDeleteBtnText}>🗑️ Xóa vĩnh viễn hồ sơ</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )
+              }
+
               return (
                 <View key={item.id} style={styles.tenantCard}>
                   {/* Card Header */}
@@ -992,16 +1067,56 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   actionDeleteBtn: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#fee2e2',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionDeleteBtnText: {
-    color: '#64748b',
+    color: '#dc2626',
     fontSize: 12,
     fontWeight: '700',
+  },
+  tenantCardTerminated: {
+    backgroundColor: '#ffffff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ef4444',
+  },
+  terminatedDetailsBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  terminatedRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  terminatedLabel: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  terminatedValue: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '500',
+  },
+  terminatedValueBold: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '700',
+  },
+  terminatedActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   emptyBox: {
     alignItems: 'center',

@@ -118,7 +118,15 @@ async function findTenantById(id) {
             r.id AS room_id, r.title AS room_title, r.price AS room_price,
             h.name AS house_name, h.address AS house_address
      FROM tenants t
-     LEFT JOIN contracts c ON t.id = c.tenant_id AND c.status = 'active'
+     LEFT JOIN (
+       SELECT c1.*
+       FROM contracts c1
+       INNER JOIN (
+         SELECT tenant_id, MAX(id) as max_id
+         FROM contracts
+         GROUP BY tenant_id
+       ) c2 ON c1.id = c2.max_id
+     ) c ON t.id = c.tenant_id
      LEFT JOIN rooms r ON c.room_id = r.id
      LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
      WHERE t.id = ?`,
@@ -138,7 +146,15 @@ async function listTenants(filters = {}) {
            r.id AS room_id, r.title AS room_title, r.price AS room_price,
            h.name AS house_name, h.address AS house_address
     FROM tenants t
-    LEFT JOIN contracts c ON t.id = c.tenant_id AND c.status = 'active'
+    LEFT JOIN (
+      SELECT c1.*
+      FROM contracts c1
+      INNER JOIN (
+        SELECT tenant_id, MAX(id) as max_id
+        FROM contracts
+        GROUP BY tenant_id
+      ) c2 ON c1.id = c2.max_id
+    ) c ON t.id = c.tenant_id
     LEFT JOIN rooms r ON c.room_id = r.id
     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
     LEFT JOIN landlords l ON t.landlord_id = l.id
@@ -208,7 +224,7 @@ function formatTenantRow(row) {
     rentEndDate: row.end_date ? new Date(row.end_date).toISOString().split('T')[0] : '2026-12-31',
     deposit: Number(row.deposit_amount) || Number(row.room_price) || 2500000,
     monthlyRent: Number(row.rent_amount) || Number(row.room_price) || 2500000,
-    status: row.contract_status === 'expired' ? 'expired' : (row.contract_status === 'cancelled' ? 'terminated' : 'active'),
+    status: row.contract_status === 'active' ? 'active' : (row.contract_status === 'expired' ? 'expired' : 'terminated'),
     notes: row.note || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -307,6 +323,16 @@ async function updateTenant(id, updates) {
 async function deleteTenant(id) {
   await ensureTenantsTable();
   const pool = await getPool();
+  try {
+    await pool.query('DELETE FROM payments WHERE tenant_id = ?', [id]);
+  } catch (e) {
+    // ignore if payments table does not exist or empty
+  }
+  try {
+    await pool.query('DELETE FROM utility_bills WHERE tenant_id = ?', [id]);
+  } catch (e) {
+    // ignore if utility_bills does not exist or empty
+  }
   const [contracts] = await pool.query('SELECT room_id FROM contracts WHERE tenant_id = ?', [id]);
   await pool.query('DELETE FROM contracts WHERE tenant_id = ?', [id]);
   for (const c of contracts) {

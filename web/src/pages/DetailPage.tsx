@@ -31,8 +31,9 @@ export default function DetailPage() {
       roomApi
         .getRoomDetails(id)
         .then((res) => {
-          if (res && res.room) {
-            setDirectRoom(res.room)
+          const item = res?.room || res?.post
+          if (item) {
+            setDirectRoom(item)
           }
         })
         .catch((err) => {

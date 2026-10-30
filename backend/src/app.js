@@ -11,6 +11,7 @@ const billRoutes = require('./routes/billRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
+const postRoutes = require('./routes/postRoutes');
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use('/api/bills', billRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/posts', postRoutes);
 
 if (require.main === module) {
   app.listen(PORT, async () => {

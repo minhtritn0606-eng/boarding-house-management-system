@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   ScrollView,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import {
   Share,
   Platform,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useBills } from '../context/BillContext'
 import { useTenants } from '../context/TenantContext'
 import { useRooms } from '../context/RoomContext'
@@ -346,7 +346,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <StatusBar barStyle="light-content" />
 
       {/* Header */}
       <View style={styles.header}>

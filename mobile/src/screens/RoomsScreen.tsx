@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   ScrollView,
   TouchableOpacity,
@@ -12,6 +11,7 @@ import {
   Alert,
   Platform,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRooms } from '../context/RoomContext'
 import { useAuth } from '../context/AuthContext'
 import type { MobileRoom, RoomType, RoomStatus } from '../types/room'
@@ -43,6 +43,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
     updateRoom,
     deleteRoom,
     toggleRoomStatus,
+    togglePublishRoom,
     getRoomsByOwner,
     vacateRoom,
   } = useRooms()
@@ -184,7 +185,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
         area: areaNum,
         floor: floorNum,
         roomType: formRoomType,
-        status: formStatus,
+        status: 'available', // Mặc định luôn là Còn trống khi tạo phòng mới
         ownerEmail: user?.email || 'nam.owner@example.com',
         amenities: formAmenities,
         note: formNote.trim(),
@@ -212,7 +213,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <StatusBar barStyle="light-content" />
       
       {/* Top App Header */}
       <View style={styles.topHeader}>
@@ -554,43 +555,47 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
                 </View>
               </View>
 
-              {/* Room Status */}
-              <Text style={styles.formLabel}>Trạng thái ban đầu</Text>
-              <View style={styles.typeRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeBtn,
-                    formStatus === 'available' && styles.typeBtnActive,
-                  ]}
-                  onPress={() => setFormStatus('available')}
-                >
-                  <Text
-                    style={[
-                      styles.typeBtnText,
-                      formStatus === 'available' && styles.typeBtnTextActive,
-                    ]}
-                  >
-                    🟡 Còn trống
-                  </Text>
-                </TouchableOpacity>
+              {/* Room Status: Ẩn khi tạo phòng mới (mặc định luôn là Còn trống), chỉ hiển thị khi Chỉnh sửa phòng */}
+              {editingRoom && (
+                <>
+                  <Text style={styles.formLabel}>Trạng thái phòng</Text>
+                  <View style={styles.typeRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.typeBtn,
+                        formStatus === 'available' && styles.typeBtnActive,
+                      ]}
+                      onPress={() => setFormStatus('available')}
+                    >
+                      <Text
+                        style={[
+                          styles.typeBtnText,
+                          formStatus === 'available' && styles.typeBtnTextActive,
+                        ]}
+                      >
+                        🟡 Còn trống
+                      </Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.typeBtn,
-                    formStatus === 'rented' && styles.typeBtnActive,
-                  ]}
-                  onPress={() => setFormStatus('rented')}
-                >
-                  <Text
-                    style={[
-                      styles.typeBtnText,
-                      formStatus === 'rented' && styles.typeBtnTextActive,
-                    ]}
-                  >
-                    🟢 Đang cho thuê
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.typeBtn,
+                        formStatus === 'rented' && styles.typeBtnActive,
+                      ]}
+                      onPress={() => setFormStatus('rented')}
+                    >
+                      <Text
+                        style={[
+                          styles.typeBtnText,
+                          formStatus === 'rented' && styles.typeBtnTextActive,
+                        ]}
+                      >
+                        🟢 Đang cho thuê
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
 
               {/* Amenities */}
               <Text style={styles.formLabel}>Tiện nghi phòng trọ</Text>

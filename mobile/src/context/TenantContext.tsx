@@ -56,7 +56,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
             rentEndDate: t.rentEndDate || '2026-12-31',
             deposit: Number(t.deposit) || 0,
             monthlyRent: Number(t.monthlyRent) || 0,
-            status: t.status || 'active',
+            status: (t.status === 'cancelled' || t.status === 'terminated')
+              ? 'terminated'
+              : (t.status === 'expired' ? 'expired' : (t.status || 'active')),
             notes: t.notes || t.note || '',
           }
         })
@@ -74,7 +76,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshTenants()
-  }, [user?.id, isAuthenticated, rooms])
+  }, [user?.id, isAuthenticated])
 
   const getTenantsByHouse = (houseName?: string) => {
     if (!houseName || houseName === 'all') return tenants
@@ -147,15 +149,19 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 
   const deleteTenant = async (id: string) => {
     const target = tenants.find((t) => t.id === id)
-    if (target && target.roomNumber) {
-      await vacateRoom(target.roomNumber, target.houseName)
-    }
-
+    // 1. Cập nhật state local ngay lập tức để thẻ biến mất chỉ sau 1 lần bấm
     setTenants((prev) => prev.filter((item) => item.id !== id))
+
+    // 2. Gửi lệnh xóa lên database backend
     try {
       await mobileTenantApi.deleteTenant(id)
     } catch (e: any) {
       console.log('Mobile delete tenant error:', e.message)
+    }
+
+    // 3. Chỉ vacateRoom nếu khách đó đang ở trạng thái active
+    if (target && target.status === 'active' && target.roomNumber) {
+      await vacateRoom(target.roomNumber, target.houseName)
     }
   }
 
@@ -170,6 +176,12 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     setTenants((prev) =>
       prev.map((item) => (item.id === id ? { ...item, status } : item))
     )
+
+    try {
+      await mobileTenantApi.updateTenant(id, { status })
+    } catch (e: any) {
+      console.log('Mobile updateContractStatus backend error:', e.message)
+    }
   }
 
   return (

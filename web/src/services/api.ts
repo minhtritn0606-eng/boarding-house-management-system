@@ -100,10 +100,12 @@ export interface RoomFilterParams {
   maxPrice?: number
   roomType?: string
   status?: string
+  public?: boolean
+  mine?: boolean
 }
 
-export const roomApi = {
-  getPublishedRooms: async (filters: RoomFilterParams = {}) => {
+export const postApi = {
+  getPublishedPosts: async (filters: RoomFilterParams = {}) => {
     const query = new URLSearchParams()
     if (filters.search) query.append('search', filters.search)
     if (filters.city) query.append('city', filters.city)
@@ -111,16 +113,17 @@ export const roomApi = {
     if (filters.maxPrice !== undefined) query.append('maxPrice', String(filters.maxPrice))
     if (filters.roomType && filters.roomType !== 'all') query.append('roomType', filters.roomType)
     if (filters.status && filters.status !== 'all') query.append('status', filters.status)
+    if (filters.mine !== undefined) query.append('mine', String(filters.mine))
 
     const queryString = query.toString() ? `?${query.toString()}` : ''
-    return await request<{ rooms: any[] }>(`/rooms${queryString}`)
+    return await request<{ posts: any[]; rooms: any[] }>(`/posts${queryString}`)
   },
 
-  getRoomDetails: async (id: number | string) => {
-    return await request<{ room: any }>(`/rooms/${id}`)
+  getPostDetails: async (id: number | string) => {
+    return await request<{ post: any; room: any }>(`/posts/${id}`)
   },
 
-  createRoom: async (data: {
+  createPost: async (data: {
     boardingHouseId?: number | string
     title: string
     description?: string
@@ -134,29 +137,39 @@ export const roomApi = {
     district?: string
     latitude?: number
     longitude?: number
+    contactPhone?: string
+    contactName?: string
   }) => {
-    return await request<{ room: any }>('/rooms', {
+    return await request<{ post: any; room: any }>('/posts', {
       method: 'POST',
       body: JSON.stringify(data),
     })
   },
 
-  updateRoom: async (id: number | string, data: Partial<any>) => {
-    return await request<{ room: any }>(`/rooms/${id}`, {
+  updatePost: async (id: number | string, data: Partial<any>) => {
+    return await request<{ post: any; room: any }>(`/posts/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   },
 
-  deleteRoom: async (id: number | string) => {
-    return await request<{ message: string }>(`/rooms/${id}`, {
+  deletePost: async (id: number | string) => {
+    return await request<{ message: string }>(`/posts/${id}`, {
       method: 'DELETE',
     })
   },
+}
 
+// Giữ lại alias roomApi để tương thích 100% với các component React hiện tại của Web
+export const roomApi = {
+  getPublishedRooms: postApi.getPublishedPosts,
+  getRoomDetails: postApi.getPostDetails,
+  createRoom: postApi.createPost,
+  updateRoom: postApi.updatePost,
+  deleteRoom: postApi.deletePost,
   publishRoom: async (id: number | string) => {
     return await request<{ room: any }>(`/rooms/${id}/publish`, {
-      method: 'PATCH',
+      method: 'POST',
     })
   },
 }

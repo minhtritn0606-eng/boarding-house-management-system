@@ -56,7 +56,7 @@ graph TD
 
 ### Công nghệ sử dụng:
 - **Web Frontend**: React 18, Vite, Tailwind CSS, Lucide React Icons.
-- **Mobile App**: React Native, Expo (SDK 54), TypeScript, Context API.
+- **Mobile App**: React Native, Expo (SDK 58), TypeScript, Context API.
 - **Backend API**: Node.js, Express.js, JWT (JSON Web Token), `bcryptjs`, `mysql2/promise`.
 - **Database**: MySQL 8.0+ (InnoDB Engine, Khóa ngoại `FOREIGN KEY` ràng buộc toàn vẹn).
 

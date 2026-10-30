@@ -19,6 +19,7 @@ export interface Room {
   postedDate?: string;
   latitude?: number;
   longitude?: number;
+  isPublished?: boolean;
 }
 
 export const sampleRooms: Room[] = [];

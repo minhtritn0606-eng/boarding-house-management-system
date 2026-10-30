@@ -13,6 +13,7 @@ interface RoomContextType {
   updateRoom: (id: string, updatedData: Partial<MobileRoom>) => Promise<void>
   deleteRoom: (id: string) => Promise<void>
   toggleRoomStatus: (id: string) => Promise<void>
+  togglePublishRoom: (id: string) => Promise<void>
   occupyRoom: (roomNumber: string, houseName?: string, tenantName?: string, tenantPhone?: string) => Promise<void>
   vacateRoom: (roomNumber: string, houseName?: string) => Promise<void>
 }
@@ -71,6 +72,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           tenantPhone: r.tenantPhone || r.tenant_phone || undefined,
           amenities: Array.isArray(r.amenities) ? r.amenities : ['Wifi', 'Điều hòa', 'Nóng lạnh'],
           floor: r.floor || 1,
+          isPublished: Boolean(r.isPublished ?? r.is_published),
         }))
         setRooms(mapped)
       } else {
@@ -124,6 +126,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         roomType: roomData.roomType,
         area: roomData.area,
         amenities: roomData.amenities,
+        isPublished: false, // Phòng tạo trên mobile là phòng nội bộ, không tự đăng lên web
       })
       if (res && res.room) {
         await refreshRooms()
@@ -182,6 +185,23 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       await mobileRoomApi.updateRoom(id, { status: nextStatus })
     } catch (e: any) {
       console.log('Mobile toggle status error:', e.message)
+    }
+  }
+
+  const togglePublishRoom = async (id: string) => {
+    const target = rooms.find((r) => r.id === id)
+    const nextPublished = !target?.isPublished
+
+    // Cập nhật giao diện tức thì (optimistic UI)
+    setRooms((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, isPublished: nextPublished } : r))
+    )
+
+    try {
+      await mobileRoomApi.publishRoom(id, nextPublished)
+    } catch (e: any) {
+      console.log('Mobile toggle publish error:', e.message)
+      await refreshRooms()
     }
   }
 
@@ -263,6 +283,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         updateRoom,
         deleteRoom,
         toggleRoomStatus,
+        togglePublishRoom,
         occupyRoom,
         vacateRoom,
       }}

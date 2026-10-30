@@ -68,14 +68,39 @@ CREATE TABLE IF NOT EXISTS rooms (
     CONSTRAINT fk_rooms_boarding_house FOREIGN KEY (boarding_house_id) REFERENCES boarding_houses(id) ON DELETE CASCADE
 );
 
--- 5. BẢNG ẢNH PHÒNG TRỌ
-CREATE TABLE IF NOT EXISTS room_images (
+-- 5. BẢNG BÀI ĐĂNG CHO THUÊ (DÀNH RIÊNG CHO WEBSITE QUẢNG BÁ TÌM PHÒNG)
+CREATE TABLE IF NOT EXISTS posts (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    room_id BIGINT NOT NULL,
-    image_url VARCHAR(255) NOT NULL,
+    landlord_id BIGINT NOT NULL,
+    boarding_house_id BIGINT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(12, 2) NOT NULL,
+    area DECIMAL(8, 2) DEFAULT 20.00,
+    room_type VARCHAR(50) DEFAULT 'private',
+    address VARCHAR(255) NOT NULL,
+    city VARCHAR(100) NOT NULL DEFAULT 'Đà Nẵng',
+    district VARCHAR(100),
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    amenities TEXT,
+    contact_phone VARCHAR(20),
+    contact_name VARCHAR(100),
+    status ENUM('active', 'hidden', 'closed') NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_posts_landlord FOREIGN KEY (landlord_id) REFERENCES landlords(id) ON DELETE CASCADE,
+    CONSTRAINT fk_posts_house FOREIGN KEY (boarding_house_id) REFERENCES boarding_houses(id) ON DELETE SET NULL
+);
+
+-- BẢNG ẢNH BÀI ĐĂNG
+CREATE TABLE IF NOT EXISTS post_images (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    post_id BIGINT NOT NULL,
+    image_url LONGTEXT NOT NULL,
     is_primary BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_room_images_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+    CONSTRAINT fk_post_images_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
 
 -- 6. BẢNG KHÁCH THUÊ

@@ -86,7 +86,7 @@ CREATE TABLE rooms (
 CREATE TABLE room_images (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     room_id BIGINT NOT NULL,
-    image_url VARCHAR(255) NOT NULL,
+    image_url LONGTEXT NOT NULL,
     is_primary BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_room_images_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE

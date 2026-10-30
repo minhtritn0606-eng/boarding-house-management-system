@@ -34,30 +34,69 @@ async function ensureAppointmentsTable() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Đồng bộ landlord_id trong viewing_requests theo bài đăng (posts) và notifications
+  try {
+    await pool.query(`
+      UPDATE viewing_requests v
+      JOIN posts p ON v.room_id = p.id
+      SET v.landlord_id = p.landlord_id
+      WHERE p.landlord_id IS NOT NULL AND (v.landlord_id IS NULL OR v.landlord_id != p.landlord_id)
+    `);
+
+    await pool.query(`
+      UPDATE notifications n
+      JOIN viewing_requests v ON n.id = v.id
+      JOIN landlords l ON v.landlord_id = l.id
+      SET n.user_id = l.user_id
+      WHERE n.title = 'Lịch hẹn xem phòng mới' AND n.user_id != l.user_id
+    `);
+  } catch (e) {
+    // ignore
+  }
 }
 
 async function createAppointment({ roomId, visitorName, phone, viewingDate, viewingTime, note }) {
   await ensureAppointmentsTable();
   const pool = await getPool();
 
-  // Find landlord and room details
-  const [roomRows] = await pool.query(
-    `SELECT r.id, r.title, h.landlord_id, l.user_id AS landlord_user_id, h.address AS house_address
-     FROM rooms r
-     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
-     LEFT JOIN landlords l ON h.landlord_id = l.id
-     WHERE r.id = ?`,
-    [roomId]
-  );
-
+  // 1. Kiểm tra xem roomId có phải là bài đăng (Post) trên Website không
   let landlordId = null;
   let landlordUserId = null;
   let roomTitle = 'Phòng trọ';
 
-  if (roomRows.length > 0) {
-    landlordId = roomRows[0].landlord_id;
-    landlordUserId = roomRows[0].landlord_user_id;
-    roomTitle = roomRows[0].title;
+  try {
+    const [postRows] = await pool.query(
+      `SELECT p.id, p.title, p.landlord_id, l.user_id AS landlord_user_id
+       FROM posts p
+       LEFT JOIN landlords l ON p.landlord_id = l.id
+       WHERE p.id = ?`,
+      [roomId]
+    );
+    if (postRows.length > 0 && postRows[0].landlord_id) {
+      landlordId = postRows[0].landlord_id;
+      landlordUserId = postRows[0].landlord_user_id;
+      roomTitle = postRows[0].title;
+    }
+  } catch (e) {}
+
+  // 2. Dự phòng kiểm tra bảng rooms nếu không tìm thấy trong posts
+  if (!landlordId) {
+    try {
+      const [roomRows] = await pool.query(
+        `SELECT r.id, r.title, h.landlord_id, l.user_id AS landlord_user_id, h.address AS house_address
+         FROM rooms r
+         LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
+         LEFT JOIN landlords l ON h.landlord_id = l.id
+         WHERE r.id = ?`,
+        [roomId]
+      );
+      if (roomRows.length > 0) {
+        landlordId = roomRows[0].landlord_id;
+        landlordUserId = roomRows[0].landlord_user_id;
+        roomTitle = roomRows[0].title;
+      }
+    } catch (e) {}
   }
 
   const [result] = await pool.query(
@@ -68,7 +107,7 @@ async function createAppointment({ roomId, visitorName, phone, viewingDate, view
 
   const appointmentId = result.insertId;
 
-  // Insert a notification for the landlord
+  // Gửi thông báo đến chủ trọ
   if (landlordUserId) {
     try {
       await pool.query(
@@ -92,9 +131,13 @@ async function getAppointmentById(id) {
   await ensureAppointmentsTable();
   const pool = await getPool();
   const [rows] = await pool.query(
-    `SELECT v.*, r.title AS room_title, r.price AS room_price,
-            h.name AS house_name, h.address AS house_address
+    `SELECT v.*, 
+            COALESCE(p.title, r.title, 'Phòng trọ') AS room_title,
+            COALESCE(p.price, r.price, 0) AS room_price,
+            COALESCE(h.name, p.title, 'Dãy trọ') AS house_name,
+            COALESCE(p.address, h.address, '') AS house_address
      FROM viewing_requests v
+     LEFT JOIN posts p ON v.room_id = p.id
      LEFT JOIN rooms r ON v.room_id = r.id
      LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
      WHERE v.id = ?`,
@@ -109,13 +152,17 @@ async function listAppointments({ landlordId, userId, roomId, status }) {
   const pool = await getPool();
 
   let query = `
-    SELECT v.*, r.title AS room_title, r.price AS room_price,
-           h.name AS house_name, h.address AS house_address,
+    SELECT v.*, 
+           COALESCE(p.title, r.title, 'Phòng trọ') AS room_title,
+           COALESCE(p.price, r.price, 0) AS room_price,
+           COALESCE(h.name, p.title, 'Dãy trọ') AS house_name,
+           COALESCE(p.address, h.address, '') AS house_address,
            u.full_name AS landlord_name, u.phone AS landlord_phone
     FROM viewing_requests v
+    LEFT JOIN posts p ON v.room_id = p.id
     LEFT JOIN rooms r ON v.room_id = r.id
     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
-    LEFT JOIN landlords l ON h.landlord_id = l.id
+    LEFT JOIN landlords l ON l.id = COALESCE(p.landlord_id, v.landlord_id, h.landlord_id)
     LEFT JOIN users u ON l.user_id = u.id
     WHERE 1=1
   `;
@@ -125,7 +172,7 @@ async function listAppointments({ landlordId, userId, roomId, status }) {
     query += ' AND l.user_id = ?';
     values.push(userId);
   } else if (landlordId) {
-    query += ' AND v.landlord_id = ?';
+    query += ' AND l.id = ?';
     values.push(landlordId);
   }
 

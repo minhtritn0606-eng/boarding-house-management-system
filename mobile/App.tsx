@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { View, StyleSheet, SafeAreaView } from 'react-native'
+import { View, StyleSheet } from 'react-native'
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { AuthProvider, useAuth } from './src/context/AuthContext'
 import { RoomProvider, useRooms } from './src/context/RoomContext'
@@ -71,15 +72,17 @@ function MainApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <RoomProvider>
-        <TenantProvider>
-          <BillProvider>
-            <MainApp />
-          </BillProvider>
-        </TenantProvider>
-      </RoomProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <RoomProvider>
+          <TenantProvider>
+            <BillProvider>
+              <MainApp />
+            </BillProvider>
+          </TenantProvider>
+        </RoomProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   )
 }
 

@@ -106,6 +106,7 @@ async function createRoomHandler(req, res) {
       floor: floor ? Number(floor) : 1,
       amenities,
       images: Array.isArray(images) ? images : [],
+      isPublished: Boolean(req.body.isPublished),
     });
 
     return res.status(201).json({ message: 'Room created successfully', room });
@@ -156,10 +157,14 @@ async function publishRoomHandler(req, res) {
       return res.status(404).json({ message: 'Room not found' });
     }
 
-    const publishedRoom = await updateRoom(roomId, { isPublished: true });
-    return res.status(200).json({ message: 'Room published successfully', room: publishedRoom });
+    const nextPublishedState = req.body?.isPublished !== undefined ? Boolean(req.body.isPublished) : !room.isPublished;
+    const publishedRoom = await updateRoom(roomId, { isPublished: nextPublishedState });
+    return res.status(200).json({
+      message: nextPublishedState ? 'Đã đăng bài lên Website thành công' : 'Đã gỡ bài đăng khỏi Website',
+      room: publishedRoom,
+    });
   } catch (error) {
-    return res.status(500).json({ message: 'Could not publish room', error: error.message });
+    return res.status(500).json({ message: 'Could not toggle publish status', error: error.message });
   }
 }
 
@@ -180,12 +185,20 @@ async function getRoomDetailsHandler(req, res) {
 
 async function listPublishedRoomsHandler(req, res) {
   try {
-    const { search, city, minPrice, maxPrice, roomType, status, landlordId, ownerEmail, mine } = req.query;
+    const { search, city, minPrice, maxPrice, roomType, status, landlordId, ownerEmail, mine, public: isPublicQuery, published } = req.query;
     
-    let userId = req.query.userId;
-    if (mine === 'true' || req.query.mine === '1' || (req.user?.id && req.query.public !== 'true')) {
-      userId = req.user?.id;
+    // Determine whether this request is for the landlord's internal room management (Mobile/MyRooms)
+    // or public room browsing (Website portal for seekers)
+    const isMine = mine === 'true' || mine === '1';
+    const isExplicitPublic = isPublicQuery === 'true' || isPublicQuery === '1';
+
+    let userId = req.query.userId ? Number(req.query.userId) : undefined;
+    if (req.user?.id && (isMine || (!isExplicitPublic && !req.query.userId))) {
+      userId = req.user.id;
     }
+
+    // Public context: guest seekers browsing Website posts
+    const isPublic = isExplicitPublic || (!userId && !isMine && !landlordId && !ownerEmail);
 
     const rooms = await listPublishedRooms({
       search,
@@ -195,11 +208,14 @@ async function listPublishedRoomsHandler(req, res) {
       roomType,
       status,
       userId,
-      landlordId,
+      landlordId: landlordId ? Number(landlordId) : undefined,
       ownerEmail,
+      isPublic,
+      published: published !== undefined ? (published === 'true' || published === '1') : undefined,
     });
     return res.status(200).json({ rooms });
   } catch (error) {
+    console.error('Lỗi chi tiết trong listPublishedRoomsHandler:', error);
     return res.status(500).json({ message: 'Could not fetch rooms', error: error.message });
   }
 }

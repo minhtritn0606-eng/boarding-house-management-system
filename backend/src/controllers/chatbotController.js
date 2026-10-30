@@ -128,26 +128,22 @@ async function handleChatbotMessage(req, res) {
     // 1. Lấy toàn bộ danh sách phòng trọ đang mở đăng từ MySQL
     const [allRooms] = await pool.query(`
       SELECT 
-        r.id,
-        r.title,
-        r.description,
-        r.price,
-        r.area,
-        r.room_type,
-        r.status,
-        r.amenities,
-        bh.name AS house_name,
-        bh.address AS house_address,
-        bh.district AS house_district,
-        bh.city AS house_city,
-        u.full_name AS landlord_name,
-        u.phone AS landlord_phone,
-        (SELECT image_url FROM room_images WHERE room_id = r.id ORDER BY is_primary DESC, id ASC LIMIT 1) AS primary_image
-      FROM rooms r
-      JOIN boarding_houses bh ON r.boarding_house_id = bh.id
-      JOIN landlords l ON bh.landlord_id = l.id
-      JOIN users u ON l.user_id = u.id
-      WHERE (r.is_published = 1 OR r.is_published IS NULL)
+        p.id,
+        p.title,
+        p.description,
+        p.price,
+        p.area,
+        p.room_type,
+        p.status,
+        p.amenities,
+        p.address AS house_address,
+        p.district AS house_district,
+        p.city AS house_city,
+        p.contact_name AS landlord_name,
+        p.contact_phone AS landlord_phone,
+        (SELECT image_url FROM post_images WHERE post_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) AS primary_image
+      FROM posts p
+      WHERE p.status = 'active'
     `);
 
     // 2. Tìm thông tin phòng hiện tại nếu người dùng đang đứng ở /rooms/:id

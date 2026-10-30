@@ -203,7 +203,7 @@ async function getAllRoomsAdmin(req, res) {
         u.full_name AS landlord_name,
         u.email AS landlord_email,
         u.phone AS landlord_phone,
-        (SELECT image_url FROM room_images WHERE room_id = r.id ORDER BY is_primary DESC, id ASC LIMIT 1) AS primary_image
+        NULL AS primary_image
       FROM rooms r
       JOIN boarding_houses bh ON r.boarding_house_id = bh.id
       JOIN landlords l ON bh.landlord_id = l.id

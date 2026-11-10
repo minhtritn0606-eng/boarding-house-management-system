@@ -377,10 +377,14 @@ export default function MyRoomsPage() {
         </>
       ) : (
         <>
-          <div className="my-rooms-content-header">
+          <div className="my-rooms-content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div className="header-left">
-              <h3>Khách đặt lịch hẹn xem phòng</h3>
-              <p>Danh sách thông tin người xem phòng muốn liên hệ và hẹn lịch trực tiếp với bạn</p>
+              <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a', fontWeight: 700 }}>
+                Khách đặt lịch hẹn xem phòng
+              </h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
+                Danh sách người xem phòng muốn liên hệ và hẹn lịch trực tiếp với bạn
+              </p>
             </div>
             <button
               type="button"

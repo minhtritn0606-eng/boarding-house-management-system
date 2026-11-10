@@ -191,6 +191,9 @@ async function updateRoom(id, updates) {
 async function deleteRoom(id) {
   await ensureRoomsTable();
   const pool = await getPool();
+  try {
+    await pool.query('DELETE FROM viewing_requests WHERE room_id = ?', [id]);
+  } catch (e) {}
   await pool.query('DELETE FROM rooms WHERE id = ?', [id]);
 }
 

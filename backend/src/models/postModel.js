@@ -290,7 +290,7 @@ async function listPosts(filters = {}) {
   try {
     const [imgRows] = await pool.query('SELECT post_id, image_url FROM post_images ORDER BY is_primary DESC, id ASC');
     allImages = imgRows;
-  } catch (e) {}
+  } catch (e) { }
 
   const defaultImages = [
     'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800',
@@ -376,6 +376,9 @@ async function updatePost(id, updates) {
 async function deletePost(id) {
   await ensurePostsTable();
   const pool = await getPool();
+  try {
+    await pool.query('DELETE FROM viewing_requests WHERE room_id = ?', [id]);
+  } catch (e) { }
   await pool.query('DELETE FROM posts WHERE id = ?', [id]);
 }
 

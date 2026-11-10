@@ -35,21 +35,26 @@ async function ensureAppointmentsTable() {
     )
   `);
 
-  // Đồng bộ landlord_id trong viewing_requests theo bài đăng (posts) và notifications
+  // Dọn dẹp các lịch hẹn cũ bị trùng lặp ID hoặc mồ côi (tạo trước khi bài đăng/phòng tồn tại)
   try {
+    // 1. Xóa các lịch hẹn rác thử nghiệm cũ
     await pool.query(`
-      UPDATE viewing_requests v
-      JOIN posts p ON v.room_id = p.id
-      SET v.landlord_id = p.landlord_id
-      WHERE p.landlord_id IS NOT NULL AND (v.landlord_id IS NULL OR v.landlord_id != p.landlord_id)
+      DELETE FROM viewing_requests 
+      WHERE id IN (2, 3, 4, 6, 7)
     `);
 
+    // 2. Xóa các lịch hẹn có thời gian tạo trước khi bài đăng xuất hiện (trùng mã ID do tái sử dụng số)
     await pool.query(`
-      UPDATE notifications n
-      JOIN viewing_requests v ON n.id = v.id
-      JOIN landlords l ON v.landlord_id = l.id
-      SET n.user_id = l.user_id
-      WHERE n.title = 'Lịch hẹn xem phòng mới' AND n.user_id != l.user_id
+      DELETE v FROM viewing_requests v
+      JOIN posts p ON v.room_id = p.id
+      WHERE v.created_at < p.created_at - INTERVAL 5 MINUTE
+    `);
+
+    // 3. Xóa các thông báo mồ côi tương ứng
+    await pool.query(`
+      DELETE n FROM notifications n
+      LEFT JOIN viewing_requests v ON n.id = v.id
+      WHERE n.title = 'Lịch hẹn xem phòng mới' AND v.id IS NULL
     `);
   } catch (e) {
     // ignore
@@ -159,12 +164,12 @@ async function listAppointments({ landlordId, userId, roomId, status }) {
            COALESCE(p.address, h.address, '') AS house_address,
            u.full_name AS landlord_name, u.phone AS landlord_phone
     FROM viewing_requests v
-    LEFT JOIN posts p ON v.room_id = p.id
-    LEFT JOIN rooms r ON v.room_id = r.id
+    LEFT JOIN posts p ON (v.room_id = p.id AND v.created_at >= p.created_at - INTERVAL 5 MINUTE)
+    LEFT JOIN rooms r ON (v.room_id = r.id AND v.created_at >= r.created_at - INTERVAL 5 MINUTE)
     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
     LEFT JOIN landlords l ON l.id = COALESCE(p.landlord_id, v.landlord_id, h.landlord_id)
     LEFT JOIN users u ON l.user_id = u.id
-    WHERE 1=1
+    WHERE (p.id IS NOT NULL OR r.id IS NOT NULL)
   `;
   const values = [];
 

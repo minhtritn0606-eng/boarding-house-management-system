@@ -57,9 +57,8 @@ export default function CreateRoomPage() {
     return (
       <div className="auth-required-box">
         <div className="auth-required-content">
-          <div className="icon">🔒</div>
-          <h2>Yêu cầu Đăng nhập Chủ trọ</h2>
-          <p>Bạn cần đăng nhập tài khoản chủ trọ để thực hiện đăng bài cho thuê phòng.</p>
+          <h2>Yêu cầu Đăng nhập</h2>
+          <p>Bạn cần đăng nhập tài khoản để thực hiện đăng tin cho thuê phòng.</p>
           <div className="auth-required-actions">
             <Link
               to="/login"
@@ -218,10 +217,10 @@ export default function CreateRoomPage() {
     <div className="create-room-container">
       <div className="create-room-header">
         <Link to="/my-rooms" className="back-link">
-          ← Quản lý phòng của tôi
+          Quay lại Quản lý tin đăng
         </Link>
         <h1>Đăng Tin Cho Thuê Phòng Mới</h1>
-        <p>Điền thông tin chi tiết để thu hút người tìm phòng nhanh chóng và hiệu quả nhất</p>
+        <p>Điền thông tin chi tiết để người tìm phòng có thể liên hệ nhanh chóng</p>
       </div>
 
       {error && <div className="auth-alert error">{error}</div>}
@@ -241,7 +240,6 @@ export default function CreateRoomPage() {
               id="room-title"
               type="text"
               required
-              placeholder="ví dụ: Studio cao cấp full nội thất gần Cầu Rồng, giờ giấc tự do"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -250,10 +248,6 @@ export default function CreateRoomPage() {
           <div className="form-group" style={{ marginBottom: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>Loại phòng <span className="req">*</span></span>
-              {!roomType && (
-                <span style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 500 }}>
-                </span>
-              )}
             </label>
             <div className="room-type-cards-grid">
               <div
@@ -308,7 +302,6 @@ export default function CreateRoomPage() {
                 required
                 min={100000}
                 step={50000}
-                placeholder="ví dụ: 2500000"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
               />
@@ -324,7 +317,6 @@ export default function CreateRoomPage() {
                 required
                 min={5}
                 step={1}
-                placeholder="ví dụ: 25"
                 value={area}
                 onChange={(e) => setArea(e.target.value)}
               />
@@ -365,7 +357,6 @@ export default function CreateRoomPage() {
                 id="room-district"
                 type="text"
                 required
-                placeholder="ví dụ: Hải Châu, Cầu Giấy, Quận 1..."
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
               />
@@ -380,7 +371,6 @@ export default function CreateRoomPage() {
               id="room-address"
               type="text"
               required
-              placeholder="ví dụ: 28 Nguyễn Văn Linh, Phường Nam Dương, Đà Nẵng"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
             />
@@ -427,13 +417,13 @@ export default function CreateRoomPage() {
         {/* Section 4: Tải hình ảnh từ thiết bị & Mô tả */}
         <section className="form-section">
           <h3 className="section-title">
-            <span className="step-num">4</span> Hình ảnh đại diện & Mô tả phòng{' '}
+            <span className="step-num">4</span> Hình ảnh & Mô tả phòng{' '}
             <span className="req">*</span>
           </h3>
 
           <div className="image-upload-wrapper">
             <label className="field-label">
-              Tải ảnh từ thiết bị của bạn <span className="req">*</span>
+              Tải ảnh từ thiết bị (tối đa 10 ảnh) <span className="req">*</span>
             </label>
 
             {/* Hidden File Input */}
@@ -455,12 +445,11 @@ export default function CreateRoomPage() {
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div className="upload-icon-circle">📸</div>
-              <div className="upload-instructions">
-                Nhấn để chọn ảnh từ máy tính/điện thoại hoặc kéo thả vào đây
+              <div className="upload-instructions" style={{ fontWeight: 600, color: '#1e293b' }}>
+                Nhấn để chọn ảnh từ máy tính/điện thoại hoặc kéo thả ảnh vào đây
               </div>
-              <p className="upload-hint">
-                Hỗ trợ tệp JPG, PNG, WEBP (Tối đa 10 ảnh, dung lượng ≤ 5MB/ảnh)
+              <p className="upload-hint" style={{ marginTop: '4px' }}>
+                Định dạng JPG, PNG, WEBP (Tối đa 10 ảnh, dung lượng ≤ 5MB/ảnh)
               </p>
             </div>
 
@@ -472,7 +461,7 @@ export default function CreateRoomPage() {
                     Đã tải lên <strong>{images.length}</strong> ảnh:
                   </span>
                   <span className="gallery-note">
-                    (Ảnh đầu tiên sẽ là <strong>Ảnh đại diện</strong> của bài đăng)
+                    (Ảnh đầu tiên sẽ là Ảnh đại diện của bài đăng)
                   </span>
                 </div>
 
@@ -485,7 +474,7 @@ export default function CreateRoomPage() {
                       <img src={imgSrc} alt={`Room upload ${idx + 1}`} />
 
                       {idx === 0 ? (
-                        <span className="primary-badge">🌟 Ảnh đại diện</span>
+                        <span className="primary-badge">Ảnh đại diện</span>
                       ) : (
                         <button
                           type="button"
@@ -510,8 +499,6 @@ export default function CreateRoomPage() {
                 </div>
               </div>
             )}
-
-
           </div>
 
           <div className="form-group" style={{ marginTop: '16px' }}>
@@ -519,7 +506,6 @@ export default function CreateRoomPage() {
             <textarea
               id="room-desc"
               rows={4}
-              placeholder="Mô tả về phòng, nội thất, khu vực xung quanh, tiện ích gần đó, giờ giấc..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -529,12 +515,12 @@ export default function CreateRoomPage() {
         {/* Section 5: Thông tin người liên hệ */}
         <section className="form-section">
           <h3 className="section-title">
-            <span className="step-num">5</span> Thông tin liên hệ chủ trọ
+            <span className="step-num">5</span> Thông tin liên hệ
           </h3>
 
           <div className="form-row-2">
             <div className="form-group">
-              <label htmlFor="owner-name">Tên chủ trọ / Người liên hệ</label>
+              <label htmlFor="owner-name">Tên người đăng / liên hệ</label>
               <input
                 id="owner-name"
                 type="text"

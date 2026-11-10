@@ -14,8 +14,7 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <Link to="/" className="nav-brand">
-        <span className="brand-logo">🏠</span>
-        <span>BoardingHouse</span>
+        <span style={{ fontWeight: 800, letterSpacing: '-0.02em', color: '#2563eb' }}>BoardingHouse</span>
       </Link>
 
       <ul className="nav-links">
@@ -31,7 +30,7 @@ export default function Navbar() {
 
       <div className="nav-actions">
         <Link to="/create-room" className="btn-nav-post">
-          <span className="plus-icon">+</span> Đăng tin
+          Đăng tin
         </Link>
 
         {isAuthenticated && user ? (
@@ -47,13 +46,15 @@ export default function Navbar() {
                 <span className="nav-user-name">{user.name} (Admin)</span>
               </Link>
             ) : (
-              <Link to="/my-rooms" className="nav-user-profile" title="Quản lý phòng của tôi">
+              <Link to="/my-rooms" className="nav-user-profile" title="Quản lý tin đăng của tôi">
                 <img
                   src={user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
                   alt={user.name}
                   className="nav-avatar"
                 />
-                <span className="nav-user-name">{user.name}</span>
+                <span className="nav-user-name">
+                  {user.name} {user.role === 'poster' ? '(Người đăng bài)' : ''}
+                </span>
               </Link>
             )}
             <button
@@ -67,7 +68,7 @@ export default function Navbar() {
           </div>
         ) : (
           <Link to="/login" className="btn-nav-login">
-            Đăng nhập Chủ trọ
+            Đăng nhập
           </Link>
         )}
       </div>

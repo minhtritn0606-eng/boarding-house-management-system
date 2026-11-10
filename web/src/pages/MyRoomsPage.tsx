@@ -15,7 +15,30 @@ export default function MyRoomsPage() {
   const [loadingAppointments, setLoadingAppointments] = useState(false)
   const [updatingId, setUpdatingId] = useState<number | null>(null)
 
+  // Bộ lọc cho danh sách bài đăng
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'rented'>('all')
+
   const myRooms = user ? getRoomsByOwner(user.email) : []
+
+  // Danh sách bài đăng sau khi lọc
+  const filteredRooms = myRooms.filter((room) => {
+    const matchesSearch =
+      !searchQuery.trim() ||
+      room.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (room.address || '').toLowerCase().includes(searchQuery.toLowerCase())
+
+    const isAvailable = room.status !== 'rented'
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'available' && isAvailable) ||
+      (statusFilter === 'rented' && !isAvailable)
+
+    return matchesSearch && matchesStatus
+  })
+
+  const availableCount = myRooms.filter((r) => r.status !== 'rented').length
+  const rentedCount = myRooms.filter((r) => r.status === 'rented').length
 
   useEffect(() => {
     if ((location.state as any)?.tab) {
@@ -96,7 +119,7 @@ export default function MyRoomsPage() {
 
   return (
     <div className="my-rooms-container">
-      {/* Landlord Profile Banner */}
+      {/* Landlord / Poster Profile Banner */}
       <div className="landlord-profile-card">
         <div className="landlord-profile-info">
           <img
@@ -105,7 +128,9 @@ export default function MyRoomsPage() {
             className="landlord-avatar"
           />
           <div className="landlord-details">
-            <div className="landlord-badge">Chủ trọ</div>
+            <div className="landlord-badge">
+              {user.role === 'poster' ? 'Người đăng bài' : 'Chủ nhà trọ'}
+            </div>
             <h2>{user.name}</h2>
             <div className="landlord-contact-line">
               <span>Email: {user.email}</span>
@@ -115,13 +140,47 @@ export default function MyRoomsPage() {
         </div>
 
         <div className="landlord-stats-actions">
-          <div className="stat-pill">
-            <span className="stat-number">{myRooms.length}</span>
-            <span className="stat-text">Bài đăng</span>
-          </div>
           <Link to="/create-room" className="btn-primary btn-post-new">
-            Đăng phòng mới
+            Đăng tin mới
           </Link>
+        </div>
+      </div>
+
+      {/* Mini Stats Grid - Thống kê nhanh */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '14px',
+          marginBottom: '20px',
+        }}
+      >
+        <div style={{ background: '#fff', padding: '16px 20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Tổng bài đăng</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+            {myRooms.length}
+          </div>
+        </div>
+
+        <div style={{ background: '#fff', padding: '16px 20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 600 }}>Đang nhận khách</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a', marginTop: '4px' }}>
+            {availableCount}
+          </div>
+        </div>
+
+        <div style={{ background: '#fff', padding: '16px 20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600 }}>Đã thuê / Tạm ẩn</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#dc2626', marginTop: '4px' }}>
+            {rentedCount}
+          </div>
+        </div>
+
+        <div style={{ background: '#fff', padding: '16px 20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600 }}>Lịch hẹn từ khách</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563eb', marginTop: '4px' }}>
+            {appointments.length}
+          </div>
         </div>
       </div>
 
@@ -141,7 +200,7 @@ export default function MyRoomsPage() {
           }}
           onClick={() => setActiveTab('rooms')}
         >
-          Danh sách phòng đăng ({myRooms.length})
+          Danh sách bài đăng ({myRooms.length})
         </button>
         <button
           type="button"
@@ -163,19 +222,60 @@ export default function MyRoomsPage() {
 
       {activeTab === 'rooms' ? (
         <>
-          <div className="my-rooms-content-header">
+          <div className="my-rooms-content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
             <div className="header-left">
-              <h3>Danh sách phòng của bạn ({myRooms.length})</h3>
-              <p>Quản lý trạng thái còn/hết phòng và chỉnh sửa bài đăng</p>
+              <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a', fontWeight: 700 }}>
+                {user.role === 'poster' ? 'Bài đăng của người đăng bài' : 'Danh sách phòng của bạn'}
+              </h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
+                Quản lý trạng thái hiển thị, chỉnh sửa thông tin hoặc xóa bài đăng
+              </p>
+            </div>
+
+            {/* Thanh tìm kiếm và bộ lọc trạng thái */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Tìm bài đăng..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  minWidth: '180px',
+                }}
+              />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  background: '#fff',
+                }}
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="available">Đang nhận khách</option>
+                <option value="rented">Đã cho thuê / Tạm ẩn</option>
+              </select>
             </div>
           </div>
 
-          {myRooms.length === 0 ? (
+          {filteredRooms.length === 0 ? (
             <div className="my-rooms-empty-state">
-              <h3>Bạn chưa có bài đăng phòng nào</h3>
-              <p>Hãy bắt đầu tạo bài đăng phòng đầu tiên để người thuê có thể liên hệ với bạn ngay!</p>
+              <h3>{searchQuery || statusFilter !== 'all' ? 'Không tìm thấy bài đăng phù hợp' : 'Bạn chưa có bài đăng nào'}</h3>
+              <p>
+                {searchQuery || statusFilter !== 'all'
+                  ? 'Thử thay đổi từ khóa tìm kiếm hoặc điều kiện lọc.'
+                  : 'Hãy tạo bài đăng phòng trọ mới để khách thuê có thể tìm kiếm và liên hệ.'}
+              </p>
               <Link to="/create-room" className="btn-primary">
-                Đăng phòng trọ ngay
+                Đăng tin mới
               </Link>
             </div>
           ) : (
@@ -194,7 +294,7 @@ export default function MyRoomsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {myRooms.map((room) => {
+                    {filteredRooms.map((room) => {
                       const isAvailable = room.status !== 'rented'
                       return (
                         <tr key={room.id}>

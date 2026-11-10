@@ -235,7 +235,7 @@ async function listPosts(filters = {}) {
   if (filters.status && filters.status !== 'all') {
     query += ' AND LOWER(p.status) = ?';
     values.push(filters.status.toLowerCase());
-  } else if (!filters.userId && !filters.mine) {
+  } else if (!filters.userId && !filters.mine && !filters.ownerEmail) {
     // Mặc định khách xem chỉ thấy các bài đang hoạt động ('active')
     query += " AND p.status = 'active'";
   }

@@ -264,7 +264,7 @@ export default function EditRoomPage() {
         ownerName: ownerName.trim() || user?.name || 'Chủ trọ',
       })
 
-      setSuccessMsg('✅ Đã cập nhật bài đăng thành công!')
+      setSuccessMsg('Đã cập nhật bài đăng thành công!')
       setTimeout(() => {
         navigate(`/rooms/${room.id}`)
       }, 1000)
@@ -279,7 +279,7 @@ export default function EditRoomPage() {
     <div className="create-room-container">
       <div className="create-room-header">
         <Link to="/my-rooms" className="back-link">
-          ← Danh sách bài đăng của tôi
+          Quay lại Quản lý tin đăng
         </Link>
         <h1>Chỉnh Sửa Bài Đăng Phòng Trọ</h1>
         <p>Cập nhật lại giá thuê, hình ảnh, tiện ích hoặc thông tin mô tả cho phòng trọ #{room.id}</p>
@@ -303,7 +303,6 @@ export default function EditRoomPage() {
               id="room-title"
               type="text"
               required
-              placeholder="ví dụ: Studio cao cấp full nội thất gần Cầu Rồng, giờ giấc tự do"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -366,8 +365,8 @@ export default function EditRoomPage() {
                 onChange={(e) => setStatus(e.target.value as any)}
                 style={{ fontWeight: 600, color: status === 'available' ? '#059669' : '#dc2626' }}
               >
-                <option value="available">🟢 Còn phòng (Đang nhận khách)</option>
-                <option value="rented">🔴 Đã cho thuê (Hết phòng)</option>
+                <option value="available">Còn phòng (Đang nhận khách)</option>
+                <option value="rented">Đã cho thuê (Hết phòng)</option>
               </select>
             </div>
 
@@ -412,7 +411,6 @@ export default function EditRoomPage() {
                 id="room-address"
                 type="text"
                 required
-                placeholder="ví dụ: 123 Tôn Đức Thắng, Phường Hòa Khánh Bắc"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
               />
@@ -443,7 +441,6 @@ export default function EditRoomPage() {
                   required
                   min="100000"
                   step="50000"
-                  placeholder="ví dụ: 2500000"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                 />
@@ -462,7 +459,6 @@ export default function EditRoomPage() {
                   required
                   min="5"
                   max="300"
-                  placeholder="ví dụ: 25"
                   value={area}
                   onChange={(e) => setArea(e.target.value)}
                 />
@@ -523,11 +519,10 @@ export default function EditRoomPage() {
               accept="image/*"
               style={{ display: 'none' }}
             />
-            <div className="upload-icon">📸</div>
-            <div className="upload-text">
-              <strong>Nhấn để chọn ảnh từ máy tính / điện thoại</strong> hoặc kéo thả ảnh vào đây
+            <div className="upload-text" style={{ fontWeight: 600 }}>
+              Nhấn để chọn ảnh từ máy tính / điện thoại hoặc kéo thả ảnh vào đây
             </div>
-            <span className="upload-hint">Hỗ trợ JPG, PNG, WEBP (tối đa 5MB mỗi ảnh, tối đa 10 ảnh)</span>
+            <span className="upload-hint">Định dạng JPG, PNG, WEBP (tối đa 5MB mỗi ảnh, tối đa 10 ảnh)</span>
           </div>
 
           {/* Grid Preview Images */}
@@ -538,7 +533,7 @@ export default function EditRoomPage() {
                   <img src={img} alt={`Phòng ${index + 1}`} />
                   <div className="preview-overlay">
                     {index === 0 ? (
-                      <span className="primary-tag">⭐ Ảnh đại diện</span>
+                      <span className="primary-tag">Ảnh đại diện</span>
                     ) : (
                       <button
                         type="button"
@@ -581,7 +576,6 @@ export default function EditRoomPage() {
             <textarea
               id="room-desc"
               rows={4}
-              placeholder="Mô tả về không gian, an ninh, quy định, môi trường xung quanh, giờ giấc..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -589,13 +583,12 @@ export default function EditRoomPage() {
 
           <div className="form-row-2">
             <div className="form-group">
-              <label htmlFor="owner-name">Tên chủ trọ / Người đăng</label>
+              <label htmlFor="owner-name">Tên người đăng</label>
               <input
                 id="owner-name"
                 type="text"
                 value={ownerName}
                 onChange={(e) => setOwnerName(e.target.value)}
-                placeholder="Cô Lan, Anh Tuấn..."
               />
             </div>
 
@@ -606,7 +599,6 @@ export default function EditRoomPage() {
                 type="tel"
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="0905 123 456"
               />
             </div>
           </div>

@@ -867,19 +867,23 @@ body {
 .detail-page-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
+.room-detail-hero,
 .room-detail-card {
   display: grid;
   grid-template-columns: 1.15fr 1fr;
   gap: 32px;
   background: white;
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: var(--shadow-md);
-  align-items: start;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
   border: 1px solid var(--border-color);
+  align-items: stretch;
   width: 100%;
   min-width: 0;
 }
@@ -987,91 +991,240 @@ body {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
 }
 
-/* Room Detail Info Column */
-.room-detail-info {
+/* Room Detail Overview (Top Hero Right Column) */
+.room-detail-overview {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 16px;
   min-width: 0;
   width: 100%;
+}
+
+.overview-header-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .detail-header-badges {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
-.room-detail-info h2 {
+.room-detail-title {
   margin: 0;
-  font-size: 1.85rem;
+  font-size: 1.65rem;
+  font-weight: 700;
   color: #0f172a;
   line-height: 1.35;
   word-break: break-word;
-  overflow-wrap: break-word;
 }
 
-.room-address-detail {
+.room-address-line {
   font-size: 0.95rem;
-  color: #64748b;
+  color: #475569;
   margin: 0;
   line-height: 1.5;
   word-break: break-word;
 }
 
-.detail-meta {
+/* Detail Price Card */
+.detail-price-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-price-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.detail-price-val {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+/* Quick Specs Grid */
+.detail-specs-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
   background: #f8fafc;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
 }
 
-.detail-meta strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  color: #64748b;
-}
-
-.detail-meta p {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.detail-price-text {
-  color: var(--primary) !important;
-  font-weight: 800 !important;
-  font-size: 1.15rem !important;
-}
-
-.room-description-box {
+.detail-spec-item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
-.room-description-box strong {
-  font-size: 0.9rem;
+.detail-spec-label {
+  font-size: 0.78rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.detail-spec-val {
+  font-size: 0.95rem;
+  font-weight: 700;
   color: #1e293b;
 }
 
-.room-description {
-  line-height: 1.75;
-  color: #334155;
-  font-size: 0.96rem;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  white-space: pre-line;
-  background: #f8fafc;
-  padding: 14px 16px;
-  border-radius: 12px;
+/* Landlord Contact Card in Hero */
+.detail-contact-card {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contact-card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.contact-person-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.contact-person-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.contact-person-phone {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #16a34a;
+}
+
+.contact-actions-row {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-call-landlord {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  background: #16a34a;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+  text-align: center;
+}
+
+.btn-call-landlord:hover {
+  background: #15803d;
+}
+
+.btn-zalo-landlord {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  background: #0284c7;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+  text-align: center;
+}
+
+.btn-zalo-landlord:hover {
+  background: #0369a1;
+}
+
+.contact-email-line {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Detail Lower Content Grid (2 Columns: Main & Sticky Side)
+   ========================================================================== */
+.detail-content-grid {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.detail-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.detail-side-column {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.detail-section-card {
+  background: white;
   border: 1px solid var(--border-color);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.detail-section-card h3 {
+  margin: 0 0 14px 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 10px;
+}
+
+.detail-description-content {
+  color: #334155;
+  line-height: 1.75;
+  font-size: 0.96rem;
+  white-space: pre-line;
   margin: 0;
 }
 
@@ -1079,57 +1232,49 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
 }
 
-.owner-info-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.owner-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.owner-name {
-  font-weight: 700;
-  color: #0f172a;
-  font-size: 0.95rem;
-}
-
-.owner-phone-btn {
+.amenity-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: #16a34a;
-  color: white;
-  text-decoration: none;
-  padding: 7px 16px;
-  border-radius: 999px;
-  font-weight: 700;
+  background: #f8fafc;
+  color: #334155;
+  padding: 6px 14px;
+  border-radius: 8px;
   font-size: 0.88rem;
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
-  transition: all 0.2s ease;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
 }
 
-.owner-phone-btn:hover {
-  background: #15803d;
-  transform: translateY(-1px);
+.detail-notice-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px;
 }
 
-.owner-email {
-  margin: 0;
-  color: #64748b;
+.detail-notice-card h4 {
+  margin: 0 0 10px 0;
   font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+}
+
+.detail-notice-card ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.detail-notice-card li {
+  margin-bottom: 6px;
+}
+
+.detail-notice-card li:last-child {
+  margin-bottom: 0;
 }
 
 /* ==========================================================================
@@ -2705,10 +2850,20 @@ body {
    Responsive Breakpoints
    ========================================================================== */
 @media (max-width: 960px) {
+  .room-detail-hero,
   .room-detail-card {
     grid-template-columns: 1fr;
     gap: 24px;
-    padding: 24px;
+    padding: 20px;
+  }
+
+  .detail-content-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .detail-side-column {
+    position: static;
   }
 
   .carousel-container {

@@ -55,6 +55,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         district: roomData.district,
         latitude: roomData.latitude,
         longitude: roomData.longitude,
+        contactPhone: (roomData as any).contactPhone || roomData.contact,
+        contactName: (roomData as any).contactName || roomData.ownerName,
         isPublished: true, // Đăng tin cho thuê trên website thì luôn công khai
       })
       const createdItem = res?.room || res?.post
@@ -81,9 +83,15 @@ export function RoomProvider({ children }: { children: ReactNode }) {
 
   const updateRoom = async (id: number, roomData: Partial<Room>) => {
     try {
-      const res = await roomApi.updateRoom(id, roomData)
-      if (res && res.room) {
-        setRooms((prev) => prev.map((r) => (r.id === id ? res.room : r)))
+      const payload: any = {
+        ...roomData,
+        contactPhone: (roomData as any).contactPhone || roomData.contact,
+        contactName: (roomData as any).contactName || roomData.ownerName,
+      }
+      const res = await roomApi.updateRoom(id, payload)
+      const updatedItem = res?.room || res?.post
+      if (updatedItem) {
+        setRooms((prev) => prev.map((r) => (r.id === id ? updatedItem : r)))
       } else {
         setRooms((prev) => prev.map((r) => (r.id === id ? { ...r, ...roomData } : r)))
       }

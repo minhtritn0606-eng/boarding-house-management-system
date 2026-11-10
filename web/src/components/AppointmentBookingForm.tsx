@@ -14,14 +14,9 @@ const TIME_SLOTS = [
 ]
 
 export default function AppointmentBookingForm({ room }: AppointmentBookingFormProps) {
-  // Tomorrow as default date (YYYY-MM-DD)
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const defaultDateStr = tomorrow.toISOString().split('T')[0]
-
   const [visitorName, setVisitorName] = useState('')
   const [phone, setPhone] = useState('')
-  const [viewingDate, setViewingDate] = useState(defaultDateStr)
+  const [viewingDate, setViewingDate] = useState('')
   const [viewingTime, setViewingTime] = useState(TIME_SLOTS[0])
   const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -145,7 +140,6 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
               id="vis-name"
               type="text"
               required
-              placeholder="ví dụ: Nguyễn Văn An"
               value={visitorName}
               onChange={(e) => setVisitorName(e.target.value)}
             />
@@ -153,13 +147,12 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
 
           <div className="appointment-form-group">
             <label htmlFor="vis-phone">
-              Số điện thoại / Zalo <span className="req">*</span>
+              Số điện thoại liên hệ (Zalo) <span className="req">*</span>
             </label>
             <input
               id="vis-phone"
               type="tel"
               required
-              placeholder="ví dụ: 0905 123 456"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
@@ -204,7 +197,6 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
           <input
             id="vis-note"
             type="text"
-            placeholder="ví dụ: Tôi muốn hỏi thêm về chỗ để xe máy..."
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />

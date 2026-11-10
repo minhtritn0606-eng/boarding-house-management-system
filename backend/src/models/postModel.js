@@ -204,7 +204,9 @@ async function findPostById(id) {
     latitude: row.latitude != null ? Number(row.latitude) : undefined,
     longitude: row.longitude != null ? Number(row.longitude) : undefined,
     amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi', 'Nóng lạnh'],
-    contact: row.contact_phone || row.owner_phone || '0905 888 999',
+    contact: row.contact_phone || row.owner_phone || '',
+    contactPhone: row.contact_phone || row.owner_phone || '',
+    contactName: row.contact_name || row.owner_name || 'Chủ trọ',
     ownerName: row.contact_name || row.owner_name || 'Chủ trọ',
     ownerEmail: row.owner_email || '',
     status: row.status || 'active',
@@ -314,7 +316,9 @@ async function listPosts(filters = {}) {
       latitude: row.latitude != null ? Number(row.latitude) : undefined,
       longitude: row.longitude != null ? Number(row.longitude) : undefined,
       amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi', 'Nóng lạnh'],
-      contact: row.contact_phone || row.owner_phone || '0905 888 999',
+      contact: row.contact_phone || row.owner_phone || '',
+      contactPhone: row.contact_phone || row.owner_phone || '',
+      contactName: row.contact_name || row.owner_name || 'Chủ trọ',
       ownerName: row.contact_name || row.owner_name || 'Chủ trọ',
       ownerEmail: row.owner_email || '',
       status: row.status || 'active',
@@ -347,8 +351,10 @@ async function updatePost(id, updates) {
     fields.push('amenities = ?');
     values.push(Array.isArray(updates.amenities) ? updates.amenities.join(', ') : updates.amenities);
   }
-  if (updates.contactPhone !== undefined) { fields.push('contact_phone = ?'); values.push(updates.contactPhone); }
-  if (updates.contactName !== undefined) { fields.push('contact_name = ?'); values.push(updates.contactName); }
+  const newPhone = updates.contactPhone !== undefined ? updates.contactPhone : updates.contact;
+  if (newPhone !== undefined) { fields.push('contact_phone = ?'); values.push(newPhone); }
+  const newName = updates.contactName !== undefined ? updates.contactName : updates.ownerName;
+  if (newName !== undefined) { fields.push('contact_name = ?'); values.push(newName); }
   if (updates.status) { fields.push('status = ?'); values.push(updates.status); }
 
   if (fields.length > 0) {

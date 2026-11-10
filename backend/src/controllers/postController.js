@@ -25,6 +25,8 @@ async function createPostHandler(req, res) {
       images,
       contactPhone,
       contactName,
+      contact,
+      ownerName,
       boardingHouseId,
     } = req.body;
 
@@ -33,6 +35,17 @@ async function createPostHandler(req, res) {
     }
 
     const pool = await getPool();
+
+    // Lấy thông tin số điện thoại và tên người liên hệ chính xác
+    let resolvedPhone = contactPhone || contact || req.user?.phone;
+    let resolvedName = contactName || ownerName || req.user?.fullName;
+    if (!resolvedPhone || !resolvedName) {
+      const [uRows] = await pool.query('SELECT phone, full_name FROM users WHERE id = ?', [userId]);
+      if (uRows.length > 0) {
+        if (!resolvedPhone) resolvedPhone = uRows[0].phone || '';
+        if (!resolvedName) resolvedName = uRows[0].full_name || 'Chủ trọ';
+      }
+    }
 
     // 1. Tìm hoặc tạo hồ sơ landlord cho user này
     let landlordId;
@@ -80,8 +93,8 @@ async function createPostHandler(req, res) {
       latitude: latitude !== undefined ? Number(latitude) : null,
       longitude: longitude !== undefined ? Number(longitude) : null,
       amenities,
-      contactPhone: contactPhone || req.user?.phone || '0905 888 999',
-      contactName: contactName || req.user?.fullName || 'Chủ trọ',
+      contactPhone: resolvedPhone || '0905 888 999',
+      contactName: resolvedName || 'Chủ trọ',
       images: Array.isArray(images) ? images : [],
     });
 

@@ -223,14 +223,7 @@ export default function MyRoomsPage() {
       {activeTab === 'rooms' ? (
         <>
           <div className="my-rooms-content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-            <div className="header-left">
-              <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a', fontWeight: 700 }}>
-                {user.role === 'poster' ? 'Bài đăng của người đăng bài' : 'Danh sách phòng của bạn'}
-              </h3>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
-                Quản lý trạng thái hiển thị, chỉnh sửa thông tin hoặc xóa bài đăng
-              </p>
-            </div>
+
 
             {/* Thanh tìm kiếm và bộ lọc trạng thái */}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -377,15 +370,7 @@ export default function MyRoomsPage() {
         </>
       ) : (
         <>
-          <div className="my-rooms-content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div className="header-left">
-              <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a', fontWeight: 700 }}>
-                Khách đặt lịch hẹn xem phòng
-              </h3>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
-                Danh sách người xem phòng muốn liên hệ và hẹn lịch trực tiếp với bạn
-              </p>
-            </div>
+          <div className="my-rooms-content-header" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
             <button
               type="button"
               className="btn-secondary"

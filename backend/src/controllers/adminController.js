@@ -1,4 +1,5 @@
 const { getPool } = require('../config/database');
+const { sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
 
 /**
  * Lấy số liệu thống kê tổng quan toàn sàn cho Admin
@@ -12,9 +13,11 @@ async function getAdminStats(req, res) {
       SELECT 
         COUNT(*) AS total_users,
         SUM(CASE WHEN role = 'landlord' THEN 1 ELSE 0 END) AS total_landlords,
+        SUM(CASE WHEN role = 'poster' THEN 1 ELSE 0 END) AS total_posters,
         SUM(CASE WHEN role = 'tenant' THEN 1 ELSE 0 END) AS total_tenants,
         SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS total_admins,
-        SUM(CASE WHEN role = 'visitor' THEN 1 ELSE 0 END) AS total_visitors
+        SUM(CASE WHEN role = 'visitor' THEN 1 ELSE 0 END) AS total_visitors,
+        SUM(CASE WHEN approval_status = 'pending' THEN 1 ELSE 0 END) AS pending_approvals
       FROM users
     `);
 
@@ -66,12 +69,12 @@ async function getAdminStats(req, res) {
 }
 
 /**
- * Lấy danh sách tất cả người dùng kèm bộ lọc
+ * Lấy danh sách tất cả người dùng kèm bộ lọc vai trò và trạng thái duyệt
  */
 async function getAllUsers(req, res) {
   try {
     const pool = await getPool();
-    const { search, role, limit = 50, offset = 0 } = req.query;
+    const { search, role, approvalStatus, limit = 50, offset = 0 } = req.query;
 
     let query = `
       SELECT 
@@ -80,6 +83,12 @@ async function getAllUsers(req, res) {
         u.email, 
         u.phone, 
         u.role, 
+        u.property_name,
+        u.property_address,
+        u.property_image,
+        u.approval_status,
+        u.approved_at,
+        u.rejection_reason,
         u.avatar, 
         u.created_at,
         (SELECT COUNT(*) FROM boarding_houses bh 
@@ -105,6 +114,11 @@ async function getAllUsers(req, res) {
       params.push(role);
     }
 
+    if (approvalStatus && approvalStatus !== 'all') {
+      query += ` AND u.approval_status = ?`;
+      params.push(approvalStatus);
+    }
+
     query += ` ORDER BY u.id DESC LIMIT ? OFFSET ?`;
     params.push(Number(limit), Number(offset));
 
@@ -118,6 +132,124 @@ async function getAllUsers(req, res) {
 }
 
 /**
+ * Lấy danh sách các tài khoản đang chờ Admin phê duyệt (approval_status = 'pending')
+ */
+async function getPendingUsers(req, res) {
+  try {
+    const pool = await getPool();
+    const [users] = await pool.query(`
+      SELECT 
+        id, 
+        full_name, 
+        email, 
+        phone, 
+        role, 
+        property_name,
+        property_address,
+        property_image,
+        approval_status, 
+        created_at 
+      FROM users 
+      WHERE approval_status = 'pending' 
+      ORDER BY id DESC
+    `);
+
+    return res.status(200).json({ users });
+  } catch (error) {
+    console.error('Error fetching pending users:', error);
+    return res.status(500).json({ message: 'Không thể lấy danh sách tài khoản chờ duyệt', error: error.message });
+  }
+}
+
+/**
+ * Phê duyệt hoặc từ chối tài khoản và tự động gửi email thông báo
+ */
+async function updateUserApproval(req, res) {
+  try {
+    const pool = await getPool();
+    const userId = Number(req.params.id);
+    const { status, reason } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Trạng thái phê duyệt không hợp lệ (approved hoặc rejected)' });
+    }
+
+    const [userRows] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+    const targetUser = userRows[0];
+
+    const approvedAt = status === 'approved' ? new Date() : null;
+    await pool.query(
+      'UPDATE users SET approval_status = ?, approved_at = ?, rejection_reason = ? WHERE id = ?',
+      [status, approvedAt, reason || null, userId]
+    );
+
+    // Nếu phê duyệt chủ trọ, đảm bảo bản ghi landlords và default boarding_house tồn tại với thông tin nhà trọ
+    if (status === 'approved' && targetUser.role === 'landlord') {
+      try {
+        const houseName = targetUser.property_name || `Nhà trọ ${targetUser.full_name}`;
+        const houseAddress = targetUser.property_address || 'TP. Đà Nẵng';
+        const houseImage = targetUser.property_image || null;
+
+        const [existingLandlord] = await pool.query('SELECT id FROM landlords WHERE user_id = ?', [userId]);
+        if (existingLandlord.length === 0) {
+          const [lResult] = await pool.query(
+            'INSERT INTO landlords (user_id, company_name, address) VALUES (?, ?, ?)',
+            [userId, houseName, houseAddress]
+          );
+          await pool.query(
+            'INSERT INTO boarding_houses (landlord_id, name, address, image_url, city, district) VALUES (?, ?, ?, ?, ?, ?)',
+            [lResult.insertId, houseName, houseAddress, houseImage, 'Đà Nẵng', 'Liên Chiểu']
+          );
+        } else {
+          // Cập nhật tên và địa chỉ nếu chủ trọ đã cung cấp thông tin
+          await pool.query(
+            'UPDATE landlords SET company_name = ?, address = ? WHERE id = ?',
+            [houseName, houseAddress, existingLandlord[0].id]
+          );
+          await pool.query(
+            'UPDATE boarding_houses SET name = ?, address = ?, image_url = COALESCE(?, image_url) WHERE landlord_id = ?',
+            [houseName, houseAddress, houseImage, existingLandlord[0].id]
+          );
+        }
+      } catch (lErr) {
+        console.warn('Auto sync landlord profile note:', lErr.message);
+      }
+    }
+
+    // Gửi email thông báo tự động cho người dùng
+    let emailResult = { success: true };
+    if (status === 'approved') {
+      emailResult = await sendApprovalEmail({
+        toEmail: targetUser.email,
+        fullName: targetUser.full_name,
+        role: targetUser.role,
+      });
+    } else {
+      emailResult = await sendRejectionEmail({
+        toEmail: targetUser.email,
+        fullName: targetUser.full_name,
+        reason: reason || 'Thông tin đăng ký chưa hợp lệ theo quy chế hệ thống',
+      });
+    }
+
+    return res.status(200).json({
+      message: `Đã ${status === 'approved' ? 'phê duyệt' : 'từ chối'} tài khoản thành công!`,
+      userId,
+      status,
+      emailSent: emailResult.success,
+      emailMode: emailResult.mode,
+      emailError: emailResult.error || null,
+    });
+  } catch (error) {
+    console.error('Error updating user approval:', error);
+    return res.status(500).json({ message: 'Lỗi khi cập nhật trạng thái phê duyệt', error: error.message });
+  }
+}
+
+/**
  * Cập nhật vai trò (Role) của người dùng
  */
 async function updateUserRole(req, res) {
@@ -126,7 +258,7 @@ async function updateUserRole(req, res) {
     const userId = Number(req.params.id);
     const { role } = req.body;
 
-    const validRoles = ['admin', 'landlord', 'tenant', 'visitor'];
+    const validRoles = ['admin', 'landlord', 'poster', 'tenant', 'visitor'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: 'Vai trò không hợp lệ' });
     }
@@ -338,6 +470,8 @@ async function getAllBillsAdmin(req, res) {
 module.exports = {
   getAdminStats,
   getAllUsers,
+  getPendingUsers,
+  updateUserApproval,
   updateUserRole,
   deleteUser,
   getAllRoomsAdmin,

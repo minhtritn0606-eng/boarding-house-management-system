@@ -2,6 +2,8 @@ const express = require('express');
 const {
   getAdminStats,
   getAllUsers,
+  getPendingUsers,
+  updateUserApproval,
   updateUserRole,
   deleteUser,
   getAllRoomsAdmin,
@@ -13,14 +15,14 @@ const { authenticateToken, authorizeRoles } = require('../middlewares/authMiddle
 
 const router = express.Router();
 
-// Cho phép truy cập trực tiếp trang quản trị
-// (Không bắt buộc token đăng nhập để mở trang admin riêng thuận tiện)
-
 // 1. Thống kê tổng quan
 router.get('/stats', getAdminStats);
 
-// 2. Quản lý người dùng
+// 2. Quản lý người dùng & Phê duyệt tài khoản
 router.get('/users', getAllUsers);
+router.get('/pending-users', getPendingUsers);
+router.patch('/users/:id/approval', updateUserApproval);
+router.put('/users/:id/approval', updateUserApproval);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
 

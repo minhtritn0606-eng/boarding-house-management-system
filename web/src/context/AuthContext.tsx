@@ -7,14 +7,24 @@ export interface LandlordUser {
   email: string
   phone: string
   avatar?: string
-  role: 'landlord' | 'admin' | 'tenant' | 'visitor'
+  role: 'landlord' | 'admin' | 'tenant' | 'visitor' | 'poster'
+  approval_status?: 'pending' | 'approved' | 'rejected'
 }
 
 interface AuthContextType {
   user: LandlordUser | null
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; user?: LandlordUser; error?: string }>
-  register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>
+  register: (data: {
+    name: string
+    email: string
+    phone: string
+    password: string
+    role?: 'landlord' | 'poster'
+    propertyName?: string
+    propertyAddress?: string
+    propertyImage?: string
+  }) => Promise<{ success: boolean; requiresApproval?: boolean; message?: string; error?: string }>
   logout: () => void
 }
 
@@ -62,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phone: res.user.phone || '0905 888 999',
           avatar: res.user.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${res.user.email}`,
           role: res.user.role || 'landlord',
+          approval_status: res.user.approval_status || 'approved',
         }
         setUser(loggedUser)
         return { success: true, user: loggedUser }
@@ -78,14 +89,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string
     phone: string
     password: string
-  }): Promise<{ success: boolean; error?: string }> => {
+    role?: 'landlord' | 'poster'
+    propertyName?: string
+    propertyAddress?: string
+    propertyImage?: string
+  }): Promise<{ success: boolean; requiresApproval?: boolean; message?: string; error?: string }> => {
     if (!data.name || !data.email || !data.phone || !data.password) {
       return { success: false, error: 'Vui lòng điền đầy đủ tất cả thông tin' }
+    }
+
+    if (data.role === 'landlord' && (!data.propertyName || !data.propertyAddress)) {
+      return { success: false, error: 'Chủ trọ vui lòng nhập tên nhà trọ và địa chỉ nhà trọ' }
     }
 
     if (data.password.length < 6) {
       return { success: false, error: 'Mật khẩu phải có ít nhất 6 ký tự' }
     }
+
+    const selectedRole = data.role || 'landlord'
 
     try {
       const res = await authApi.register({
@@ -93,25 +114,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: data.email,
         phone: data.phone,
         password: data.password,
-        role: 'landlord',
+        role: selectedRole,
+        propertyName: data.propertyName,
+        propertyAddress: data.propertyAddress,
+        propertyImage: data.propertyImage,
       })
-      if (res && res.user) {
+
+      if (res.requiresApproval) {
+        // Tài khoản chờ Admin duyệt -> không lưu trạng thái đăng nhập
+        return {
+          success: true,
+          requiresApproval: true,
+          message: res.message || 'Đăng ký thành công! Hồ sơ đang chờ Quản trị viên xét duyệt.',
+        }
+      }
+
+      if (res && res.user && res.token) {
         const loggedUser: LandlordUser = {
           id: String(res.user.id),
           name: res.user.fullName || data.name,
           email: res.user.email,
           phone: data.phone,
           avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${res.user.email}`,
-          role: 'landlord',
+          role: res.user.role || selectedRole,
+          approval_status: 'approved',
         }
         setUser(loggedUser)
-        return { success: true }
+        return { success: true, requiresApproval: false }
       }
+
+      return { success: true, requiresApproval: true, message: res.message }
     } catch (apiError: any) {
       return { success: false, error: apiError.message || 'Đăng ký thất bại' }
     }
-
-    return { success: false, error: 'Đăng ký không thành công' }
   }
 
   const logout = () => {

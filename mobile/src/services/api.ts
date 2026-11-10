@@ -125,8 +125,17 @@ export const mobileAuthApi = {
     return res
   },
 
-  register: async (data: { fullName: string; email: string; password: string; role?: string }) => {
-    const res = await mobileRequest<{ user: any; token: string; message?: string }>('/auth/register', {
+  register: async (data: {
+    fullName: string
+    email: string
+    password: string
+    phone?: string
+    role?: string
+    propertyName?: string
+    propertyAddress?: string
+    propertyImage?: string
+  }) => {
+    const res = await mobileRequest<{ user: any; token?: string; requiresApproval?: boolean; message?: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     })

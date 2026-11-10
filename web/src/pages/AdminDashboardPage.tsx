@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { adminApi, type AdminStats } from '../services/api'
 
-type TabType = 'overview' | 'users' | 'rooms' | 'bills' | 'settings'
+type TabType = 'overview' | 'approvals' | 'users' | 'rooms' | 'bills' | 'settings'
 
 export default function AdminDashboardPage() {
   const { user, isAuthenticated, login, logout } = useAuth()
@@ -18,6 +18,7 @@ export default function AdminDashboardPage() {
   // Data states
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [usersList, setUsersList] = useState<any[]>([])
+  const [pendingUsersList, setPendingUsersList] = useState<any[]>([])
   const [roomsList, setRoomsList] = useState<any[]>([])
   const [billsList, setBillsList] = useState<any[]>([])
 
@@ -35,6 +36,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(false)
   const [actionLoadingId, setActionLoadingId] = useState<number | string | null>(null)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ type, message })
@@ -72,6 +74,62 @@ export default function AdminDashboardPage() {
       setStats(data)
     } catch (err: any) {
       console.error('Error fetching admin stats:', err)
+    }
+  }
+
+  // Fetch Pending Users
+  const fetchPendingUsers = async () => {
+    try {
+      setLoading(true)
+      const res = await adminApi.getPendingUsers()
+      setPendingUsersList(res.users || [])
+    } catch (err: any) {
+      showNotification(err.message || 'Lỗi tải danh sách tài khoản chờ duyệt', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle Approve User
+  const handleApproveUser = async (userId: number, name: string) => {
+    try {
+      setActionLoadingId(userId)
+      const res = await adminApi.updateUserApproval(userId, 'approved')
+      if (res.emailSent === false) {
+        showNotification(`Đã duyệt tài khoản ${name} nhưng không gửi được email (${res.emailError || 'Lỗi SMTP'}).`, 'error')
+      } else {
+        showNotification(`Đã duyệt tài khoản ${name} và gửi email kích hoạt thành công!`)
+      }
+      fetchStats()
+      fetchPendingUsers()
+      if (activeTab === 'users') fetchUsers()
+    } catch (err: any) {
+      showNotification(err.message || 'Lỗi khi phê duyệt tài khoản', 'error')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  // Handle Reject User
+  const handleRejectUser = async (userId: number, name: string) => {
+    const reason = window.prompt(`Nhập lý do từ chối tài khoản "${name}":`, 'Thông tin hồ sơ chưa hợp lệ')
+    if (reason === null) return
+
+    try {
+      setActionLoadingId(userId)
+      const res = await adminApi.updateUserApproval(userId, 'rejected', reason)
+      if (res.emailSent === false) {
+        showNotification(`Đã từ chối tài khoản ${name} nhưng không gửi được email (${res.emailError || 'Lỗi SMTP'}).`, 'error')
+      } else {
+        showNotification(`Đã từ chối tài khoản ${name} và gửi email thông báo thành công.`)
+      }
+      fetchStats()
+      fetchPendingUsers()
+      if (activeTab === 'users') fetchUsers()
+    } catch (err: any) {
+      showNotification(err.message || 'Lỗi khi từ chối tài khoản', 'error')
+    } finally {
+      setActionLoadingId(null)
     }
   }
 
@@ -128,7 +186,9 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (!isAdmin) return
 
-    if (activeTab === 'users') {
+    if (activeTab === 'approvals') {
+      fetchPendingUsers()
+    } else if (activeTab === 'users') {
       fetchUsers()
     } else if (activeTab === 'rooms') {
       fetchRooms()
@@ -419,6 +479,40 @@ export default function AdminDashboardPage() {
               <li>
                 <button
                   type="button"
+                  onClick={() => setActiveTab('approvals')}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: '6px',
+                    background: activeTab === 'approvals' ? '#2563eb' : 'transparent',
+                    color: activeTab === 'approvals' ? '#fff' : '#94a3b8',
+                    border: 'none',
+                    fontWeight: activeTab === 'approvals' ? '700' : '500',
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span>Duyệt Tài Khoản</span>
+                  {(stats?.users?.pending_approvals ?? 0) > 0 ? (
+                    <span style={{ background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800' }}>
+                      {stats?.users.pending_approvals}
+                    </span>
+                  ) : (
+                    <span style={{ background: '#1e293b', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' }}>
+                      0
+                    </span>
+                  )}
+                </button>
+              </li>
+
+              <li>
+                <button
+                  type="button"
                   onClick={() => setActiveTab('users')}
                   style={{
                     width: '100%',
@@ -584,6 +678,7 @@ export default function AdminDashboardPage() {
           <div>
             <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', fontWeight: '800' }}>
               {activeTab === 'overview' && 'Bảng Điều Khiển Tổng Quan'}
+              {activeTab === 'approvals' && 'Xét Duyệt Hồ Sơ Đăng Ký Mới'}
               {activeTab === 'users' && 'Quản Lý Tài Khoản & Phân Quyền'}
               {activeTab === 'rooms' && 'Kiểm Duyệt & Quản Lý Phòng Trọ'}
               {activeTab === 'bills' && 'Giám Sát Hóa Đơn Toàn Sàn'}
@@ -599,6 +694,7 @@ export default function AdminDashboardPage() {
               type="button"
               onClick={() => {
                 fetchStats()
+                if (activeTab === 'approvals') fetchPendingUsers()
                 if (activeTab === 'users') fetchUsers()
                 if (activeTab === 'rooms') fetchRooms()
                 if (activeTab === 'bills') fetchBills()
@@ -786,6 +882,203 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
+          {/* ================= TAB: APPROVALS MANAGEMENT ================= */}
+          {activeTab === 'approvals' && (
+            <div style={{ background: '#fff', padding: '24px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a', fontWeight: '800' }}>
+                    Danh Sách Tài Khoản Chờ Phê Duyệt
+                  </h3>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem' }}>
+                    Sau khi Admin phê duyệt, hệ thống sẽ tự động kích hoạt tài khoản và gửi email thông báo kèm link đăng nhập cho người dùng.
+                  </p>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '8px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Đang chờ xử lý:</span>
+                  <span style={{ background: '#ef4444', color: '#fff', padding: '2px 10px', borderRadius: '12px', fontWeight: '800', fontSize: '0.85rem' }}>
+                    {pendingUsersList.length} hồ sơ
+                  </span>
+                </div>
+              </div>
+
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
+                  Đang tải danh sách tài khoản chờ duyệt...
+                </div>
+              ) : pendingUsersList.length === 0 ? (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '60px 20px',
+                    background: '#f8fafc',
+                    borderRadius: '8px',
+                    border: '1px dashed #cbd5e1',
+                  }}
+                >
+                  <div style={{ fontSize: '42px', marginBottom: '12px' }}>🎉</div>
+                  <h4 style={{ margin: '0 0 6px', color: '#0f172a', fontSize: '1.05rem', fontWeight: '700' }}>
+                    Không có hồ sơ nào đang chờ duyệt
+                  </h4>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
+                    Tất cả các tài khoản Chủ trọ và Người đăng bài đăng ký mới đều đã được xử lý xong.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
+                        <th style={{ padding: '12px 14px' }}>Họ và tên</th>
+                        <th style={{ padding: '12px 14px' }}>Email & Số điện thoại</th>
+                        <th style={{ padding: '12px 14px' }}>Vai trò</th>
+                        <th style={{ padding: '12px 14px' }}>Cơ sở nhà trọ (Tên, Địa chỉ, Ảnh)</th>
+                        <th style={{ padding: '12px 14px' }}>Ngày gửi đơn</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'right' }}>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingUsersList.map((u) => (
+                        <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '14px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <img
+                                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${u.email}`}
+                                alt={u.full_name}
+                                style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }}
+                              />
+                              <div>
+                                <div style={{ fontWeight: '700', color: '#0f172a' }}>{u.full_name}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>ID: #{u.id}</div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td style={{ padding: '14px' }}>
+                            <div style={{ color: '#0f172a', fontWeight: '600' }}>{u.email}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                              {u.phone || 'Chưa cung cấp SĐT'}
+                            </div>
+                          </td>
+
+                          <td style={{ padding: '14px' }}>
+                            {u.role === 'landlord' ? (
+                              <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '4px 10px', borderRadius: '6px', fontWeight: '700', fontSize: '0.8rem' }}>
+                                Chủ nhà trọ
+                              </span>
+                            ) : u.role === 'poster' ? (
+                              <span style={{ background: '#fdf4ff', color: '#a21caf', border: '1px solid #f5d0fe', padding: '4px 10px', borderRadius: '6px', fontWeight: '700', fontSize: '0.8rem' }}>
+                                Người đăng bài
+                              </span>
+                            ) : (
+                              <span style={{ background: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>
+                                {u.role}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Cột thông tin cơ sở nhà trọ của Chủ trọ */}
+                          <td style={{ padding: '14px', maxWidth: '260px' }}>
+                            {u.role === 'landlord' ? (
+                              <div>
+                                <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.88rem' }}>
+                                  {u.property_name || 'Chưa đặt tên trọ'}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px', wordBreak: 'break-word' }}>
+                                  {u.property_address || 'Chưa có địa chỉ'}
+                                </div>
+                                {u.property_image ? (
+                                  <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <img
+                                      src={u.property_image}
+                                      alt={u.property_name || 'Ảnh trọ'}
+                                      onClick={() => setPreviewImage(u.property_image)}
+                                      style={{
+                                        width: '56px',
+                                        height: '38px',
+                                        objectFit: 'cover',
+                                        borderRadius: '4px',
+                                        border: '1px solid #cbd5e1',
+                                        cursor: 'pointer',
+                                      }}
+                                      title="Nhấp để phóng to ảnh"
+                                    />
+                                    <span
+                                      onClick={() => setPreviewImage(u.property_image)}
+                                      style={{ fontSize: '0.75rem', color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}
+                                    >
+                                      Xem ảnh
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', fontStyle: 'italic' }}>
+                                    Không đính kèm ảnh
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Không áp dụng</span>
+                            )}
+                          </td>
+
+                          <td style={{ padding: '14px', color: '#64748b', fontSize: '0.82rem' }}>
+                            {u.created_at ? new Date(u.created_at).toLocaleString('vi-VN') : 'Mới đăng ký'}
+                          </td>
+
+                          <td style={{ padding: '14px', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '8px' }}>
+                              <button
+                                type="button"
+                                disabled={actionLoadingId === u.id}
+                                onClick={() => handleApproveUser(u.id, u.full_name)}
+                                style={{
+                                  background: '#16a34a',
+                                  color: '#fff',
+                                  border: 'none',
+                                  padding: '7px 14px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  opacity: actionLoadingId === u.id ? 0.6 : 1,
+                                }}
+                              >
+                                ✓ Phê duyệt & Gửi Mail
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={actionLoadingId === u.id}
+                                onClick={() => handleRejectUser(u.id, u.full_name)}
+                                style={{
+                                  background: '#fff',
+                                  color: '#dc2626',
+                                  border: '1px solid #fca5a5',
+                                  padding: '7px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                  opacity: actionLoadingId === u.id ? 0.6 : 1,
+                                }}
+                              >
+                                Từ chối
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ================= TAB 2: USERS MANAGEMENT ================= */}
           {activeTab === 'users' && (
             <div style={{ background: '#fff', padding: '24px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
@@ -840,6 +1133,7 @@ export default function AdminDashboardPage() {
                     <option value="all">Tất cả vai trò</option>
                     <option value="admin">Quản trị viên (Admin)</option>
                     <option value="landlord">Chủ nhà trọ (Landlord)</option>
+                    <option value="poster">Người đăng bài (Poster)</option>
                     <option value="tenant">Khách thuê (Tenant)</option>
                     <option value="visitor">Khách vãng lai (Visitor)</option>
                   </select>
@@ -860,6 +1154,7 @@ export default function AdminDashboardPage() {
                         <th style={{ padding: '12px 14px' }}>Liên hệ</th>
                         <th style={{ padding: '12px 14px' }}>Dãy / Phòng</th>
                         <th style={{ padding: '12px 14px' }}>Vai trò</th>
+                        <th style={{ padding: '12px 14px' }}>Trạng thái</th>
                         <th style={{ padding: '12px 14px', textAlign: 'right' }}>Thao tác</th>
                       </tr>
                     </thead>
@@ -907,20 +1202,59 @@ export default function AdminDashboardPage() {
                                     ? '#fee2e2'
                                     : u.role === 'landlord'
                                     ? '#eff6ff'
+                                    : u.role === 'poster'
+                                    ? '#fdf4ff'
                                     : '#f8fafc',
                                 color:
                                   u.role === 'admin'
                                     ? '#991b1b'
                                     : u.role === 'landlord'
                                     ? '#1e40af'
+                                    : u.role === 'poster'
+                                    ? '#a21caf'
                                     : '#334155',
                               }}
                             >
                               <option value="admin">Admin</option>
                               <option value="landlord">Landlord</option>
+                              <option value="poster">Poster</option>
                               <option value="tenant">Tenant</option>
                               <option value="visitor">Visitor</option>
                             </select>
+                          </td>
+
+                          <td style={{ padding: '12px 14px' }}>
+                            {u.approval_status === 'pending' ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', padding: '3px 8px', borderRadius: '4px', fontWeight: '700', fontSize: '0.75rem', display: 'inline-block', width: 'fit-content' }}>
+                                  ⏳ Chờ duyệt
+                                </span>
+                                <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApproveUser(u.id, u.full_name)}
+                                    style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: '3px', fontSize: '0.72rem', fontWeight: '600', cursor: 'pointer' }}
+                                  >
+                                    Duyệt
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRejectUser(u.id, u.full_name)}
+                                    style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', padding: '2px 6px', borderRadius: '3px', fontSize: '0.72rem', fontWeight: '600', cursor: 'pointer' }}
+                                  >
+                                    Từ chối
+                                  </button>
+                                </div>
+                              </div>
+                            ) : u.approval_status === 'rejected' ? (
+                              <span style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: '4px', fontWeight: '700', fontSize: '0.75rem' }}>
+                                ✕ Bị từ chối
+                              </span>
+                            ) : (
+                              <span style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '4px', fontWeight: '700', fontSize: '0.75rem' }}>
+                                ✓ Đã kích hoạt
+                              </span>
+                            )}
                           </td>
 
                           <td style={{ padding: '12px 14px', textAlign: 'right' }}>
@@ -1253,6 +1587,72 @@ export default function AdminDashboardPage() {
                   <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Express API: <code>http://localhost:5000/api</code></div>
                   <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Admin Router: <code>/api/admin/*</code></div>
                 </div>
+              </div>
+            </div>
+          )}
+          {/* Modal phóng to ảnh nhà trọ */}
+          {previewImage && (
+            <div
+              onClick={() => setPreviewImage(null)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(15, 23, 42, 0.75)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 999999,
+                padding: '24px',
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: 'relative',
+                  background: '#ffffff',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  maxWidth: '750px',
+                  maxHeight: '90vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '12px' }}>
+                  <div style={{ fontWeight: '700', fontSize: '0.95rem', color: '#0f172a' }}>
+                    Hình ảnh cơ sở nhà trọ đính kèm
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewImage(null)}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      cursor: 'pointer',
+                      fontWeight: '700',
+                      color: '#475569',
+                    }}
+                  >
+                    Đóng ✕
+                  </button>
+                </div>
+                <img
+                  src={previewImage}
+                  alt="Ảnh nhà trọ"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '75vh',
+                    borderRadius: '8px',
+                    objectFit: 'contain',
+                  }}
+                />
               </div>
             </div>
           )}

@@ -12,7 +12,11 @@ interface AuthContextType {
     email: string
     phone: string
     password: string
-  }) => Promise<{ success: boolean; error?: string }>
+    role?: 'landlord' | 'poster'
+    propertyName?: string
+    propertyAddress?: string
+    propertyImage?: string
+  }) => Promise<{ success: boolean; requiresApproval?: boolean; message?: string; error?: string }>
   logout: () => void
 }
 
@@ -40,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: res.user.fullName || res.user.name || cleanEmail.split('@')[0],
           email: res.user.email,
           phone: res.user.phone || '0905 888 999',
-          role: 'landlord',
+          role: res.user.role || 'landlord',
           avatar: res.user.avatar || `https://api.dicebear.com/7.x/bottts/png?seed=${cleanEmail}`,
         })
         setIsLoading(false)
@@ -60,16 +64,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string
     phone: string
     password: string
-  }): Promise<{ success: boolean; error?: string }> => {
+    role?: 'landlord' | 'poster'
+    propertyName?: string
+    propertyAddress?: string
+    propertyImage?: string
+  }): Promise<{ success: boolean; requiresApproval?: boolean; message?: string; error?: string }> => {
     setIsLoading(true)
     const cleanName = data.name.trim()
     const cleanEmail = data.email.trim()
     const cleanPhone = data.phone.trim()
     const cleanPass = data.password.trim()
+    const selectedRole = data.role || 'landlord'
 
     if (!cleanName || !cleanEmail || !cleanPhone || !cleanPass) {
       setIsLoading(false)
       return { success: false, error: 'Vui lòng điền đầy đủ tất cả thông tin' }
+    }
+
+    if (selectedRole === 'landlord' && (!data.propertyName?.trim() || !data.propertyAddress?.trim())) {
+      setIsLoading(false)
+      return { success: false, error: 'Vui lòng nhập tên nhà trọ và địa chỉ nhà trọ' }
     }
 
     if (cleanPass.length < 6) {
@@ -81,28 +95,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await mobileAuthApi.register({
         fullName: cleanName,
         email: cleanEmail,
+        phone: cleanPhone,
         password: cleanPass,
-        role: 'landlord',
+        role: selectedRole,
+        propertyName: data.propertyName?.trim(),
+        propertyAddress: data.propertyAddress?.trim(),
+        propertyImage: data.propertyImage?.trim(),
       })
-      if (res && res.user) {
+
+      setIsLoading(false)
+
+      if (res.requiresApproval) {
+        return {
+          success: true,
+          requiresApproval: true,
+          message: res.message || 'Đăng ký thành công! Hồ sơ đang chờ Quản trị viên phê duyệt.',
+        }
+      }
+
+      if (res && res.user && res.token) {
         setUser({
           id: String(res.user.id),
           name: res.user.fullName || cleanName,
           email: res.user.email,
           phone: cleanPhone,
-          role: 'landlord',
+          role: selectedRole,
           avatar: `https://api.dicebear.com/7.x/bottts/png?seed=${cleanEmail}`,
         })
-        setIsLoading(false)
-        return { success: true }
+        return { success: true, requiresApproval: false }
       }
+
+      return { success: true, requiresApproval: true, message: res.message }
     } catch (apiErr: any) {
       setIsLoading(false)
       return { success: false, error: apiErr.message || 'Đăng ký không thành công' }
     }
-
-    setIsLoading(false)
-    return { success: true }
   }
 
   const logout = () => {

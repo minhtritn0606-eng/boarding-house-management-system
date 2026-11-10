@@ -67,8 +67,17 @@ export const authApi = {
     return res
   },
 
-  register: async (data: { fullName: string; email: string; password: string; phone?: string; role?: string }) => {
-    const res = await request<{ user: any; token: string; message?: string }>('/auth/register', {
+  register: async (data: {
+    fullName: string
+    email: string
+    password: string
+    phone?: string
+    role?: string
+    propertyName?: string
+    propertyAddress?: string
+    propertyImage?: string
+  }) => {
+    const res = await request<{ user: any; token?: string; requiresApproval?: boolean; message?: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     })
@@ -139,6 +148,7 @@ export const postApi = {
     longitude?: number
     contactPhone?: string
     contactName?: string
+    isPublished?: boolean
   }) => {
     return await request<{ post: any; room: any }>('/posts', {
       method: 'POST',
@@ -239,9 +249,11 @@ export interface AdminStats {
   users: {
     total_users: number
     total_landlords: number
+    total_posters?: number
     total_tenants: number
     total_admins: number
     total_visitors: number
+    pending_approvals?: number
   }
   rooms: {
     total_rooms: number
@@ -267,12 +279,27 @@ export const adminApi = {
     return await request<AdminStats>('/admin/stats')
   },
 
-  getUsers: async (params: { search?: string; role?: string } = {}) => {
+  getUsers: async (params: { search?: string; role?: string; approvalStatus?: string } = {}) => {
     const query = new URLSearchParams()
     if (params.search) query.append('search', params.search)
     if (params.role && params.role !== 'all') query.append('role', params.role)
+    if (params.approvalStatus && params.approvalStatus !== 'all') query.append('approvalStatus', params.approvalStatus)
     const qs = query.toString() ? `?${query.toString()}` : ''
     return await request<{ users: any[] }>(`/admin/users${qs}`)
+  },
+
+  getPendingUsers: async () => {
+    return await request<{ users: any[] }>('/admin/pending-users')
+  },
+
+  updateUserApproval: async (userId: number | string, status: 'approved' | 'rejected', reason?: string) => {
+    return await request<{ message: string; userId: number; status: string; emailSent?: boolean; emailError?: string }>(
+      `/admin/users/${userId}/approval`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ status, reason }),
+      }
+    )
   },
 
   updateUserRole: async (userId: number | string, role: string) => {

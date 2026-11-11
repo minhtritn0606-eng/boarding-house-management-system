@@ -74,57 +74,49 @@ ${currentRoomContext}`;
       'gemini-pro',
     ];
 
-    // ================= Cách 1: Sử dụng @google/generative-ai SDK =================
+    // ================= ƯU TIÊN 1: Sử dụng @google/genai SDK mới nhất (gemini-2.5-flash) =================
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      for (const mName of candidateModels) {
+      const ai = new GoogleGenAI({ apiKey });
+      const modernModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      for (const mName of modernModels) {
         try {
-          const model = genAI.getGenerativeModel({
+          const response = await ai.models.generateContent({
             model: mName,
-            systemInstruction,
+            contents: `${systemInstruction}\n\n--- CÂU HỎI CỦA NGƯỜI DÙNG ---\n${message}`,
           });
-          const result = await model.generateContent(message);
-          rawReply = result.response.text();
+          rawReply = response.text || '';
           if (rawReply) {
-            console.log(`[Gemini AI] Responded successfully via model: ${mName}`);
+            console.log(`[Gemini AI GenAI SDK] Phản hồi thành công qua model mới: ${mName}`);
             break;
           }
-        } catch (e1) {
-          // Thử gọi dạng prompt gộp (tương thích mọi phiên bản)
-          try {
-            const modelSimple = genAI.getGenerativeModel({ model: mName });
-            const promptCombo = `${systemInstruction}\n\n--- CÂU HỎI CỦA NGƯỜI DÙNG ---\n${message}`;
-            const resultSimple = await modelSimple.generateContent(promptCombo);
-            rawReply = resultSimple.response.text();
-            if (rawReply) {
-              console.log(`[Gemini AI] Responded via prompt combo on model: ${mName}`);
-              break;
-            }
-          } catch (e2) {
-            // thử model tiếp theo
-          }
+        } catch (e) {
+          // thử model tiếp theo
         }
       }
     } catch (sdkError) {
-      console.warn('[Gemini AI] GenerativeAI SDK error:', sdkError.message);
+      console.warn('[Gemini AI] GenAI SDK error:', sdkError.message);
     }
 
-    // ================= Cách 2: Thử @google/genai SDK =================
+    // ================= DỰ PHÒNG: Thử @google/generative-ai SDK =================
     if (!rawReply) {
       try {
-        const ai = new GoogleGenAI({ apiKey });
-        for (const mName of candidateModels) {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const legacyModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+        for (const mName of legacyModels) {
           try {
-            const response = await ai.models.generateContent({
+            const model = genAI.getGenerativeModel({
               model: mName,
-              contents: `${systemInstruction}\n\nCâu hỏi: ${message}`,
+              systemInstruction,
             });
-            rawReply = response.text || '';
+            const result = await model.generateContent(message);
+            rawReply = result.response.text();
             if (rawReply) {
-              console.log(`[Gemini AI GenAI SDK] Responded via model: ${mName}`);
+              console.log(`[Gemini AI] Responded successfully via legacy model: ${mName}`);
               break;
             }
-          } catch (e) {}
+          } catch (e1) {
+            // thử tiếp
+          }
         }
       } catch (sdk2Error) {}
     }

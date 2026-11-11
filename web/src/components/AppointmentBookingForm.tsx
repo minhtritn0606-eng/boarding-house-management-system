@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { appointmentApi } from '../services/api'
 import type { Room } from '../data/sampleRooms'
 
@@ -13,6 +13,31 @@ const TIME_SLOTS = [
   'Giờ khác (Tự thỏa thuận)',
 ]
 
+function getIsoDate(offsetDays: number = 0): string {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatSelectedDateVi(dateStr: string): string {
+  if (!dateStr) return ''
+  try {
+    const parts = dateStr.split('-')
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+      const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+      const dayName = days[d.getDay()]
+      return `${dayName}, ${parts[2]}/${parts[1]}/${parts[0]}`
+    }
+    return dateStr
+  } catch {
+    return dateStr
+  }
+}
+
 export default function AppointmentBookingForm({ room }: AppointmentBookingFormProps) {
   const [visitorName, setVisitorName] = useState('')
   const [phone, setPhone] = useState('')
@@ -23,7 +48,19 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
   const [error, setError] = useState('')
   const [isSuccess, setIsSuccess] = useState(false)
 
+  const dateInputRef = useRef<HTMLInputElement>(null)
+  const tomorrowStr = useMemo(() => getIsoDate(1), [])
+  const dayAfterStr = useMemo(() => getIsoDate(2), [])
+
   const isAvailable = room.status !== 'rented'
+
+  const handleOpenCalendar = () => {
+    try {
+      dateInputRef.current?.showPicker?.()
+    } catch {
+      dateInputRef.current?.focus()
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,7 +76,7 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
       return
     }
 
-    // Phone format check (Vietnamese phone standard 10 digits)
+    // Phone format check (Vietnamese phone standard 9-11 digits)
     const phoneClean = phone.trim().replace(/\s+/g, '')
     if (!/^[0-9]{9,11}$/.test(phoneClean)) {
       setError('Số điện thoại không hợp lệ (vui lòng nhập 10 chữ số)')
@@ -65,6 +102,7 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
 
       setIsSuccess(true)
       window.dispatchEvent(new Event('appointment-updated'))
+      window.dispatchEvent(new Event('notification-updated'))
     } catch (err: any) {
       setError(err.message || 'Không thể gửi yêu cầu đặt lịch. Vui lòng thử lại.')
     } finally {
@@ -106,7 +144,7 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
             <span>Phòng:</span> <strong>{room.title}</strong>
           </div>
           <div>
-            <span>Ngày hẹn:</span> <strong>{viewingDate}</strong>
+            <span>Ngày hẹn:</span> <strong>{formatSelectedDateVi(viewingDate) || viewingDate}</strong>
           </div>
           <div>
             <span>Khung giờ:</span> <strong>{viewingTime}</strong>
@@ -133,9 +171,7 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
       <form onSubmit={handleSubmit} className="appointment-form">
         <div className="appointment-form-row">
           <div className="appointment-form-group">
-            <label htmlFor="vis-name">
-              Họ và tên <span className="req">*</span>
-            </label>
+            <label htmlFor="vis-name">Họ và tên</label>
             <input
               id="vis-name"
               type="text"
@@ -146,9 +182,7 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
           </div>
 
           <div className="appointment-form-group">
-            <label htmlFor="vis-phone">
-              Số điện thoại liên hệ (Zalo) <span className="req">*</span>
-            </label>
+            <label htmlFor="vis-phone">Số điện thoại / Zalo</label>
             <input
               id="vis-phone"
               type="tel"
@@ -161,23 +195,74 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
 
         <div className="appointment-form-row">
           <div className="appointment-form-group">
-            <label htmlFor="vis-date">
-              Ngày muốn đến xem <span className="req">*</span>
-            </label>
-            <input
-              id="vis-date"
-              type="date"
-              required
-              min={new Date().toISOString().split('T')[0]}
-              value={viewingDate}
-              onChange={(e) => setViewingDate(e.target.value)}
-            />
+            <label htmlFor="vis-date">Ngày muốn đến xem</label>
+            <div className="appointment-date-picker-wrap" onClick={handleOpenCalendar}>
+              <input
+                ref={dateInputRef}
+                id="vis-date"
+                type="date"
+                required
+                min={tomorrowStr}
+                value={viewingDate}
+                onChange={(e) => setViewingDate(e.target.value)}
+                className="appointment-date-input"
+                title="Bấm để mở lịch chọn ngày"
+              />
+              <button
+                type="button"
+                className="calendar-picker-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenCalendar()
+                }}
+                title="Mở lịch chọn ngày"
+                aria-label="Mở lịch chọn ngày"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Quick date picker shortcuts: chỉ có Ngày mai và Ngày kia */}
+            <div className="quick-date-pills">
+              <button
+                type="button"
+                className={`quick-date-pill ${viewingDate === tomorrowStr ? 'active' : ''}`}
+                onClick={() => setViewingDate(tomorrowStr)}
+              >
+                Ngày mai
+              </button>
+              <button
+                type="button"
+                className={`quick-date-pill ${viewingDate === dayAfterStr ? 'active' : ''}`}
+                onClick={() => setViewingDate(dayAfterStr)}
+              >
+                Ngày kia
+              </button>
+            </div>
+
+            {viewingDate && (
+              <div className="selected-date-preview">
+                {formatSelectedDateVi(viewingDate)}
+              </div>
+            )}
           </div>
 
           <div className="appointment-form-group">
-            <label htmlFor="vis-time">
-              Khung giờ hẹn <span className="req">*</span>
-            </label>
+            <label htmlFor="vis-time">Khung giờ hẹn</label>
             <select
               id="vis-time"
               value={viewingTime}
@@ -193,7 +278,7 @@ export default function AppointmentBookingForm({ room }: AppointmentBookingFormP
         </div>
 
         <div className="appointment-form-group">
-          <label htmlFor="vis-note">Lời nhắn cho chủ trọ (Tùy chọn)</label>
+          <label htmlFor="vis-note">Lời nhắn cho chủ trọ</label>
           <input
             id="vis-note"
             type="text"

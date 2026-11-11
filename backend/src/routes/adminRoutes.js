@@ -8,6 +8,9 @@ const {
   deleteUser,
   getAllRoomsAdmin,
   toggleRoomPublishAdmin,
+  approvePostAdmin,
+  rejectPostAdmin,
+  recheckPostAIAdmin,
   deleteRoomAdmin,
   getAllBillsAdmin,
 } = require('../controllers/adminController');
@@ -26,9 +29,12 @@ router.put('/users/:id/approval', updateUserApproval);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
 
-// 3. Quản lý bài đăng & phòng trọ
+// 3. Quản lý bài đăng & phòng trọ & Kiểm duyệt AI
 router.get('/rooms', getAllRoomsAdmin);
 router.patch('/rooms/:id/toggle-publish', toggleRoomPublishAdmin);
+router.post('/rooms/:id/approve', approvePostAdmin);
+router.post('/rooms/:id/reject', rejectPostAdmin);
+router.post('/rooms/:id/recheck-ai', recheckPostAIAdmin);
 router.delete('/rooms/:id', deleteRoomAdmin);
 
 // 4. Quản lý hóa đơn & giao dịch

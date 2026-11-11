@@ -1,51 +1,76 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { appointmentApi, type ViewingAppointment } from '../services/api'
+import { notificationApi, type AppNotification } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+
+function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return ''
+  try {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    if (diffMs < 0) return 'Vừa xong'
+    const diffMin = Math.floor(diffMs / (1000 * 60))
+    if (diffMin < 1) return 'Vừa xong'
+    if (diffMin < 60) return `${diffMin} phút trước`
+    const diffHours = Math.floor(diffMin / 60)
+    if (diffHours < 24) return `${diffHours} giờ trước`
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays === 1) return 'Hôm qua'
+    if (diffDays < 7) return `${diffDays} ngày trước`
+    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+  } catch {
+    return dateStr
+  }
+}
 
 export default function NotificationBell() {
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
-  const [appointments, setAppointments] = useState<ViewingAppointment[]>([])
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [unreadCount, setUnreadCount] = useState<number>(0)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<'all' | 'appointment' | 'rejected' | 'approved'>('all')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const fetchAppointments = async () => {
+  const fetchNotifications = async () => {
     if (!isAuthenticated) return
     try {
       setLoading(true)
-      const data = await appointmentApi.getAppointments()
-      setAppointments(data.appointments || [])
+      const data = await notificationApi.getNotifications(30)
+      setNotifications(data.notifications || [])
+      setUnreadCount(data.unreadCount || 0)
     } catch (err) {
-      console.error('Không thể lấy danh sách lịch hẹn cho thông báo:', err)
+      console.error('Không thể tải thông báo:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  // Load appointments on mount and listen to custom event
   useEffect(() => {
     if (isAuthenticated) {
-      fetchAppointments()
+      fetchNotifications()
 
       const handleUpdate = () => {
-        fetchAppointments()
+        fetchNotifications()
       }
 
+      window.addEventListener('notification-updated', handleUpdate)
       window.addEventListener('appointment-updated', handleUpdate)
 
-      // Polling every 45s for fresh appointments
-      const interval = setInterval(fetchAppointments, 45000)
+      // Cập nhật ngầm mỗi 45 giây
+      const interval = setInterval(fetchNotifications, 45000)
 
       return () => {
+        window.removeEventListener('notification-updated', handleUpdate)
         window.removeEventListener('appointment-updated', handleUpdate)
         clearInterval(interval)
       }
     }
   }, [isAuthenticated])
 
-  // Close dropdown on click outside
+  // Đóng dropdown khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -61,26 +86,92 @@ export default function NotificationBell() {
     }
   }, [isOpen])
 
-  // Count pending appointments as new notifications
-  const pendingCount = appointments.filter((app) => app.status === 'pending').length
-  const totalCount = appointments.length
+  const handleMarkAsRead = async (item: AppNotification) => {
+    const isUnread = !item.is_read || item.is_read === 0
+    if (isUnread) {
+      try {
+        await notificationApi.markAsRead(item.id)
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === item.id ? { ...n, is_read: true } : n))
+        )
+        setUnreadCount((prev) => Math.max(0, prev - 1))
+      } catch (err) {
+        console.error('Lỗi đánh dấu đã đọc:', err)
+      }
+    }
 
-  const handleOpenAllAppointments = () => {
     setIsOpen(false)
-    navigate('/my-rooms', { state: { tab: 'appointments' } })
+    navigate(`/notifications?id=${item.id}`)
   }
 
-  const getStatusBadge = (status: ViewingAppointment['status']) => {
-    switch (status) {
-      case 'confirmed':
-        return { text: 'Đã xác nhận', bg: '#ecfdf5', color: '#065f46', dot: '#10b981' }
-      case 'completed':
-        return { text: 'Đã xem phòng', bg: '#eff6ff', color: '#1e40af', dot: '#3b82f6' }
-      case 'cancelled':
-        return { text: 'Đã hủy', bg: '#fef2f2', color: '#991b1b', dot: '#ef4444' }
-      case 'pending':
-      default:
-        return { text: 'Chờ xác nhận', bg: '#fffbeb', color: '#92400e', dot: '#f59e0b' }
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationApi.markAllAsRead()
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+      setUnreadCount(0)
+    } catch (err) {
+      console.error('Lỗi đánh dấu tất cả đã đọc:', err)
+    }
+  }
+
+  const filteredNotifications = useMemo(() => {
+    if (activeFilter === 'appointment') {
+      return notifications.filter(
+        (n) => n.type === 'appointment' || n.title.toLowerCase().includes('lịch hẹn') || n.title.toLowerCase().includes('xem phòng')
+      )
+    }
+    if (activeFilter === 'rejected') {
+      return notifications.filter(
+        (n) => n.type === 'rejected' || n.title.toLowerCase().includes('từ chối') || n.title.toLowerCase().includes('tạm dừng')
+      )
+    }
+    if (activeFilter === 'approved') {
+      return notifications.filter(
+        (n) => n.type === 'approved' || n.title.toLowerCase().includes('duyệt')
+      )
+    }
+    return notifications
+  }, [notifications, activeFilter])
+
+  const getNotificationStyle = (type?: string, title?: string) => {
+    const lowerTitle = (title || '').toLowerCase()
+    if (type === 'appointment' || lowerTitle.includes('lịch hẹn') || lowerTitle.includes('xem phòng')) {
+      return {
+        tagText: 'Lịch hẹn xem',
+        tagBg: '#eff6ff',
+        tagColor: '#1d4ed8',
+        borderLeft: '3px solid #3b82f6',
+      }
+    }
+    if (type === 'rejected' || lowerTitle.includes('từ chối') || lowerTitle.includes('tạm dừng')) {
+      return {
+        tagText: 'Từ chối duyệt',
+        tagBg: '#fee2e2',
+        tagColor: '#991b1b',
+        borderLeft: '3px solid #ef4444',
+      }
+    }
+    if (type === 'approved' || lowerTitle.includes('đã duyệt') || lowerTitle.includes('thành công')) {
+      return {
+        tagText: 'Đã duyệt',
+        tagBg: '#dcfce7',
+        tagColor: '#166534',
+        borderLeft: '3px solid #10b981',
+      }
+    }
+    if (type === 'pending' || lowerTitle.includes('chờ duyệt') || lowerTitle.includes('xác minh')) {
+      return {
+        tagText: 'Chờ duyệt',
+        tagBg: '#fef3c7',
+        tagColor: '#b45309',
+        borderLeft: '3px solid #f59e0b',
+      }
+    }
+    return {
+      tagText: 'Thông báo',
+      tagBg: '#eff6ff',
+      tagColor: '#1d4ed8',
+      borderLeft: '3px solid #3b82f6',
     }
   }
 
@@ -88,19 +179,19 @@ export default function NotificationBell() {
     <div className="notification-bell-container" ref={dropdownRef}>
       <button
         type="button"
-        className={`notification-bell-btn ${pendingCount > 0 ? 'has-unread' : ''}`}
+        className={`notification-bell-btn ${unreadCount > 0 ? 'has-unread' : ''}`}
         onClick={() => setIsOpen((prev) => !prev)}
-        title="Thông báo lịch xem phòng"
-        aria-label="Thông báo lịch hẹn xem phòng"
+        title="Thông báo tài khoản"
+        aria-label="Thông báo tài khoản"
       >
         <svg
           className="bell-icon"
-          width="20"
-          height="20"
+          width="18"
+          height="18"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
@@ -108,93 +199,117 @@ export default function NotificationBell() {
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
 
-        {pendingCount > 0 && (
+        {unreadCount > 0 && (
           <span className="notification-badge">
-            {pendingCount > 9 ? '9+' : pendingCount}
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
         <div className="notification-dropdown">
+          {/* Header */}
           <div className="notification-dropdown-header">
             <div className="header-title-box">
-              <span className="header-icon">📅</span>
-              <span className="header-title">Lịch hẹn xem phòng</span>
-              {pendingCount > 0 ? (
-                <span className="pending-pill">{pendingCount} mới</span>
-              ) : (
-                <span className="total-pill">{totalCount} lịch hẹn</span>
+              <span className="header-title">Thông báo</span>
+              {unreadCount > 0 && (
+                <span className="pending-pill">{unreadCount} mới</span>
               )}
             </div>
+
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                className="btn-mark-all-read"
+                onClick={handleMarkAllAsRead}
+              >
+                Đánh dấu đã đọc
+              </button>
+            )}
+          </div>
+
+          {/* Filter Pills */}
+          <div className="notification-filter-tabs">
             <button
               type="button"
-              className="btn-refresh-notif"
-              onClick={fetchAppointments}
-              disabled={loading}
-              title="Làm mới thông báo"
+              className={`notif-tab ${activeFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setActiveFilter('all')}
             >
-              <span className={loading ? 'spinning' : ''}>🔄</span>
+              Tất cả ({notifications.length})
+            </button>
+            <button
+              type="button"
+              className={`notif-tab ${activeFilter === 'appointment' ? 'active' : ''}`}
+              onClick={() => setActiveFilter('appointment')}
+            >
+              Lịch hẹn
+            </button>
+            <button
+              type="button"
+              className={`notif-tab ${activeFilter === 'rejected' ? 'active' : ''}`}
+              onClick={() => setActiveFilter('rejected')}
+            >
+              Bị từ chối
+            </button>
+            <button
+              type="button"
+              className={`notif-tab ${activeFilter === 'approved' ? 'active' : ''}`}
+              onClick={() => setActiveFilter('approved')}
+            >
+              Đã duyệt
             </button>
           </div>
 
+          {/* Body List */}
           <div className="notification-dropdown-body">
-            {appointments.length === 0 ? (
+            {loading && notifications.length === 0 ? (
               <div className="notification-empty">
-                <span className="empty-icon">📭</span>
-                <p className="empty-title">Chưa có lịch hẹn xem phòng nào</p>
+                <p className="empty-sub">Đang tải thông báo...</p>
+              </div>
+            ) : filteredNotifications.length === 0 ? (
+              <div className="notification-empty">
+                <p className="empty-title">Không có thông báo nào</p>
                 <p className="empty-sub">
-                  Khi khách đặt lịch xem phòng trọ của bạn, thông báo sẽ hiển thị ở đây.
+                  Kết quả kiểm duyệt bài đăng và cập nhật hệ thống sẽ xuất hiện tại đây.
                 </p>
               </div>
             ) : (
               <div className="notification-list">
-                {appointments.slice(0, 6).map((app) => {
-                  const badge = getStatusBadge(app.status)
-                  const isPending = app.status === 'pending'
+                {filteredNotifications.map((item) => {
+                  const styleConfig = getNotificationStyle(item.type, item.title)
+                  const isUnread = !item.is_read || item.is_read === 0
+
                   return (
                     <div
-                      key={app.id}
-                      className={`notification-item ${isPending ? 'is-pending' : ''}`}
-                      onClick={handleOpenAllAppointments}
-                      title="Bấm để mở danh sách quản lý lịch hẹn"
+                      key={item.id}
+                      className={`notification-item ${isUnread ? 'is-unread' : ''}`}
+                      style={{ borderLeft: styleConfig.borderLeft }}
+                      onClick={() => handleMarkAsRead(item)}
+                      title="Nhấn để xem chi tiết"
                     >
-                      <div className="item-avatar">
-                        {app.visitorName ? app.visitorName.charAt(0).toUpperCase() : 'K'}
-                      </div>
                       <div className="item-content">
                         <div className="item-header-line">
-                          <strong className="visitor-name">{app.visitorName}</strong>
                           <span
                             className="item-status-tag"
-                            style={{ background: badge.bg, color: badge.color }}
+                            style={{ background: styleConfig.tagBg, color: styleConfig.tagColor }}
                           >
-                            <span className="status-dot" style={{ background: badge.dot }}></span>
-                            {badge.text}
+                            {styleConfig.tagText}
+                          </span>
+                          <span className="item-time">
+                            {formatRelativeTime(item.created_at)}
                           </span>
                         </div>
 
-                        <div className="item-room-title">
-                          🏠 {app.roomTitle || `Phòng #${app.roomId}`}
+                        <strong className="item-title">{item.title}</strong>
+
+                        <p className="item-message">{item.message}</p>
+
+                        <div className="item-action-hint">
+                          Bấm để xem nội dung đầy đủ &rarr;
                         </div>
-
-                        <div className="item-schedule-line">
-                          <span className="schedule-date">📅 {app.viewingDate}</span>
-                          <span className="schedule-time">⏰ {app.viewingTime}</span>
-                        </div>
-
-                        {app.phone && (
-                          <div className="item-phone-line">
-                            📞 SĐT: <strong>{app.phone}</strong>
-                          </div>
-                        )}
-
-                        {app.note && (
-                          <div className="item-note-line">
-                            💬 "{app.note}"
-                          </div>
-                        )}
                       </div>
+
+                      {isUnread && <span className="unread-dot" title="Chưa đọc"></span>}
                     </div>
                   )
                 })}
@@ -202,13 +317,17 @@ export default function NotificationBell() {
             )}
           </div>
 
+          {/* Footer */}
           <div className="notification-dropdown-footer">
             <button
               type="button"
               className="btn-view-all-appointments"
-              onClick={handleOpenAllAppointments}
+              onClick={() => {
+                setIsOpen(false)
+                navigate('/notifications')
+              }}
             >
-              Quản lý lịch hẹn xem phòng ({totalCount}) &rarr;
+              Mở trang thông báo chi tiết &rarr;
             </button>
           </div>
         </div>

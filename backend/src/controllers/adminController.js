@@ -1,5 +1,8 @@
 const { getPool } = require('../config/database');
 const { sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
+const { moderatePost } = require('../services/aiModeratorService');
+const { findPostById, updatePost } = require('../models/postModel');
+const { createNotification, getLandlordUserIdByPostId } = require('../models/notificationModel');
 
 /**
  * Lấy số liệu thống kê tổng quan toàn sàn cho Admin
@@ -310,60 +313,89 @@ async function deleteUser(req, res) {
 }
 
 /**
- * Lấy toàn bộ danh sách phòng trọ phục vụ kiểm duyệt
+ * Lấy toàn bộ danh sách phòng trọ & bài đăng phục vụ kiểm duyệt AI
  */
 async function getAllRoomsAdmin(req, res) {
   try {
     const pool = await getPool();
-    const { search, status, isPublished, limit = 50, offset = 0 } = req.query;
+    const { search, status, isPublished, aiReviewStatus, limit = 50, offset = 0 } = req.query;
 
     let query = `
       SELECT 
-        r.id,
-        r.title,
-        r.price,
-        r.area,
-        r.floor,
-        r.room_type,
-        r.status,
-        r.is_published,
-        r.created_at,
-        bh.name AS house_name,
-        bh.address AS house_address,
-        bh.city AS house_city,
-        bh.district AS house_district,
-        u.full_name AS landlord_name,
+        p.id,
+        p.title,
+        p.price,
+        p.area,
+        1 AS floor,
+        p.room_type,
+        p.status,
+        (CASE WHEN p.status = 'active' THEN 1 ELSE 0 END) AS is_published,
+        p.created_at,
+        COALESCE(bh.name, 'Nhà trọ') AS house_name,
+        p.address AS house_address,
+        p.city AS house_city,
+        p.district AS house_district,
+        COALESCE(p.contact_name, u.full_name, 'Chủ trọ') AS landlord_name,
         u.email AS landlord_email,
-        u.phone AS landlord_phone,
-        NULL AS primary_image
-      FROM rooms r
-      JOIN boarding_houses bh ON r.boarding_house_id = bh.id
-      JOIN landlords l ON bh.landlord_id = l.id
-      JOIN users u ON l.user_id = u.id
+        COALESCE(p.contact_phone, u.phone) AS landlord_phone,
+        (SELECT image_url FROM post_images WHERE post_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) AS primary_image,
+        COALESCE(p.ai_risk_score, 0) AS ai_risk_score,
+        COALESCE(p.ai_review_status, 'approved') AS ai_review_status,
+        p.ai_flags,
+        p.ai_summary
+      FROM posts p
+      LEFT JOIN boarding_houses bh ON p.boarding_house_id = bh.id
+      LEFT JOIN landlords l ON p.landlord_id = l.id
+      LEFT JOIN users u ON l.user_id = u.id
       WHERE 1=1
     `;
     const params = [];
 
     if (search) {
-      query += ` AND (r.title LIKE ? OR bh.name LIKE ? OR u.full_name LIKE ? OR u.phone LIKE ?)`;
+      query += ` AND (p.title LIKE ? OR p.address LIKE ? OR u.full_name LIKE ? OR p.contact_name LIKE ? OR p.contact_phone LIKE ?)`;
       const s = `%${search}%`;
-      params.push(s, s, s, s);
+      params.push(s, s, s, s, s);
     }
 
     if (status && status !== 'all') {
-      query += ` AND r.status = ?`;
+      query += ` AND p.status = ?`;
       params.push(status);
     }
 
-    if (isPublished !== undefined && isPublished !== 'all') {
-      query += ` AND r.is_published = ?`;
-      params.push(isPublished === 'true' || isPublished === '1' ? 1 : 0);
+    if (aiReviewStatus && aiReviewStatus !== 'all') {
+      query += ` AND p.ai_review_status = ?`;
+      params.push(aiReviewStatus);
     }
 
-    query += ` ORDER BY r.id DESC LIMIT ? OFFSET ?`;
+    if (isPublished !== undefined && isPublished !== 'all') {
+      if (isPublished === 'true' || isPublished === '1') {
+        query += ` AND p.status = 'active'`;
+      } else {
+        query += ` AND p.status != 'active'`;
+      }
+    }
+
+    query += ` ORDER BY p.id DESC LIMIT ? OFFSET ?`;
     params.push(Number(limit), Number(offset));
 
-    const [rooms] = await pool.query(query, params);
+    const [rawRooms] = await pool.query(query, params);
+
+    const rooms = rawRooms.map((r) => {
+      let parsedFlags = [];
+      if (r.ai_flags) {
+        try {
+          parsedFlags = typeof r.ai_flags === 'string'
+            ? (r.ai_flags.startsWith('[') ? JSON.parse(r.ai_flags) : [r.ai_flags])
+            : r.ai_flags;
+        } catch (e) {
+          parsedFlags = [r.ai_flags];
+        }
+      }
+      return {
+        ...r,
+        ai_flags: parsedFlags,
+      };
+    });
 
     return res.status(200).json({ rooms });
   } catch (error) {
@@ -373,21 +405,33 @@ async function getAllRoomsAdmin(req, res) {
 }
 
 /**
- * Kiểm duyệt / Bật tắt trạng thái hiển thị của phòng trọ
+ * Kiểm duyệt / Bật tắt trạng thái hiển thị của bài đăng
  */
 async function toggleRoomPublishAdmin(req, res) {
   try {
     const pool = await getPool();
     const roomId = Number(req.params.id);
 
+    const [posts] = await pool.query('SELECT id, status FROM posts WHERE id = ?', [roomId]);
+    if (posts.length > 0) {
+      const nextStatus = posts[0].status === 'active' ? 'pending' : 'active';
+      await pool.query('UPDATE posts SET status = ? WHERE id = ?', [nextStatus, roomId]);
+      return res.status(200).json({
+        message: nextStatus === 'active' ? 'Đã duyệt và hiển thị bài đăng' : 'Đã ẩn bài đăng khỏi website',
+        roomId,
+        isPublished: nextStatus === 'active',
+        status: nextStatus,
+      });
+    }
+
+    // Fallback nếu bài đăng nằm ở bảng rooms
     const [rooms] = await pool.query('SELECT id, is_published FROM rooms WHERE id = ?', [roomId]);
     if (rooms.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy phòng trọ' });
+      return res.status(404).json({ message: 'Không tìm thấy bài đăng phòng trọ' });
     }
 
     const currentStatus = Boolean(rooms[0].is_published);
     const nextStatus = !currentStatus;
-
     await pool.query('UPDATE rooms SET is_published = ? WHERE id = ?', [nextStatus ? 1 : 0, roomId]);
 
     return res.status(200).json({
@@ -402,6 +446,122 @@ async function toggleRoomPublishAdmin(req, res) {
 }
 
 /**
+ * Admin duyệt bài đăng (Approve Post)
+ */
+async function approvePostAdmin(req, res) {
+  try {
+    const pool = await getPool();
+    const roomId = Number(req.params.id);
+
+    await pool.query(
+      "UPDATE posts SET status = 'active', ai_review_status = 'approved' WHERE id = ?",
+      [roomId]
+    );
+
+    // Gửi thông báo đến chủ sở hữu bài đăng
+    try {
+      const ownerInfo = await getLandlordUserIdByPostId(roomId);
+      if (ownerInfo?.userId) {
+        await createNotification({
+          userId: ownerInfo.userId,
+          title: 'Bài đăng đã được duyệt',
+          message: `Bài đăng "${ownerInfo.postTitle}" đã được Quản trị viên phê duyệt và xuất bản công khai trên website.`,
+          type: 'approved',
+          link: `/rooms/${roomId}`,
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Lỗi gửi thông báo duyệt bài:', notifErr.message);
+    }
+
+    return res.status(200).json({ message: 'Đã phê duyệt và xuất bản bài đăng thành công!', roomId });
+  } catch (error) {
+    return res.status(500).json({ message: 'Lỗi khi phê duyệt bài đăng', error: error.message });
+  }
+}
+
+/**
+ * Admin từ chối bài đăng (Reject Post)
+ */
+async function rejectPostAdmin(req, res) {
+  try {
+    const pool = await getPool();
+    const roomId = Number(req.params.id);
+    const { reason } = req.body || {};
+
+    let aiSummary = reason || 'Admin từ chối bài đăng do vi phạm quy định sàn.';
+
+    await pool.query(
+      "UPDATE posts SET status = 'rejected', ai_review_status = 'rejected', ai_summary = ? WHERE id = ?",
+      [aiSummary, roomId]
+    );
+
+    // Gửi thông báo đến chủ sở hữu bài đăng
+    try {
+      const ownerInfo = await getLandlordUserIdByPostId(roomId);
+      if (ownerInfo?.userId) {
+        await createNotification({
+          userId: ownerInfo.userId,
+          title: 'Bài đăng bị từ chối phê duyệt',
+          message: `Bài đăng "${ownerInfo.postTitle}" đã bị từ chối phê duyệt. Lý do: ${aiSummary}`,
+          type: 'rejected',
+          link: null,
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Lỗi gửi thông báo từ chối bài:', notifErr.message);
+    }
+
+    return res.status(200).json({ message: 'Đã từ chối bài đăng vi phạm', roomId });
+  } catch (error) {
+    return res.status(500).json({ message: 'Lỗi khi từ chối bài đăng', error: error.message });
+  }
+}
+
+/**
+ * Admin yêu cầu AI quét kiểm duyệt lại bài đăng
+ */
+async function recheckPostAIAdmin(req, res) {
+  try {
+    const roomId = Number(req.params.id);
+    const post = await findPostById(roomId);
+    if (!post) {
+      return res.status(404).json({ message: 'Không tìm thấy bài đăng' });
+    }
+
+    const moderation = await moderatePost({
+      id: roomId,
+      landlordId: post.landlordId || 1,
+      title: post.title,
+      description: post.description,
+      price: post.price,
+      area: post.area,
+      roomType: post.roomType,
+      address: post.address,
+      city: post.city,
+      district: post.district,
+      images: post.images,
+    });
+
+    const updatedPost = await updatePost(roomId, {
+      aiRiskScore: moderation.riskScore,
+      aiReviewStatus: moderation.reviewStatus,
+      aiFlags: moderation.flags,
+      aiSummary: moderation.summary,
+      status: moderation.postStatus,
+    });
+
+    return res.status(200).json({
+      message: 'Đã hoàn tất quét AI kiểm duyệt lại bài đăng',
+      moderation,
+      post: updatedPost,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Lỗi khi quét lại AI cho bài đăng', error: error.message });
+  }
+}
+
+/**
  * Xóa phòng trọ (Admin cưỡng chế xóa khi vi phạm)
  */
 async function deleteRoomAdmin(req, res) {
@@ -409,6 +569,7 @@ async function deleteRoomAdmin(req, res) {
     const pool = await getPool();
     const roomId = Number(req.params.id);
 
+    await pool.query('DELETE FROM posts WHERE id = ?', [roomId]);
     await pool.query('DELETE FROM rooms WHERE id = ?', [roomId]);
 
     return res.status(200).json({ message: 'Đã xóa bài đăng phòng trọ thành công', roomId });
@@ -476,6 +637,9 @@ module.exports = {
   deleteUser,
   getAllRoomsAdmin,
   toggleRoomPublishAdmin,
+  approvePostAdmin,
+  rejectPostAdmin,
+  recheckPostAIAdmin,
   deleteRoomAdmin,
   getAllBillsAdmin,
 };

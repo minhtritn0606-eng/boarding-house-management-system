@@ -188,6 +188,39 @@ export default function DetailPage() {
         )}
       </div>
 
+      {(room.status === 'pending' || (room as any).aiReviewStatus === 'pending_review') && (
+        <div
+          style={{
+            background: '#fffbeb',
+            border: '1px solid #fde68a',
+            color: '#92400e',
+            padding: '12px 18px',
+            borderRadius: '10px',
+            marginBottom: '20px',
+            fontSize: '0.92rem',
+            lineHeight: '1.5',
+          }}
+        >
+          <strong>Thông báo kiểm duyệt:</strong> Bài đăng này đang ở chế độ xem trước (Chờ duyệt). Khách tìm trọ bên ngoài sẽ không thấy bài viết này cho đến khi được Quản trị viên phê duyệt chính thức.
+        </div>
+      )}
+      {room.status === 'rejected' && (
+        <div
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#991b1b',
+            padding: '12px 18px',
+            borderRadius: '10px',
+            marginBottom: '20px',
+            fontSize: '0.92rem',
+            lineHeight: '1.5',
+          }}
+        >
+          <strong>Bài đăng bị tạm dừng:</strong> Hệ thống AI phát hiện nghi vấn vi phạm (phá giá hoặc trùng lặp dữ liệu). Bài viết hiện đã bị tạm dừng xuất bản.
+        </div>
+      )}
+
       {/* 1. HERO TOP SECTION: Carousel & Room Overview + Contact */}
       <div className="room-detail-hero">
         <Carousel images={room.images} />
@@ -196,10 +229,44 @@ export default function DetailPage() {
           <div className="overview-header-group">
             <div className="detail-header-badges">
               <span className="room-type-badge">{getRoomTypeLabel(room.roomType)}</span>
-              <span className={`room-status-badge ${isAvailable ? 'available' : 'rented'}`}>
-                <span className="status-dot"></span>
-                {isAvailable ? 'Còn phòng' : 'Đã thuê'}
-              </span>
+              {room.status === 'pending' || (room as any).aiReviewStatus === 'pending_review' ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    background: '#fef3c7',
+                    color: '#b45309',
+                    border: '1px solid #fde68a',
+                  }}
+                >
+                  Chờ duyệt
+                </span>
+              ) : room.status === 'rejected' ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    background: '#fee2e2',
+                    color: '#b91c1c',
+                    border: '1px solid #fecaca',
+                  }}
+                >
+                  Tạm dừng xuất bản
+                </span>
+              ) : (
+                <span className={`room-status-badge ${isAvailable ? 'available' : 'rented'}`}>
+                  <span className="status-dot"></span>
+                  {isAvailable ? 'Còn phòng' : 'Đã thuê'}
+                </span>
+              )}
             </div>
 
             <h1 className="room-detail-title">{room.title}</h1>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
+import { useToast } from '../context/ToastContext'
 import { roomApi } from '../services/api'
 import LocationPicker from '../components/LocationPicker'
 import { compressImageFile } from '../utils/imageCompressor'
@@ -28,6 +29,7 @@ export default function EditRoomPage() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
   const { rooms, updateRoom, isLoading: isContextLoading } = useRooms()
+  const { showToast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [directRoom, setDirectRoom] = useState<any>(null)
@@ -74,6 +76,12 @@ export default function EditRoomPage() {
         })
     }
   }, [id, contextRoom])
+
+  const isUnapproved =
+    room?.status === 'pending' ||
+    room?.status === 'rejected' ||
+    (room as any)?.aiReviewStatus === 'pending_review' ||
+    (room as any)?.aiReviewStatus === 'rejected'
 
   // Điền dữ liệu ban đầu từ phòng cần chỉnh sửa
   useEffect(() => {
@@ -246,7 +254,7 @@ export default function EditRoomPage() {
     setIsSubmitting(true)
 
     try {
-      await updateRoom(room.id, {
+      const updated = await updateRoom(room.id, {
         title: title.trim(),
         city,
         district: district.trim() || undefined,
@@ -254,7 +262,7 @@ export default function EditRoomPage() {
         price: numPrice,
         area: numArea,
         roomType,
-        status,
+        status: isUnapproved ? room.status : status,
         latitude,
         longitude,
         amenities,
@@ -264,12 +272,45 @@ export default function EditRoomPage() {
         ownerName: ownerName.trim() || user?.name || 'Chủ trọ',
       })
 
+      if (updated?.status === 'pending' || (updated as any)?.aiReviewStatus === 'pending_review') {
+        showToast({
+          type: 'warning',
+          title: 'Chờ Quản Trị Viên Duyệt',
+          message: 'Bạn đã lưu thay đổi. Hệ thống AI phát hiện bài đăng cần quản trị viên kiểm tra trước khi hiển thị công khai.',
+          duration: 6000,
+        })
+        setIsSubmitting(false)
+        navigate('/my-rooms')
+        return
+      } else if (updated?.status === 'rejected' || (updated as any)?.aiReviewStatus === 'rejected') {
+        showToast({
+          type: 'error',
+          title: 'Bài Đăng Bị Tạm Dừng',
+          message: 'Nội dung sau khi chỉnh sửa bị phát hiện nghi vấn vi phạm (phá giá hoặc trùng lặp). Vui lòng kiểm tra lại.',
+          duration: 6000,
+        })
+        setIsSubmitting(false)
+        navigate('/my-rooms')
+        return
+      }
+
       setSuccessMsg('Đã cập nhật bài đăng thành công!')
+      showToast({
+        type: 'success',
+        title: 'Cập nhật thành công',
+        message: 'Thông tin bài đăng phòng trọ đã được lưu và kiểm duyệt hợp lệ!',
+        duration: 3500,
+      })
       setTimeout(() => {
         navigate(`/rooms/${room.id}`)
-      }, 1000)
+      }, 800)
     } catch (err: any) {
       setError('Có lỗi xảy ra khi cập nhật bài đăng. Vui lòng thử lại.')
+      showToast({
+        type: 'error',
+        title: 'Cập nhật thất bại',
+        message: 'Có lỗi xảy ra khi cập nhật bài đăng. Vui lòng thử lại.',
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -359,15 +400,34 @@ export default function EditRoomPage() {
               <label htmlFor="room-status">
                 Trạng thái phòng <span className="req">*</span>
               </label>
-              <select
-                id="room-status"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                style={{ fontWeight: 600, color: status === 'available' ? '#059669' : '#dc2626' }}
-              >
-                <option value="available">Còn phòng (Đang nhận khách)</option>
-                <option value="rented">Đã cho thuê (Hết phòng)</option>
-              </select>
+              {isUnapproved ? (
+                <div
+                  style={{
+                    padding: '9px 14px',
+                    borderRadius: '8px',
+                    background: room?.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                    color: room?.status === 'rejected' ? '#b91c1c' : '#b45309',
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                    border: '1px solid ' + (room?.status === 'rejected' ? '#fecaca' : '#fde68a'),
+                    lineHeight: '1.4',
+                  }}
+                >
+                  {room?.status === 'rejected'
+                    ? 'Bài đăng bị tạm dừng (Cần Admin phê duyệt lại)'
+                    : 'Đang chờ Admin duyệt (Chưa hiển thị công khai)'}
+                </div>
+              ) : (
+                <select
+                  id="room-status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as any)}
+                  style={{ fontWeight: 600, color: status === 'available' ? '#059669' : '#dc2626' }}
+                >
+                  <option value="available">Còn phòng (Đang nhận khách)</option>
+                  <option value="rented">Đã cho thuê (Hết phòng)</option>
+                </select>
+              )}
             </div>
 
             <div className="form-group">

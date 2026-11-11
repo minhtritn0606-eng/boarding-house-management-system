@@ -11,7 +11,7 @@ export interface Room {
   district?: string;
   area?: number;
   floor?: number;
-  status?: 'available' | 'rented';
+  status?: 'available' | 'rented' | 'pending' | 'rejected' | string;
   amenities?: string[];
   ownerName?: string;
   ownerEmail?: string;
@@ -20,6 +20,10 @@ export interface Room {
   latitude?: number;
   longitude?: number;
   isPublished?: boolean;
+  aiRiskScore?: number;
+  aiReviewStatus?: 'approved' | 'pending_review' | 'rejected' | string;
+  aiFlags?: string[];
+  aiSummary?: string;
 }
 
 export const sampleRooms: Room[] = [];

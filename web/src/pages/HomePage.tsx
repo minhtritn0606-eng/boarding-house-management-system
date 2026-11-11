@@ -5,7 +5,12 @@ import RoomCard from '../components/RoomCard'
 export default function HomePage() {
   const { rooms } = useRooms()
 
-  const availableRooms = rooms.filter((r) => r.status !== 'rented')
+  const availableRooms = rooms.filter((r) => {
+    const isNotRented = r.status !== 'rented'
+    const isNotUnapproved = r.status !== 'pending' && r.status !== 'rejected'
+    const isAiApproved = !r.aiReviewStatus || r.aiReviewStatus === 'approved'
+    return isNotRented && isNotUnapproved && isAiApproved
+  })
   const newest = [...availableRooms]
     .sort((a, b) => (b.postedDate || '').localeCompare(a.postedDate || ''))
     .slice(0, 4)

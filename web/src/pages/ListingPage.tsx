@@ -16,7 +16,12 @@ export default function ListingPage() {
   const perPage = 30
 
   const filtered = useMemo(() => {
-    let out = rooms.filter((r) => r.status !== 'rented')
+    let out = rooms.filter((r) => {
+      const isNotRented = r.status !== 'rented'
+      const isNotUnapproved = r.status !== 'pending' && r.status !== 'rejected'
+      const isAiApproved = !r.aiReviewStatus || r.aiReviewStatus === 'approved'
+      return isNotRented && isNotUnapproved && isAiApproved
+    })
     if (city) out = out.filter((r) => r.city === city)
     if (district) out = out.filter((r) => (r.district || '').toLowerCase().includes(district.toLowerCase()))
     if (minArea) out = out.filter((r) => (r.area || 0) >= Number(minArea))

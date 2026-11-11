@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
+import { useToast } from '../context/ToastContext'
 import { appointmentApi, type ViewingAppointment } from '../services/api'
 
 export default function MyRoomsPage() {
   const { user, isAuthenticated } = useAuth()
   const { getRoomsByOwner, toggleRoomStatus, deleteRoom } = useRooms()
+  const { showToast } = useToast()
   const location = useLocation()
   const [activeTab, setActiveTab] = useState<'rooms' | 'appointments'>(() => {
     return (location.state as any)?.tab === 'appointments' ? 'appointments' : 'rooms'
@@ -72,9 +74,19 @@ export default function MyRoomsPage() {
         prev.map((app) => (app.id === id ? { ...app, status: newStatus } : app))
       )
       window.dispatchEvent(new Event('appointment-updated'))
+      showToast({
+        type: 'success',
+        title: 'Cập nhật thành công',
+        message: `Đã cập nhật trạng thái lịch hẹn sang: ${newStatus === 'confirmed' ? 'Đã xác nhận' : newStatus === 'cancelled' ? 'Đã từ chối' : 'Chờ xác nhận'
+          }`,
+      })
     } catch (err) {
       console.error('Không thể cập nhật trạng thái:', err)
-      alert('Có lỗi xảy ra khi cập nhật trạng thái lịch hẹn.')
+      showToast({
+        type: 'error',
+        title: 'Cập nhật thất bại',
+        message: 'Có lỗi xảy ra khi cập nhật trạng thái lịch hẹn.',
+      })
     } finally {
       setUpdatingId(null)
     }
@@ -86,8 +98,18 @@ export default function MyRoomsPage() {
         await appointmentApi.deleteAppointment(id)
         setAppointments((prev) => prev.filter((app) => app.id !== id))
         window.dispatchEvent(new Event('appointment-updated'))
+        showToast({
+          type: 'info',
+          title: 'Đã xóa lịch hẹn',
+          message: 'Lịch xem phòng đã được xóa khỏi danh sách.',
+        })
       } catch (err) {
         console.error('Không thể xóa lịch hẹn:', err)
+        showToast({
+          type: 'error',
+          title: 'Xóa thất bại',
+          message: 'Không thể xóa lịch hẹn lúc này.',
+        })
       }
     }
   }
@@ -114,7 +136,24 @@ export default function MyRoomsPage() {
   const handleDelete = (id: number, title: string) => {
     if (window.confirm(`Bạn có chắc chắn muốn xóa bài đăng "${title}" không?`)) {
       deleteRoom(id)
+      showToast({
+        type: 'info',
+        title: 'Đã xóa bài đăng',
+        message: `Đã xóa bài đăng "${title}" thành công.`,
+      })
     }
+  }
+
+  const handleToggleStatus = (id: number, isCurrentlyAvailable: boolean) => {
+    toggleRoomStatus(id)
+    showToast({
+      type: 'info',
+      title: 'Đã cập nhật trạng thái',
+      message: isCurrentlyAvailable
+        ? 'Phòng đã được chuyển sang trạng thái "Đã thuê".'
+        : 'Phòng đã được mở lại sang trạng thái "Còn phòng".',
+      duration: 3500,
+    })
   }
 
   return (
@@ -306,6 +345,11 @@ export default function MyRoomsPage() {
                                   {room.title}
                                 </Link>
                                 <div className="room-cell-type">{room.roomType}</div>
+                                {(room as any).aiFlags && (room as any).aiFlags.length > 0 && (
+                                  <div style={{ fontSize: '0.72rem', color: '#b91c1c', marginTop: '2px', lineHeight: 1.3 }}>
+                                    Lưu ý: {(room as any).aiFlags[0]}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -322,15 +366,47 @@ export default function MyRoomsPage() {
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>{room.area} m²</td>
                           <td style={{ whiteSpace: 'nowrap' }}>
-                            <button
-                              type="button"
-                              className={`status-toggle-btn ${isAvailable ? 'available' : 'rented'}`}
-                              onClick={() => toggleRoomStatus(room.id)}
-                              title="Nhấn để đổi trạng thái"
-                            >
-                              <span className="dot"></span>
-                              {isAvailable ? 'Còn phòng' : 'Đã thuê'}
-                            </button>
+                            {room.status === 'pending' || (room as any).aiReviewStatus === 'pending_review' ? (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: '600',
+                                  background: '#fef3c7',
+                                  color: '#b45309',
+                                }}
+                                title={(room as any).aiFlags?.join('; ') || 'Đang chờ Admin duyệt'}
+                              >
+                                Chờ duyệt
+                              </span>
+                            ) : room.status === 'rejected' ? (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: '600',
+                                  background: '#fee2e2',
+                                  color: '#b91c1c',
+                                }}
+                                title={(room as any).aiFlags?.join('; ') || 'Bài đăng bị từ chối'}
+                              >
+                                Bị từ chối
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`status-toggle-btn ${isAvailable ? 'available' : 'rented'}`}
+                                onClick={() => handleToggleStatus(room.id, isAvailable)}
+                                title="Nhấn để đổi trạng thái"
+                              >
+                                <span className="dot"></span>
+                                {isAvailable ? 'Còn phòng' : 'Đã thuê'}
+                              </button>
+                            )}
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>{room.postedDate || '—'}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>

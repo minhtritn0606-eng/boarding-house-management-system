@@ -40,6 +40,26 @@ async function ensurePostsTable() {
     )
   `);
 
+  // Đảm bảo các cột AI kiểm duyệt tồn tại trong bảng posts
+  const aiCols = [
+    { name: 'ai_risk_score', type: 'INT DEFAULT 0' },
+    { name: 'ai_review_status', type: "VARCHAR(50) DEFAULT 'approved'" },
+    { name: 'ai_flags', type: 'TEXT DEFAULT NULL' },
+    { name: 'ai_summary', type: 'TEXT DEFAULT NULL' },
+  ];
+  for (const c of aiCols) {
+    try {
+      const [exist] = await pool.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'posts' AND COLUMN_NAME = ?`,
+        [c.name]
+      );
+      if (exist.length === 0) {
+        await pool.query(`ALTER TABLE posts ADD COLUMN ${c.name} ${c.type}`);
+      }
+    } catch (e) { }
+  }
+
   // Tự động sao chép các bài đăng mẫu sẵn có sang bảng posts nếu bảng posts đang trống
   try {
     const [countRows] = await pool.query('SELECT COUNT(*) AS total FROM posts');
@@ -114,14 +134,19 @@ async function createPost({
   contactPhone = '',
   contactName = '',
   images = [],
+  aiRiskScore = 0,
+  aiReviewStatus = 'approved',
+  aiFlags = [],
+  aiSummary = '',
+  status = 'active',
 }) {
   await ensurePostsTable();
   const pool = await getPool();
 
   const [res] = await pool.query(
     `INSERT INTO posts 
-     (landlord_id, boarding_house_id, title, description, price, area, room_type, address, city, district, latitude, longitude, amenities, contact_phone, contact_name, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+     (landlord_id, boarding_house_id, title, description, price, area, room_type, address, city, district, latitude, longitude, amenities, contact_phone, contact_name, ai_risk_score, ai_review_status, ai_flags, ai_summary, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       landlordId,
       boardingHouseId,
@@ -138,6 +163,11 @@ async function createPost({
       Array.isArray(amenities) ? amenities.join(', ') : amenities,
       contactPhone,
       contactName,
+      aiRiskScore,
+      aiReviewStatus,
+      JSON.stringify(aiFlags || []),
+      aiSummary,
+      status,
     ]
   );
 
@@ -210,6 +240,10 @@ async function findPostById(id) {
     ownerName: row.contact_name || row.owner_name || 'Chủ trọ',
     ownerEmail: row.owner_email || '',
     status: row.status || 'active',
+    aiRiskScore: row.ai_risk_score != null ? Number(row.ai_risk_score) : 0,
+    aiReviewStatus: row.ai_review_status || 'approved',
+    aiFlags: row.ai_flags ? (typeof row.ai_flags === 'string' ? (row.ai_flags.startsWith('[') ? JSON.parse(row.ai_flags) : [row.ai_flags]) : row.ai_flags) : [],
+    aiSummary: row.ai_summary || '',
     images,
     postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
     createdAt: row.created_at,
@@ -238,8 +272,8 @@ async function listPosts(filters = {}) {
     query += ' AND LOWER(p.status) = ?';
     values.push(filters.status.toLowerCase());
   } else if (!filters.userId && !filters.mine && !filters.ownerEmail) {
-    // Mặc định khách xem chỉ thấy các bài đang hoạt động ('active')
-    query += " AND p.status = 'active'";
+    // Mặc định khách xem chỉ thấy các bài đang hoạt động ('active' / 'available') VÀ đã được duyệt ('approved')
+    query += " AND (p.status = 'active' OR p.status = 'available') AND (p.ai_review_status IS NULL OR p.ai_review_status = 'approved')";
   }
 
   if (filters.search) {
@@ -322,6 +356,10 @@ async function listPosts(filters = {}) {
       ownerName: row.contact_name || row.owner_name || 'Chủ trọ',
       ownerEmail: row.owner_email || '',
       status: row.status || 'active',
+      aiRiskScore: row.ai_risk_score != null ? Number(row.ai_risk_score) : 0,
+      aiReviewStatus: row.ai_review_status || 'approved',
+      aiFlags: row.ai_flags ? (typeof row.ai_flags === 'string' ? (row.ai_flags.startsWith('[') ? JSON.parse(row.ai_flags) : [row.ai_flags]) : row.ai_flags) : [],
+      aiSummary: row.ai_summary || '',
       images: postImgs.length > 0 ? postImgs : defaultImages,
       postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
       createdAt: row.created_at,
@@ -356,6 +394,13 @@ async function updatePost(id, updates) {
   const newName = updates.contactName !== undefined ? updates.contactName : updates.ownerName;
   if (newName !== undefined) { fields.push('contact_name = ?'); values.push(newName); }
   if (updates.status) { fields.push('status = ?'); values.push(updates.status); }
+  if (updates.aiRiskScore !== undefined) { fields.push('ai_risk_score = ?'); values.push(Number(updates.aiRiskScore)); }
+  if (updates.aiReviewStatus !== undefined) { fields.push('ai_review_status = ?'); values.push(updates.aiReviewStatus); }
+  if (updates.aiFlags !== undefined) {
+    fields.push('ai_flags = ?');
+    values.push(typeof updates.aiFlags === 'string' ? updates.aiFlags : JSON.stringify(updates.aiFlags || []));
+  }
+  if (updates.aiSummary !== undefined) { fields.push('ai_summary = ?'); values.push(updates.aiSummary); }
 
   if (fields.length > 0) {
     values.push(id);

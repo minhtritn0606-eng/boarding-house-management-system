@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
+import { useToast } from '../context/ToastContext'
 import LocationPicker from '../components/LocationPicker'
 import { compressImageFile } from '../utils/imageCompressor'
 
@@ -26,6 +27,7 @@ export default function CreateRoomPage() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
   const { addRoom } = useRooms()
+  const { showToast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [title, setTitle] = useState('')
@@ -209,6 +211,34 @@ export default function CreateRoomPage() {
       status: 'available',
     })
 
+    if (created.status === 'pending' || (created as any).aiReviewStatus === 'pending_review') {
+      showToast({
+        type: 'warning',
+        title: 'Chờ Quản Trị Viên Duyệt',
+        message: 'Bài đăng của bạn đã được gửi thành công và đang ở trạng thái CHỜ DUYỆT (Hệ thống AI phát hiện một số thông tin cần quản trị viên xác minh).',
+        duration: 6000,
+      })
+      setIsSubmitting(false)
+      navigate('/my-rooms')
+      return
+    } else if (created.status === 'rejected') {
+      showToast({
+        type: 'error',
+        title: 'Bài Đăng Bị Tạm Dừng',
+        message: 'Hệ thống AI phát hiện nghi vấn vi phạm (phá giá hoặc trùng lặp thông tin). Vui lòng kiểm tra lại trong mục Quản lý tin.',
+        duration: 6000,
+      })
+      setIsSubmitting(false)
+      navigate('/my-rooms')
+      return
+    }
+
+    showToast({
+      type: 'success',
+      title: 'Đăng Tin Thành Công',
+      message: 'Bài đăng phòng trọ đã được AI duyệt và xuất bản công khai thành công!',
+      duration: 4000,
+    })
     setIsSubmitting(false)
     navigate(`/rooms/${created.id}`)
   }

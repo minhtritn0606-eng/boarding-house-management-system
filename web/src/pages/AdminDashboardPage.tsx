@@ -29,6 +29,7 @@ export default function AdminDashboardPage() {
   const [roomSearch, setRoomSearch] = useState('')
   const [roomStatusFilter, setRoomStatusFilter] = useState('all')
   const [roomPublishFilter, setRoomPublishFilter] = useState('all')
+  const [roomAiStatusFilter, setRoomAiStatusFilter] = useState('all')
 
   const [billStatusFilter, setBillStatusFilter] = useState('all')
 
@@ -154,6 +155,7 @@ export default function AdminDashboardPage() {
         search: roomSearch,
         status: roomStatusFilter,
         isPublished: roomPublishFilter,
+        aiReviewStatus: roomAiStatusFilter,
       })
       setRoomsList(res.rooms || [])
     } catch (err: any) {
@@ -195,7 +197,7 @@ export default function AdminDashboardPage() {
     } else if (activeTab === 'bills') {
       fetchBills()
     }
-  }, [activeTab, userRoleFilter, roomStatusFilter, roomPublishFilter, isAdmin])
+  }, [activeTab, userRoleFilter, roomStatusFilter, roomPublishFilter, roomAiStatusFilter, isAdmin])
 
   // Handle Update Role
   const handleUpdateRole = async (userId: number, newRole: string) => {
@@ -241,6 +243,53 @@ export default function AdminDashboardPage() {
       fetchStats()
     } catch (err: any) {
       showNotification(err.message || 'Không thể đổi trạng thái bài đăng', 'error')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  // Handle Approve Room (Admin 1-click Approve)
+  const handleApproveRoom = async (roomId: number) => {
+    try {
+      setActionLoadingId(roomId)
+      const res = await adminApi.approveRoom(roomId)
+      showNotification(res.message || 'Đã duyệt xuất bản bài đăng thành công!')
+      fetchRooms()
+      fetchStats()
+    } catch (err: any) {
+      showNotification(err.message || 'Lỗi khi duyệt bài đăng', 'error')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  // Handle Reject Room (Admin Reject)
+  const handleRejectRoom = async (roomId: number) => {
+    const reason = window.prompt('Nhập lý do từ chối bài đăng vi phạm (tùy chọn):')
+    if (reason === null) return
+    try {
+      setActionLoadingId(roomId)
+      const res = await adminApi.rejectRoom(roomId, reason)
+      showNotification(res.message || 'Đã từ chối bài đăng')
+      fetchRooms()
+      fetchStats()
+    } catch (err: any) {
+      showNotification(err.message || 'Lỗi khi từ chối bài đăng', 'error')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  // Handle Recheck AI
+  const handleRecheckRoomAI = async (roomId: number) => {
+    try {
+      setActionLoadingId(roomId)
+      const res = await adminApi.recheckRoomAI(roomId)
+      showNotification(`Đã quét AI xong! Điểm rủi ro: ${res.moderation?.riskScore ?? 0}/100`)
+      fetchRooms()
+      fetchStats()
+    } catch (err: any) {
+      showNotification(err.message || 'Lỗi khi quét lại AI cho bài đăng', 'error')
     } finally {
       setActionLoadingId(null)
     }
@@ -1341,6 +1390,23 @@ export default function AdminDashboardPage() {
                   </select>
 
                   <select
+                    value={roomAiStatusFilter}
+                    onChange={(e) => setRoomAiStatusFilter(e.target.value)}
+                    style={{
+                      padding: '9px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.88rem',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="all">Tất cả đánh giá AI</option>
+                    <option value="pending_review">AI cảnh báo nghi vấn (Cần duyệt)</option>
+                    <option value="approved">AI đánh giá an toàn</option>
+                    <option value="rejected">AI từ chối (Gian lận)</option>
+                  </select>
+
+                  <select
                     value={roomStatusFilter}
                     onChange={(e) => setRoomStatusFilter(e.target.value)}
                     style={{
@@ -1371,13 +1437,18 @@ export default function AdminDashboardPage() {
                         <th style={{ padding: '12px 14px' }}>Thông tin phòng</th>
                         <th style={{ padding: '12px 14px' }}>Chủ nhà trọ</th>
                         <th style={{ padding: '12px 14px' }}>Giá thuê</th>
-                        <th style={{ padding: '12px 14px' }}>Hiển thị</th>
+                        <th style={{ padding: '12px 14px' }}>Kiểm duyệt AI & Rủi ro</th>
+                        <th style={{ padding: '12px 14px' }}>Trạng thái</th>
                         <th style={{ padding: '12px 14px', textAlign: 'right' }}>Hành động</th>
                       </tr>
                     </thead>
                     <tbody>
                       {roomsList.map((r) => {
                         const isPublished = Boolean(r.is_published)
+                        const riskScore = r.ai_risk_score ?? 0
+                        const aiStatus = r.ai_review_status || 'approved'
+                        const flags = Array.isArray(r.ai_flags) ? r.ai_flags : []
+
                         return (
                           <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                             <td style={{ padding: '12px 14px' }}>
@@ -1423,6 +1494,56 @@ export default function AdminDashboardPage() {
                               </div>
                             </td>
 
+                            {/* Cột Kiểm duyệt AI & Rủi ro */}
+                            <td style={{ padding: '12px 14px', maxWidth: '300px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '3px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '700',
+                                    width: 'fit-content',
+                                    background:
+                                      riskScore >= 70
+                                        ? '#fee2e2'
+                                        : riskScore >= 35
+                                        ? '#fef3c7'
+                                        : '#dcfce7',
+                                    color:
+                                      riskScore >= 70
+                                        ? '#b91c1c'
+                                        : riskScore >= 35
+                                        ? '#b45309'
+                                        : '#15803d',
+                                  }}
+                                >
+                                  {riskScore >= 70
+                                    ? `Rủi ro cao (${riskScore}/100)`
+                                    : riskScore >= 35
+                                    ? `Nghi vấn (${riskScore}/100)`
+                                    : `An toàn (${riskScore}/100)`}
+                                </span>
+
+                                {flags.length > 0 && (
+                                  <div style={{ fontSize: '0.74rem', color: '#b91c1c', marginTop: '2px' }}>
+                                    {flags.map((f: string, idx: number) => (
+                                      <div key={idx} style={{ lineHeight: 1.35, marginBottom: '2px' }}>
+                                        • {f}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {r.ai_summary && (
+                                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', marginTop: '2px' }}>
+                                    "{r.ai_summary}"
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
                             <td style={{ padding: '12px 14px' }}>
                               <span
                                 style={{
@@ -1431,32 +1552,113 @@ export default function AdminDashboardPage() {
                                   borderRadius: '4px',
                                   fontSize: '0.75rem',
                                   fontWeight: '700',
-                                  background: isPublished ? '#dcfce7' : '#f1f5f9',
-                                  color: isPublished ? '#15803d' : '#64748b',
+                                  background:
+                                    r.status === 'rejected'
+                                      ? '#fee2e2'
+                                      : r.status === 'pending' || aiStatus === 'pending_review'
+                                      ? '#fef3c7'
+                                      : isPublished
+                                      ? '#dcfce7'
+                                      : '#f1f5f9',
+                                  color:
+                                    r.status === 'rejected'
+                                      ? '#b91c1c'
+                                      : r.status === 'pending' || aiStatus === 'pending_review'
+                                      ? '#b45309'
+                                      : isPublished
+                                      ? '#15803d'
+                                      : '#64748b',
                                 }}
                               >
-                                {isPublished ? 'Đang hiển thị' : 'Đang ẩn'}
+                                {r.status === 'rejected'
+                                  ? 'Đã từ chối'
+                                  : r.status === 'pending' || aiStatus === 'pending_review'
+                                  ? 'Chờ duyệt'
+                                  : isPublished
+                                  ? 'Đang hiển thị'
+                                  : 'Đang ẩn'}
                               </span>
                             </td>
 
                             <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                {r.status !== 'active' && (
+                                  <button
+                                    type="button"
+                                    disabled={actionLoadingId === r.id}
+                                    onClick={() => handleApproveRoom(r.id)}
+                                    style={{
+                                      background: '#dcfce7',
+                                      color: '#15803d',
+                                      border: 'none',
+                                      padding: '5px 9px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Duyệt bài
+                                  </button>
+                                )}
+
+                                {r.status === 'active' && (
+                                  <button
+                                    type="button"
+                                    disabled={actionLoadingId === r.id}
+                                    onClick={() => handleToggleRoomPublish(r.id)}
+                                    style={{
+                                      background: '#fef3c7',
+                                      color: '#92400e',
+                                      border: 'none',
+                                      padding: '5px 9px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Ẩn tin
+                                  </button>
+                                )}
+
+                                {r.status !== 'rejected' && (
+                                  <button
+                                    type="button"
+                                    disabled={actionLoadingId === r.id}
+                                    onClick={() => handleRejectRoom(r.id)}
+                                    style={{
+                                      background: '#fee2e2',
+                                      color: '#b91c1c',
+                                      border: 'none',
+                                      padding: '5px 9px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Từ chối
+                                  </button>
+                                )}
+
                                 <button
                                   type="button"
                                   disabled={actionLoadingId === r.id}
-                                  onClick={() => handleToggleRoomPublish(r.id)}
+                                  onClick={() => handleRecheckRoomAI(r.id)}
+                                  title="Quét lại AI kiểm duyệt"
                                   style={{
-                                    background: isPublished ? '#fef3c7' : '#dcfce7',
-                                    color: isPublished ? '#92400e' : '#15803d',
-                                    border: 'none',
-                                    padding: '5px 10px',
+                                    background: '#eff6ff',
+                                    color: '#2563eb',
+                                    border: '1px solid #bfdbfe',
+                                    padding: '5px 9px',
                                     borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: '700',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
                                     cursor: 'pointer',
                                   }}
                                 >
-                                  {isPublished ? 'Ẩn tin' : 'Duyệt bài'}
+                                  Quét lại AI
                                 </button>
 
                                 <button
@@ -1464,13 +1666,13 @@ export default function AdminDashboardPage() {
                                   disabled={actionLoadingId === r.id}
                                   onClick={() => handleDeleteRoom(r.id, r.title)}
                                   style={{
-                                    background: '#fee2e2',
-                                    color: '#dc2626',
+                                    background: '#f1f5f9',
+                                    color: '#64748b',
                                     border: 'none',
-                                    padding: '5px 10px',
+                                    padding: '5px 9px',
                                     borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: '700',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
                                     cursor: 'pointer',
                                   }}
                                 >

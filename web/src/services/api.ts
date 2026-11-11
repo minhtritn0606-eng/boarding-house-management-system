@@ -315,13 +315,33 @@ export const adminApi = {
     })
   },
 
-  getRooms: async (params: { search?: string; status?: string; isPublished?: string } = {}) => {
+  getRooms: async (params: { search?: string; status?: string; isPublished?: string; aiReviewStatus?: string } = {}) => {
     const query = new URLSearchParams()
     if (params.search) query.append('search', params.search)
     if (params.status && params.status !== 'all') query.append('status', params.status)
     if (params.isPublished && params.isPublished !== 'all') query.append('isPublished', params.isPublished)
+    if (params.aiReviewStatus && params.aiReviewStatus !== 'all') query.append('aiReviewStatus', params.aiReviewStatus)
     const qs = query.toString() ? `?${query.toString()}` : ''
     return await request<{ rooms: any[] }>(`/admin/rooms${qs}`)
+  },
+
+  approveRoom: async (roomId: number | string) => {
+    return await request<{ message: string; roomId: number }>(`/admin/rooms/${roomId}/approve`, {
+      method: 'POST',
+    })
+  },
+
+  rejectRoom: async (roomId: number | string, reason?: string) => {
+    return await request<{ message: string; roomId: number }>(`/admin/rooms/${roomId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    })
+  },
+
+  recheckRoomAI: async (roomId: number | string) => {
+    return await request<{ message: string; moderation: any; post: any }>(`/admin/rooms/${roomId}/recheck-ai`, {
+      method: 'POST',
+    })
   },
 
   toggleRoomPublish: async (roomId: number | string) => {
@@ -429,5 +449,36 @@ export const appointmentApi = {
     })
   },
 }
+
+// ================= NOTIFICATIONS API =================
+export interface AppNotification {
+  id: number
+  userId: number
+  title: string
+  message: string
+  type?: 'approved' | 'rejected' | 'pending' | 'system' | 'appointment'
+  link?: string | null
+  is_read: boolean | number
+  created_at?: string
+}
+
+export const notificationApi = {
+  getNotifications: async (limit = 30) => {
+    return await request<{ notifications: AppNotification[]; unreadCount: number }>(
+      `/notifications?limit=${limit}`
+    )
+  },
+  markAsRead: async (id: number | string) => {
+    return await request<{ message: string; unreadCount: number }>(`/notifications/${id}/read`, {
+      method: 'PUT',
+    })
+  },
+  markAllAsRead: async () => {
+    return await request<{ message: string; unreadCount: number }>('/notifications/read-all', {
+      method: 'PUT',
+    })
+  },
+}
+
 
 

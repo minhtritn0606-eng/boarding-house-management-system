@@ -7,7 +7,7 @@ interface RoomContextType {
   isLoading: boolean
   refreshRooms: () => Promise<void>
   addRoom: (roomData: Omit<Room, 'id' | 'postedDate'>) => Promise<Room>
-  updateRoom: (id: number, roomData: Partial<Room>) => Promise<void>
+  updateRoom: (id: number, roomData: Partial<Room>) => Promise<Room | undefined>
   deleteRoom: (id: number) => Promise<void>
   toggleRoomStatus: (id: number) => Promise<void>
   getRoomsByOwner: (ownerEmail?: string) => Room[]
@@ -61,7 +61,16 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       })
       const createdItem = res?.room || res?.post
       if (createdItem) {
-        setRooms((prev) => [createdItem, ...prev.filter((r) => r.id !== createdItem.id)])
+        // Chỉ thêm vào danh sách phòng công khai nếu bài đăng đã được duyệt (không ở trạng thái pending/rejected)
+        const isApproved =
+          createdItem.status !== 'pending' &&
+          createdItem.status !== 'rejected' &&
+          createdItem.aiReviewStatus !== 'pending_review' &&
+          createdItem.aiReviewStatus !== 'rejected'
+
+        if (isApproved) {
+          setRooms((prev) => [createdItem, ...prev.filter((r) => r.id !== createdItem.id)])
+        }
         return createdItem
       }
     } catch (e: any) {
@@ -81,7 +90,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     return fallbackRoom
   }
 
-  const updateRoom = async (id: number, roomData: Partial<Room>) => {
+  const updateRoom = async (id: number, roomData: Partial<Room>): Promise<Room | undefined> => {
     try {
       const payload: any = {
         ...roomData,
@@ -91,7 +100,19 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       const res = await roomApi.updateRoom(id, payload)
       const updatedItem = res?.room || res?.post
       if (updatedItem) {
-        setRooms((prev) => prev.map((r) => (r.id === id ? updatedItem : r)))
+        const isApproved =
+          updatedItem.status !== 'pending' &&
+          updatedItem.status !== 'rejected' &&
+          updatedItem.aiReviewStatus !== 'pending_review' &&
+          updatedItem.aiReviewStatus !== 'rejected'
+
+        if (isApproved) {
+          setRooms((prev) => prev.map((r) => (r.id === id ? updatedItem : r)))
+        } else {
+          // Nếu bài sửa xong bị pending/rejected -> gỡ khỏi danh sách phòng công khai
+          setRooms((prev) => prev.filter((r) => r.id !== id))
+        }
+        return updatedItem
       } else {
         setRooms((prev) => prev.map((r) => (r.id === id ? { ...r, ...roomData } : r)))
       }

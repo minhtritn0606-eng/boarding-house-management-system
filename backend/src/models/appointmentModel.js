@@ -34,31 +34,6 @@ async function ensureAppointmentsTable() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
-
-  // Dọn dẹp các lịch hẹn cũ bị trùng lặp ID hoặc mồ côi (tạo trước khi bài đăng/phòng tồn tại)
-  try {
-    // 1. Xóa các lịch hẹn rác thử nghiệm cũ
-    await pool.query(`
-      DELETE FROM viewing_requests 
-      WHERE id IN (2, 3, 4, 6, 7)
-    `);
-
-    // 2. Xóa các lịch hẹn có thời gian tạo trước khi bài đăng xuất hiện (trùng mã ID do tái sử dụng số)
-    await pool.query(`
-      DELETE v FROM viewing_requests v
-      JOIN posts p ON v.room_id = p.id
-      WHERE v.created_at < p.created_at - INTERVAL 5 MINUTE
-    `);
-
-    // 3. Xóa các thông báo mồ côi tương ứng
-    await pool.query(`
-      DELETE n FROM notifications n
-      LEFT JOIN viewing_requests v ON n.id = v.id
-      WHERE n.title = 'Lịch hẹn xem phòng mới' AND v.id IS NULL
-    `);
-  } catch (e) {
-    // ignore
-  }
 }
 
 async function createAppointment({ roomId, visitorName, phone, viewingDate, viewingTime, note }) {
@@ -72,21 +47,25 @@ async function createAppointment({ roomId, visitorName, phone, viewingDate, view
 
   try {
     const [postRows] = await pool.query(
-      `SELECT p.id, p.title, p.landlord_id, l.user_id AS landlord_user_id
+      `SELECT p.id, p.title, p.landlord_id, 
+              COALESCE(l.user_id, u.id, p.landlord_id) AS landlord_user_id
        FROM posts p
        LEFT JOIN landlords l ON p.landlord_id = l.id
+       LEFT JOIN users u ON (l.user_id = u.id OR u.phone = p.contact_phone)
        WHERE p.id = ?`,
       [roomId]
     );
-    if (postRows.length > 0 && postRows[0].landlord_id) {
+    if (postRows.length > 0) {
       landlordId = postRows[0].landlord_id;
       landlordUserId = postRows[0].landlord_user_id;
       roomTitle = postRows[0].title;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Lỗi tìm bài đăng theo roomId:', e.message);
+  }
 
   // 2. Dự phòng kiểm tra bảng rooms nếu không tìm thấy trong posts
-  if (!landlordId) {
+  if (!landlordUserId) {
     try {
       const [roomRows] = await pool.query(
         `SELECT r.id, r.title, h.landlord_id, l.user_id AS landlord_user_id, h.address AS house_address
@@ -115,15 +94,15 @@ async function createAppointment({ roomId, visitorName, phone, viewingDate, view
   // Gửi thông báo đến chủ trọ
   if (landlordUserId) {
     try {
-      await pool.query(
-        `INSERT INTO notifications (user_id, title, message)
-         VALUES (?, ?, ?)`,
-        [
-          landlordUserId,
-          'Lịch hẹn xem phòng mới',
-          `Khách hàng ${visitorName} (SĐT: ${phone}) vừa đặt lịch xem "${roomTitle}" vào ngày ${viewingDate} (${viewingTime}).`,
-        ]
-      );
+      const { createNotification } = require('./notificationModel');
+      const noteText = note && note.trim() ? ` Ghi chú: ${note.trim()}` : '';
+      await createNotification({
+        userId: landlordUserId,
+        title: 'Lịch hẹn xem phòng mới',
+        message: `Khách hàng ${visitorName} (SĐT: ${phone}) vừa đặt lịch xem phòng "${roomTitle}" vào ngày ${viewingDate} (${viewingTime}).${noteText}`,
+        type: 'appointment',
+        link: '/my-rooms',
+      });
     } catch (e) {
       console.warn('Could not insert notification:', e.message);
     }
@@ -164,21 +143,21 @@ async function listAppointments({ landlordId, userId, roomId, status }) {
            COALESCE(p.address, h.address, '') AS house_address,
            u.full_name AS landlord_name, u.phone AS landlord_phone
     FROM viewing_requests v
-    LEFT JOIN posts p ON (v.room_id = p.id AND v.created_at >= p.created_at - INTERVAL 5 MINUTE)
-    LEFT JOIN rooms r ON (v.room_id = r.id AND v.created_at >= r.created_at - INTERVAL 5 MINUTE)
+    LEFT JOIN posts p ON v.room_id = p.id
+    LEFT JOIN rooms r ON v.room_id = r.id
     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
     LEFT JOIN landlords l ON l.id = COALESCE(p.landlord_id, v.landlord_id, h.landlord_id)
-    LEFT JOIN users u ON l.user_id = u.id
-    WHERE (p.id IS NOT NULL OR r.id IS NOT NULL)
+    LEFT JOIN users u ON (l.user_id = u.id OR u.phone = p.contact_phone)
+    WHERE 1=1
   `;
   const values = [];
 
   if (userId) {
-    query += ' AND l.user_id = ?';
-    values.push(userId);
+    query += ' AND (l.user_id = ? OR u.id = ? OR v.landlord_id = ?)';
+    values.push(userId, userId, userId);
   } else if (landlordId) {
-    query += ' AND l.id = ?';
-    values.push(landlordId);
+    query += ' AND (l.id = ? OR v.landlord_id = ?)';
+    values.push(landlordId, landlordId);
   }
 
   if (roomId) {

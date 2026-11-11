@@ -3,6 +3,7 @@ const {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   getUnreadCount,
+  deleteNotification,
 } = require('../models/notificationModel');
 
 /**
@@ -67,8 +68,34 @@ async function markAllAsReadHandler(req, res) {
   }
 }
 
+/**
+ * Xóa một thông báo
+ */
+async function deleteNotificationHandler(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Vui lòng đăng nhập' });
+    }
+
+    const notificationId = Number(req.params.id);
+    const success = await deleteNotification(notificationId, userId);
+    const unreadCount = await getUnreadCount(userId);
+
+    if (!success) {
+      return res.status(404).json({ message: 'Không tìm thấy thông báo hoặc bạn không có quyền xóa' });
+    }
+
+    return res.status(200).json({ message: 'Đã xóa thông báo thành công', unreadCount });
+  } catch (error) {
+    console.error('Lỗi khi xóa thông báo:', error);
+    return res.status(500).json({ message: 'Lỗi khi xóa thông báo', error: error.message });
+  }
+}
+
 module.exports = {
   getNotificationsHandler,
   markAsReadHandler,
   markAllAsReadHandler,
+  deleteNotificationHandler,
 };

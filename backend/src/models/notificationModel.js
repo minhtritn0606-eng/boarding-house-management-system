@@ -106,6 +106,19 @@ async function getUnreadCount(userId) {
 }
 
 /**
+ * Xóa một thông báo theo id và user_id
+ */
+async function deleteNotification(id, userId) {
+  await ensureNotificationsTable();
+  const pool = await getPool();
+  const [res] = await pool.query(
+    `DELETE FROM notifications WHERE id = ? AND user_id = ?`,
+    [id, userId]
+  );
+  return res.affectedRows > 0;
+}
+
+/**
  * Tìm user_id của chủ sở hữu bài đăng
  */
 async function getLandlordUserIdByPostId(postId) {
@@ -130,5 +143,6 @@ module.exports = {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   getUnreadCount,
+  deleteNotification,
   getLandlordUserIdByPostId,
 };

@@ -22,6 +22,16 @@ const DEFAULT_AMENITIES = [
   'Bếp nấu ăn',
   'Camera an ninh',
   'Bảo vệ 24/7',
+  'Khóa vân tay',
+  'Không chung chủ',
+  'Tủ quần áo',
+  'Giường nệm',
+  'Bàn làm việc',
+  'Cửa sổ',
+  'Nuôi thú cưng',
+  'Sân phơi',
+  'Tủ bếp',
+  'Tivi',
 ]
 
 export default function EditRoomPage() {
@@ -536,13 +546,13 @@ export default function EditRoomPage() {
           </h3>
           <p className="section-desc">Chọn các tiện ích đang có sẵn tại phòng trọ:</p>
 
-          <div className="amenities-grid">
+          <div className="amenities-checkbox-grid">
             {DEFAULT_AMENITIES.map((item) => {
               const isChecked = amenities.includes(item)
               return (
                 <label
                   key={item}
-                  className={`amenity-chip ${isChecked ? 'checked' : ''}`}
+                  className={`amenity-checkbox-card ${isChecked ? 'checked' : ''}`}
                 >
                   <input
                     type="checkbox"

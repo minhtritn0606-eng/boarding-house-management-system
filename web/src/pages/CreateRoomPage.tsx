@@ -21,6 +21,16 @@ const DEFAULT_AMENITIES = [
   'Bếp nấu ăn',
   'Camera an ninh',
   'Bảo vệ 24/7',
+  'Khóa vân tay',
+  'Không chung chủ',
+  'Tủ quần áo',
+  'Giường nệm',
+  'Bàn làm việc',
+  'Cửa sổ',
+  'Nuôi thú cưng',
+  'Sân phơi',
+  'Tủ bếp',
+  'Tivi',
 ]
 
 export default function CreateRoomPage() {

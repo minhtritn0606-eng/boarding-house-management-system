@@ -493,6 +493,11 @@ export const notificationApi = {
       method: 'PUT',
     })
   },
+  deleteNotification: async (id: number | string) => {
+    return await request<{ message: string; unreadCount: number }>(`/notifications/${id}`, {
+      method: 'DELETE',
+    })
+  },
 }
 
 

@@ -140,7 +140,7 @@ export default function NotificationsPage() {
   // Đánh dấu đã đọc khi xem chi tiết
   useEffect(() => {
     if (selectedNotification && (!selectedNotification.is_read || selectedNotification.is_read === 0)) {
-      notificationApi.markAsRead(selectedNotification.id).catch(() => {})
+      notificationApi.markAsRead(selectedNotification.id).catch(() => { })
       setNotifications((prev) =>
         prev.map((n) => (n.id === selectedNotification.id ? { ...n, is_read: true } : n))
       )
@@ -157,7 +157,7 @@ export default function NotificationsPage() {
         setNotifications((prev) =>
           prev.map((n) => (n.id === item.id ? { ...n, is_read: true } : n))
         )
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 
@@ -302,14 +302,7 @@ export default function NotificationsPage() {
           gap: '12px',
         }}
       >
-        <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#0f172a', margin: '0 0 6px', textAlign: 'left' }}>
-            Hộp Thư Thông Báo
-          </h1>
-          <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', textAlign: 'left' }}>
-            Cập nhật về lịch hẹn xem phòng từ khách hàng, kiểm duyệt bài đăng và thông báo hệ thống
-          </p>
-        </div>
+
 
         {counts.unread > 0 && (
           <button
@@ -508,8 +501,8 @@ export default function NotificationsPage() {
                       borderLeft: isSelected
                         ? '3px solid #0f172a'
                         : isUnread
-                        ? '3px solid #f59e0b'
-                        : '3px solid transparent',
+                          ? '3px solid #f59e0b'
+                          : '3px solid transparent',
                       transition: 'all 0.15s ease',
                       textAlign: 'left',
                     }}
@@ -809,7 +802,7 @@ export default function NotificationsPage() {
                         transition: 'background 0.15s ease',
                       }}
                     >
-                      Mở danh sách quản lý lịch hẹn →
+                      Mở danh sách lịch hẹn
                     </Link>
 
                     {appointmentDetails.phone && (
@@ -830,6 +823,28 @@ export default function NotificationsPage() {
                         }}
                       >
                         Gọi điện cho khách
+                      </a>
+                    )}
+
+                    {appointmentDetails.phone && (
+                      <a
+                        href={`https://zalo.me/${appointmentDetails.phone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#0068ff',
+                          color: '#ffffff',
+                          padding: '9px 16px',
+                          borderRadius: '8px',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Nhắn Zalo cho khách
                       </a>
                     )}
                   </div>
@@ -857,7 +872,7 @@ export default function NotificationsPage() {
 
               {/* Special Context Guidance for Rejections */}
               {selectedNotification.type === 'rejected' ||
-              (selectedNotification.title || '').toLowerCase().includes('từ chối') ? (
+                (selectedNotification.title || '').toLowerCase().includes('từ chối') ? (
                 <div
                   style={{
                     background: '#fff1f2',

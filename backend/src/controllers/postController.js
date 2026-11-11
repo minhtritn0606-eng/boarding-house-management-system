@@ -4,6 +4,8 @@ const {
   listPosts,
   updatePost,
   deletePost,
+  incrementViewCount,
+  incrementContactClicks,
 } = require('../models/postModel');
 const { getPool } = require('../config/database');
 const { moderatePost } = require('../services/aiModeratorService');
@@ -415,6 +417,29 @@ async function recheckPostAIHandler(req, res) {
   }
 }
 
+async function trackPostViewHandler(req, res) {
+  try {
+    const postId = Number(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'ID bài đăng không hợp lệ' });
+    await incrementViewCount(postId);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+async function trackPostContactHandler(req, res) {
+  try {
+    const postId = Number(req.params.id);
+    const { type = 'call' } = req.body || {};
+    if (!postId) return res.status(400).json({ error: 'ID bài đăng không hợp lệ' });
+    await incrementContactClicks(postId, type);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 module.exports = {
   createPostHandler,
   listPostsHandler,
@@ -422,4 +447,6 @@ module.exports = {
   updatePostHandler,
   deletePostHandler,
   recheckPostAIHandler,
+  trackPostViewHandler,
+  trackPostContactHandler,
 };

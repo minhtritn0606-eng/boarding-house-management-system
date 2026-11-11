@@ -189,6 +189,18 @@ async function deleteAppointment(id) {
   await pool.query('DELETE FROM viewing_requests WHERE id = ?', [id]);
 }
 
+function formatViewingDate(val) {
+  if (!val) return '';
+  if (typeof val === 'string') return val.split('T')[0];
+  if (val instanceof Date) {
+    const year = val.getFullYear();
+    const month = String(val.getMonth() + 1).padStart(2, '0');
+    const day = String(val.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(val);
+}
+
 function formatAppointmentRow(row) {
   return {
     id: row.id,
@@ -199,7 +211,7 @@ function formatAppointmentRow(row) {
     houseAddress: row.house_address || '',
     visitorName: row.visitor_name,
     phone: row.phone,
-    viewingDate: row.viewing_date ? new Date(row.viewing_date).toISOString().split('T')[0] : '',
+    viewingDate: formatViewingDate(row.viewing_date),
     viewingTime: row.viewing_time,
     note: row.note || '',
     status: row.status || 'pending',

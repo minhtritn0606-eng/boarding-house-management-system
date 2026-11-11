@@ -168,6 +168,19 @@ export const postApi = {
       method: 'DELETE',
     })
   },
+
+  trackView: async (id: number | string) => {
+    return await request<{ success: boolean }>(`/posts/${id}/track-view`, {
+      method: 'POST',
+    })
+  },
+
+  trackContact: async (id: number | string, type: 'call' | 'zalo' = 'call') => {
+    return await request<{ success: boolean }>(`/posts/${id}/track-contact`, {
+      method: 'POST',
+      body: JSON.stringify({ type }),
+    })
+  },
 }
 
 // Giữ lại alias roomApi để tương thích 100% với các component React hiện tại của Web
@@ -177,6 +190,8 @@ export const roomApi = {
   createRoom: postApi.createPost,
   updateRoom: postApi.updatePost,
   deleteRoom: postApi.deletePost,
+  trackView: postApi.trackView,
+  trackContact: postApi.trackContact,
   publishRoom: async (id: number | string) => {
     return await request<{ room: any }>(`/rooms/${id}/publish`, {
       method: 'POST',

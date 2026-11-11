@@ -5,6 +5,15 @@ import { useRooms } from '../context/RoomContext'
 import { useToast } from '../context/ToastContext'
 import { appointmentApi, type ViewingAppointment } from '../services/api'
 
+function formatDisplayDate(dateStr?: string) {
+  if (!dateStr) return '—'
+  const parts = dateStr.split('-')
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`
+  }
+  return dateStr
+}
+
 export default function MyRoomsPage() {
   const { user, isAuthenticated } = useAuth()
   const { getRoomsByOwner, toggleRoomStatus, deleteRoom } = useRooms()
@@ -261,6 +270,46 @@ export default function MyRoomsPage() {
 
       {activeTab === 'rooms' ? (
         <>
+          {/* Thống kê tổng quan lượt quan tâm của tất cả bài đăng */}
+          <div className="landlord-analytics-cards">
+            <div className="analytics-card">
+              <span className="analytics-icon">👁️</span>
+              <div className="analytics-info">
+                <span className="analytics-num">
+                  {myRooms.reduce((acc, r) => acc + (r.viewCount || 0), 0)}
+                </span>
+                <span className="analytics-label">Tổng lượt xem bài</span>
+              </div>
+            </div>
+            <div className="analytics-card">
+              <span className="analytics-icon">📞</span>
+              <div className="analytics-info">
+                <span className="analytics-num">
+                  {myRooms.reduce((acc, r) => acc + (r.contactClicks || 0), 0)}
+                </span>
+                <span className="analytics-label">Lượt bấm gọi điện</span>
+              </div>
+            </div>
+            <div className="analytics-card">
+              <span className="analytics-icon">💬</span>
+              <div className="analytics-info">
+                <span className="analytics-num">
+                  {myRooms.reduce((acc, r) => acc + (r.zaloClicks || 0), 0)}
+                </span>
+                <span className="analytics-label">Lượt bấm nhắn Zalo</span>
+              </div>
+            </div>
+            <div className="analytics-card">
+              <span className="analytics-icon">📅</span>
+              <div className="analytics-info">
+                <span className="analytics-num">
+                  {appointments.length}
+                </span>
+                <span className="analytics-label">Lịch hẹn xem phòng</span>
+              </div>
+            </div>
+          </div>
+
           <div className="my-rooms-content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
 
 
@@ -317,10 +366,11 @@ export default function MyRoomsPage() {
                   <thead>
                     <tr>
                       <th style={{ width: '130px' }}>Phòng</th>
-                      <th style={{ width: '130px' }}>Khu vực</th>
-                      <th style={{ width: '95px' }}>Giá thuê</th>
-                      <th style={{ width: '65px' }}>Diện tích</th>
-                      <th style={{ width: '105px' }}>Trạng thái</th>
+                      <th style={{ width: '110px' }}>Khu vực</th>
+                      <th style={{ width: '90px' }}>Giá thuê</th>
+                      <th style={{ width: '60px' }}>Diện tích</th>
+                      <th style={{ width: '120px' }}>Lượt quan tâm</th>
+                      <th style={{ width: '100px' }}>Trạng thái</th>
                       <th style={{ width: '85px' }}>Ngày đăng</th>
                       <th style={{ width: '100px' }}>Thao tác</th>
                     </tr>
@@ -365,6 +415,19 @@ export default function MyRoomsPage() {
                             </strong>
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>{room.area} m²</td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
+                              <span title="Lượt xem bài đăng" style={{ color: '#0f172a' }}>
+                                👁️ <strong>{room.viewCount || 0}</strong> xem
+                              </span>
+                              <span title="Lượt khách bấm gọi hoặc nhắn Zalo" style={{ color: '#0284c7' }}>
+                                💬 <strong>{(room.contactClicks || 0) + (room.zaloClicks || 0)}</strong> liên hệ
+                              </span>
+                              <span title="Số lịch hẹn xem phòng đã đặt" style={{ color: '#059669' }}>
+                                📅 <strong>{room.appointmentCount || 0}</strong> lịch hẹn
+                              </span>
+                            </div>
+                          </td>
                           <td style={{ whiteSpace: 'nowrap' }}>
                             {room.status === 'pending' || (room as any).aiReviewStatus === 'pending_review' ? (
                               <span
@@ -489,12 +552,23 @@ export default function MyRoomsPage() {
                             <strong style={{ color: '#0f172a' }}>{app.visitorName}</strong>
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>
-                            <a
-                              href={`tel:${app.phone}`}
-                              style={{ color: 'var(--primary-color)', fontWeight: 600, textDecoration: 'none' }}
-                            >
-                              {app.phone}
-                            </a>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <a
+                                href={`tel:${app.phone}`}
+                                style={{ color: 'var(--primary-color)', fontWeight: 600, textDecoration: 'none', fontSize: '0.85rem' }}
+                              >
+                                {app.phone}
+                              </a>
+                              <a
+                                href={`https://zalo.me/${app.phone.replace(/[^0-9]/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-table-zalo"
+                                title="Mở chat Zalo với khách hàng"
+                              >
+                                Nhắn Zalo
+                              </a>
+                            </div>
                           </td>
                           <td>
                             <Link
@@ -507,7 +581,7 @@ export default function MyRoomsPage() {
                           </td>
                           <td>
                             <div style={{ fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                              {app.viewingDate}
+                              {formatDisplayDate(app.viewingDate)}
                             </div>
                             <div style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap', marginTop: '2px' }}>
                               {app.viewingTime}

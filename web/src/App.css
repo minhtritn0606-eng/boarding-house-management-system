@@ -1156,8 +1156,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   padding: 9px 14px;
-  background: #0284c7;
+  background: #0068ff;
   color: white;
   text-decoration: none;
   border-radius: 8px;
@@ -1168,7 +1169,108 @@ body {
 }
 
 .btn-zalo-landlord:hover {
-  background: #0369a1;
+  background: #0052cc;
+}
+
+.zalo-badge-text {
+  background: rgba(255, 255, 255, 0.25);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.detail-engagement-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin: 12px 0 16px 0;
+  font-size: 0.82rem;
+  color: #475569;
+  flex-wrap: wrap;
+}
+
+.engagement-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.engagement-icon {
+  font-size: 0.95rem;
+}
+
+.engagement-dot {
+  color: #cbd5e1;
+}
+
+/* Landlord Engagement Analytics Banner */
+.landlord-analytics-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.analytics-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.analytics-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.analytics-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-num {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.analytics-label {
+  font-size: 0.76rem;
+  color: #64748b;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.btn-table-zalo {
+  display: inline-block;
+  padding: 2px 7px;
+  background: #eff6ff;
+  color: #0068ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.btn-table-zalo:hover {
+  background: #0068ff;
+  color: #ffffff;
+  border-color: #0068ff;
 }
 
 .contact-email-line {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
-import { roomApi } from '../services/api'
+import { roomApi, postApi } from '../services/api'
 import type { Room } from '../data/sampleRooms'
 import Carousel from '../components/Carousel'
 import AppointmentBookingForm from '../components/AppointmentBookingForm'
@@ -44,6 +44,17 @@ export default function DetailPage() {
         })
     }
   }, [id, contextRoom])
+
+  // Ghi nhận lượt xem (tránh tăng liên tục khi refresh trong cùng phiên)
+  useEffect(() => {
+    if (room?.id) {
+      const storageKey = `viewed_post_${room.id}`
+      if (!sessionStorage.getItem(storageKey)) {
+        sessionStorage.setItem(storageKey, '1')
+        postApi.trackView(room.id).catch(() => { })
+      }
+    }
+  }, [room?.id])
 
   if (isContextLoading || isDirectLoading) {
     return (
@@ -280,6 +291,21 @@ export default function DetailPage() {
             </span>
           </div>
 
+          {/* Thống kê lượt quan tâm của bài đăng */}
+          <div className="detail-engagement-bar">
+            <span className="engagement-item" title="Số lượt xem bài đăng">
+              {room.viewCount || 0} lượt xem
+            </span>
+            <span className="engagement-dot">•</span>
+            <span className="engagement-item" title="Số lượt bấm gọi hoặc nhắn Zalo">
+              {(room.contactClicks || 0) + (room.zaloClicks || 0)} lượt liên hệ
+            </span>
+            <span className="engagement-dot">•</span>
+            <span className="engagement-item" title="Số yêu cầu xem phòng đã gửi">
+              {room.appointmentCount || 0} lịch hẹn
+            </span>
+          </div>
+
           <div className="detail-specs-grid">
             <div className="detail-spec-item">
               <span className="detail-spec-label">Diện tích</span>
@@ -310,7 +336,11 @@ export default function DetailPage() {
 
             {cleanPhone && (
               <div className="contact-actions-row">
-                <a href={`tel:${cleanPhone}`} className="btn-call-landlord">
+                <a
+                  href={`tel:${cleanPhone}`}
+                  className="btn-call-landlord"
+                  onClick={() => postApi.trackContact(room.id, 'call').catch(() => { })}
+                >
                   Gọi điện: {contactPhone}
                 </a>
                 <a
@@ -318,6 +348,7 @@ export default function DetailPage() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-zalo-landlord"
+                  onClick={() => postApi.trackContact(room.id, 'zalo').catch(() => { })}
                 >
                   Nhắn Zalo
                 </a>

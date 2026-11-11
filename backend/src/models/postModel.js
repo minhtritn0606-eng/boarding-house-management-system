@@ -40,12 +40,15 @@ async function ensurePostsTable() {
     )
   `);
 
-  // Đảm bảo các cột AI kiểm duyệt tồn tại trong bảng posts
+  // Đảm bảo các cột AI kiểm duyệt và thống kê lượt quan tâm tồn tại trong bảng posts
   const aiCols = [
     { name: 'ai_risk_score', type: 'INT DEFAULT 0' },
     { name: 'ai_review_status', type: "VARCHAR(50) DEFAULT 'approved'" },
     { name: 'ai_flags', type: 'TEXT DEFAULT NULL' },
     { name: 'ai_summary', type: 'TEXT DEFAULT NULL' },
+    { name: 'view_count', type: 'INT DEFAULT 0' },
+    { name: 'contact_clicks', type: 'INT DEFAULT 0' },
+    { name: 'zalo_clicks', type: 'INT DEFAULT 0' },
   ];
   for (const c of aiCols) {
     try {
@@ -195,6 +198,7 @@ async function findPostById(id) {
 
   const [rows] = await pool.query(
     `SELECT p.*,
+            (SELECT COUNT(*) FROM viewing_requests vr WHERE vr.room_id = p.id) AS appointment_count,
             h.name AS house_name,
             u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
      FROM posts p
@@ -244,6 +248,10 @@ async function findPostById(id) {
     aiReviewStatus: row.ai_review_status || 'approved',
     aiFlags: row.ai_flags ? (typeof row.ai_flags === 'string' ? (row.ai_flags.startsWith('[') ? JSON.parse(row.ai_flags) : [row.ai_flags]) : row.ai_flags) : [],
     aiSummary: row.ai_summary || '',
+    viewCount: Number(row.view_count || 0),
+    contactClicks: Number(row.contact_clicks || 0),
+    zaloClicks: Number(row.zalo_clicks || 0),
+    appointmentCount: Number(row.appointment_count || 0),
     images,
     postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
     createdAt: row.created_at,
@@ -257,6 +265,7 @@ async function listPosts(filters = {}) {
 
   let query = `
     SELECT p.*,
+           (SELECT COUNT(*) FROM viewing_requests vr WHERE vr.room_id = p.id) AS appointment_count,
            h.name AS house_name,
            u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
     FROM posts p
@@ -360,6 +369,10 @@ async function listPosts(filters = {}) {
       aiReviewStatus: row.ai_review_status || 'approved',
       aiFlags: row.ai_flags ? (typeof row.ai_flags === 'string' ? (row.ai_flags.startsWith('[') ? JSON.parse(row.ai_flags) : [row.ai_flags]) : row.ai_flags) : [],
       aiSummary: row.ai_summary || '',
+      viewCount: Number(row.view_count || 0),
+      contactClicks: Number(row.contact_clicks || 0),
+      zaloClicks: Number(row.zalo_clicks || 0),
+      appointmentCount: Number(row.appointment_count || 0),
       images: postImgs.length > 0 ? postImgs : defaultImages,
       postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
       createdAt: row.created_at,
@@ -433,6 +446,22 @@ async function deletePost(id) {
   await pool.query('DELETE FROM posts WHERE id = ?', [id]);
 }
 
+async function incrementViewCount(id) {
+  await ensurePostsTable();
+  const pool = await getPool();
+  await pool.query('UPDATE posts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?', [id]);
+}
+
+async function incrementContactClicks(id, type = 'call') {
+  await ensurePostsTable();
+  const pool = await getPool();
+  if (type === 'zalo') {
+    await pool.query('UPDATE posts SET zalo_clicks = COALESCE(zalo_clicks, 0) + 1 WHERE id = ?', [id]);
+  } else {
+    await pool.query('UPDATE posts SET contact_clicks = COALESCE(contact_clicks, 0) + 1 WHERE id = ?', [id]);
+  }
+}
+
 module.exports = {
   ensurePostsTable,
   createPost,
@@ -440,4 +469,6 @@ module.exports = {
   listPosts,
   updatePost,
   deletePost,
+  incrementViewCount,
+  incrementContactClicks,
 };

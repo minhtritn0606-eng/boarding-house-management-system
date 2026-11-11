@@ -24,6 +24,10 @@ export interface Room {
   aiReviewStatus?: 'approved' | 'pending_review' | 'rejected' | string;
   aiFlags?: string[];
   aiSummary?: string;
+  viewCount?: number;
+  contactClicks?: number;
+  zaloClicks?: number;
+  appointmentCount?: number;
 }
 
 export const sampleRooms: Room[] = [];

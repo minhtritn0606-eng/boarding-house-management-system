@@ -465,12 +465,13 @@ export default function EditRoomPage() {
 
             <div className="form-group">
               <label htmlFor="room-address">
-                Địa chỉ chi tiết (Số nhà, tên đường, phường/xã) <span className="req">*</span>
+                Địa chỉ chi tiết (Số nhà, tên đường) <span className="req">*</span>
               </label>
               <input
                 id="room-address"
                 type="text"
                 required
+                placeholder="VD: 26 Lê Trung Đình"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
               />
@@ -557,72 +558,90 @@ export default function EditRoomPage() {
 
         {/* Section 3: Hình ảnh phòng */}
         <section className="form-section">
-          <div className="section-title-row">
-            <h3 className="section-title">
-              <span className="step-num">3</span> Hình ảnh thực tế ({images.length}/10)
-            </h3>
-            <span className="help-badge">Ảnh đầu tiên sẽ là Ảnh Đại Diện</span>
-          </div>
+          <h3 className="section-title">
+            <span className="step-num">3</span> Hình ảnh thực tế ({images.length}/10){' '}
+            <span className="req">*</span>
+          </h3>
 
-          <div
-            className={`upload-dropzone ${isDragging ? 'dragging' : ''}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
+          <div className="image-upload-wrapper">
+            <label className="field-label">
+              Tải ảnh từ thiết bị (tối đa 10 ảnh) <span className="req">*</span>
+            </label>
+
+            {/* Hidden File Input */}
             <input
               type="file"
               ref={fileInputRef}
-              onChange={handleFileChange}
-              multiple
               accept="image/*"
+              multiple
+              onChange={handleFileChange}
               style={{ display: 'none' }}
+              id="device-file-input"
             />
-            <div className="upload-text" style={{ fontWeight: 600 }}>
-              Nhấn để chọn ảnh từ máy tính / điện thoại hoặc kéo thả ảnh vào đây
-            </div>
-            <span className="upload-hint">Định dạng JPG, PNG, WEBP (tối đa 5MB mỗi ảnh, tối đa 10 ảnh)</span>
-          </div>
 
-          {/* Grid Preview Images */}
-          {images.length > 0 && (
-            <div className="image-previews-grid">
-              {images.map((img, index) => (
-                <div key={index} className={`preview-item ${index === 0 ? 'is-primary' : ''}`}>
-                  <img src={img} alt={`Phòng ${index + 1}`} />
-                  <div className="preview-overlay">
-                    {index === 0 ? (
-                      <span className="primary-tag">Ảnh đại diện</span>
-                    ) : (
+            {/* Drag and Drop Zone */}
+            <div
+              className={`upload-drop-zone ${isDragging ? 'dragging' : ''}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="upload-instructions" style={{ fontWeight: 600, color: '#1e293b' }}>
+                Nhấn để chọn ảnh từ máy tính/điện thoại hoặc kéo thả ảnh vào đây
+              </div>
+              <p className="upload-hint" style={{ marginTop: '4px' }}>
+                Định dạng JPG, PNG, WEBP (Tối đa 10 ảnh, dung lượng ≤ 5MB/ảnh)
+              </p>
+            </div>
+
+            {/* Uploaded Images Gallery */}
+            {images.length > 0 && (
+              <div className="uploaded-gallery-box">
+                <div className="gallery-header">
+                  <span>
+                    Đã tải lên <strong>{images.length}</strong> ảnh:
+                  </span>
+                  <span className="gallery-note">
+                    (Ảnh đầu tiên sẽ là Ảnh đại diện của bài đăng)
+                  </span>
+                </div>
+
+                <div className="uploaded-image-grid">
+                  {images.map((imgSrc, idx) => (
+                    <div
+                      key={idx}
+                      className={`uploaded-image-card ${idx === 0 ? 'is-primary' : ''}`}
+                    >
+                      <img src={imgSrc} alt={`Room upload ${idx + 1}`} />
+
+                      {idx === 0 ? (
+                        <span className="primary-badge">Ảnh đại diện</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-make-primary"
+                          onClick={() => handleSetPrimaryImage(idx)}
+                          title="Đặt làm ảnh đại diện chính"
+                        >
+                          Đặt làm ảnh chính
+                        </button>
+                      )}
+
                       <button
                         type="button"
-                        className="btn-set-primary"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleSetPrimaryImage(index)
-                        }}
-                        title="Đặt làm ảnh đại diện"
+                        className="btn-remove-image"
+                        onClick={() => handleRemoveImage(idx)}
+                        title="Xóa ảnh này"
                       >
-                        Đặt làm ảnh chính
+                        ✕
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="btn-remove-img"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRemoveImage(index)
-                      }}
-                      title="Xóa ảnh này"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Section 4: Mô tả & Thông tin liên hệ */}

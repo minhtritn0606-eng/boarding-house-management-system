@@ -387,6 +387,7 @@ export default function CreateRoomPage() {
                 id="room-district"
                 type="text"
                 required
+                placeholder="VD: Ngũ Hành Sơn"
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
               />
@@ -395,12 +396,13 @@ export default function CreateRoomPage() {
 
           <div className="form-group">
             <label htmlFor="room-address">
-              Địa chỉ chi tiết <span className="req">*</span>
+              Địa chỉ chi tiết (Số nhà, tên đường) <span className="req">*</span>
             </label>
             <input
               id="room-address"
               type="text"
               required
+              placeholder="VD: 26 Lê Trung Đình"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
             />

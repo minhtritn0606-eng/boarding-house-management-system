@@ -290,19 +290,111 @@ export default function NotificationsPage() {
     : null
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '30px auto', padding: '0 20px', textAlign: 'left' }}>
-      {/* Header bar */}
+    <div style={{ maxWidth: '1100px', margin: '0 auto', textAlign: 'left' }}>
+      {/* Filter Tabs & Quick Actions */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '24px',
-          flexWrap: 'wrap',
+          alignItems: 'center',
           gap: '12px',
+          marginBottom: '16px',
+          borderBottom: '1px solid #e2e8f0',
+          paddingBottom: '12px',
+          flexWrap: 'wrap',
         }}
       >
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setFilterType('all')}
+            style={{
+              border: 'none',
+              background: filterType === 'all' ? '#0f172a' : '#f1f5f9',
+              color: filterType === 'all' ? '#ffffff' : '#475569',
+              fontWeight: 600,
+              fontSize: '0.82rem',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Tất cả ({counts.total})
+          </button>
 
+          <button
+            type="button"
+            onClick={() => setFilterType('appointment')}
+            style={{
+              border: 'none',
+              background: filterType === 'appointment' ? '#0f172a' : '#f1f5f9',
+              color: filterType === 'appointment' ? '#ffffff' : '#475569',
+              fontWeight: 600,
+              fontSize: '0.82rem',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Lịch xem phòng ({counts.appointment})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilterType('unread')}
+            style={{
+              border: 'none',
+              background: filterType === 'unread' ? '#0f172a' : '#f1f5f9',
+              color: filterType === 'unread' ? '#ffffff' : '#475569',
+              fontWeight: 600,
+              fontSize: '0.82rem',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Chưa đọc ({counts.unread})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilterType('rejected')}
+            style={{
+              border: 'none',
+              background: filterType === 'rejected' ? '#0f172a' : '#f1f5f9',
+              color: filterType === 'rejected' ? '#ffffff' : '#475569',
+              fontWeight: 600,
+              fontSize: '0.82rem',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Bị từ chối ({counts.rejected})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilterType('approved')}
+            style={{
+              border: 'none',
+              background: filterType === 'approved' ? '#0f172a' : '#f1f5f9',
+              color: filterType === 'approved' ? '#ffffff' : '#475569',
+              fontWeight: 600,
+              fontSize: '0.82rem',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Đã duyệt ({counts.approved})
+          </button>
+        </div>
 
         {counts.unread > 0 && (
           <button
@@ -311,115 +403,19 @@ export default function NotificationsPage() {
             style={{
               background: '#f8fafc',
               border: '1px solid #cbd5e1',
-              padding: '8px 14px',
+              padding: '6px 12px',
               borderRadius: '8px',
-              fontSize: '0.85rem',
+              fontSize: '0.80rem',
               fontWeight: 600,
               color: '#334155',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
             }}
           >
             Đánh dấu tất cả đã đọc ({counts.unread})
           </button>
         )}
-      </div>
-
-      {/* Filter Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '20px',
-          borderBottom: '1px solid #e2e8f0',
-          paddingBottom: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setFilterType('all')}
-          style={{
-            border: 'none',
-            background: filterType === 'all' ? '#0f172a' : '#f1f5f9',
-            color: filterType === 'all' ? '#ffffff' : '#475569',
-            fontWeight: 600,
-            fontSize: '0.82rem',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            cursor: 'pointer',
-          }}
-        >
-          Tất cả ({counts.total})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilterType('appointment')}
-          style={{
-            border: 'none',
-            background: filterType === 'appointment' ? '#0f172a' : '#f1f5f9',
-            color: filterType === 'appointment' ? '#ffffff' : '#475569',
-            fontWeight: 600,
-            fontSize: '0.82rem',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            cursor: 'pointer',
-          }}
-        >
-          Lịch xem phòng ({counts.appointment})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilterType('unread')}
-          style={{
-            border: 'none',
-            background: filterType === 'unread' ? '#0f172a' : '#f1f5f9',
-            color: filterType === 'unread' ? '#ffffff' : '#475569',
-            fontWeight: 600,
-            fontSize: '0.82rem',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            cursor: 'pointer',
-          }}
-        >
-          Chưa đọc ({counts.unread})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilterType('rejected')}
-          style={{
-            border: 'none',
-            background: filterType === 'rejected' ? '#0f172a' : '#f1f5f9',
-            color: filterType === 'rejected' ? '#ffffff' : '#475569',
-            fontWeight: 600,
-            fontSize: '0.82rem',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            cursor: 'pointer',
-          }}
-        >
-          Bị từ chối ({counts.rejected})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilterType('approved')}
-          style={{
-            border: 'none',
-            background: filterType === 'approved' ? '#0f172a' : '#f1f5f9',
-            color: filterType === 'approved' ? '#ffffff' : '#475569',
-            fontWeight: 600,
-            fontSize: '0.82rem',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            cursor: 'pointer',
-          }}
-        >
-          Đã duyệt ({counts.approved})
-        </button>
       </div>
 
       {/* Main 2-Column Split: Master List on left, Full Detail on right */}

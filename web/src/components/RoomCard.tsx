@@ -37,6 +37,39 @@ export default function RoomCard({ room }: RoomCardProps) {
     }
   }
 
+  // Định dạng địa chỉ kèm Quận/Huyện: "Số nhà/tên đường, Quận/Huyện" (VD: "26 Lê Trung Đình, Ngũ Hành Sơn")
+  const getDisplayAddress = () => {
+    const rawAddress = (room.address || '').trim()
+    const district = (room.district || '').trim()
+
+    if (!rawAddress) {
+      return district || room.city || 'Chưa cập nhật'
+    }
+
+    // Viết hoa chữ cái đầu cho từng từ (VD: "26 lê trung đình" -> "26 Lê Trung Đình")
+    const cleanAddress = rawAddress
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+
+    if (!district) {
+      return cleanAddress
+    }
+
+    // Kiểm tra xem trong địa chỉ đã có tên quận hay chưa để tránh lặp lại
+    const lowerAddress = cleanAddress.toLowerCase()
+    const lowerDistrict = district.toLowerCase()
+    const cleanDistrictName = district.replace(/^(quận|huyện|q\.)\s+/i, '').trim()
+    const lowerCleanDistrict = cleanDistrictName.toLowerCase()
+
+    if (lowerAddress.includes(lowerDistrict) || lowerAddress.includes(lowerCleanDistrict)) {
+      return cleanAddress
+    }
+
+    return `${cleanAddress}, ${district}`
+  }
+
   const thumbnail =
     room.images?.[0] ||
     'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'
@@ -79,10 +112,17 @@ export default function RoomCard({ room }: RoomCardProps) {
           ) : null}
         </div>
 
-        {/* 5. Địa chỉ */}
-        <div className="room-card-address" title={room.address}>
+        {/* 5. Địa chỉ: Số nhà & Quận/Huyện */}
+        <div
+          className="room-card-address"
+          title={`${room.address}${
+            room.district && !room.address.toLowerCase().includes(room.district.toLowerCase())
+              ? `, ${room.district}`
+              : ''
+          }${room.city ? `, ${room.city}` : ''}`}
+        >
           <span className="address-icon">📍</span>
-          <span className="address-text">{room.address}</span>
+          <span className="address-text">{getDisplayAddress()}</span>
         </div>
 
         {/* 6. Một số tiện nghi */}

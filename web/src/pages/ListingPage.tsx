@@ -9,6 +9,25 @@ import type { Room } from '../data/sampleRooms'
 type PriceRange = 'all' | 'under1.5' | '1.5-2.5' | '2.5-4' | 'above4'
 type ViewMode = 'cards' | 'map'
 
+interface AmenityOption {
+  id: string
+  label: string
+  keywords: string[]
+}
+
+const POPULAR_AMENITIES: AmenityOption[] = [
+  { id: 'ac', label: 'Điều hòa / Máy lạnh', keywords: ['điều hòa', 'máy lạnh'] },
+  { id: 'mezzanine', label: 'Gác lửng', keywords: ['gác lửng', 'gác'] },
+  { id: 'private_wc', label: 'Vệ sinh khép kín', keywords: ['vệ sinh riêng', 'khép kín', 'wc riêng', 'toilet riêng'] },
+  { id: 'washing_machine', label: 'Máy giặt', keywords: ['máy giặt'] },
+  { id: 'fridge', label: 'Tủ lạnh', keywords: ['tủ lạnh'] },
+  { id: 'free_hours', label: 'Giờ giấc tự do', keywords: ['giờ giấc tự do', 'không chung chủ', 'tự do'] },
+  { id: 'kitchen', label: 'Bếp nấu ăn', keywords: ['bếp', 'nấu ăn'] },
+  { id: 'parking', label: 'Chỗ để xe', keywords: ['để xe', 'chỗ để xe', 'nhà xe', 'hầm xe'] },
+  { id: 'balcony', label: 'Ban công / Cửa sổ', keywords: ['ban công', 'cửa sổ'] },
+  { id: 'wifi', label: 'Wifi tốc độ cao', keywords: ['wifi', 'mạng'] },
+]
+
 export default function ListingPage() {
   const { rooms } = useRooms()
   const [searchParams] = useSearchParams()
@@ -39,12 +58,22 @@ export default function ListingPage() {
 
   const [keyword, setKeyword] = useState(initialKeyword)
   const [priceRange, setPriceRange] = useState<PriceRange>(initialPrice)
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
   const [city, setCity] = useState('')
   const [district, setDistrict] = useState(initialDistrict)
   const [minArea, setMinArea] = useState('')
   const [roomType, setRoomType] = useState('')
   const [sort, setSort] = useState('new')
   const [page, setPage] = useState(1)
+
+  const toggleAmenity = (amenityId: string) => {
+    setSelectedAmenities((prev) =>
+      prev.includes(amenityId)
+        ? prev.filter((id) => id !== amenityId)
+        : [...prev, amenityId]
+    )
+    setPage(1)
+  }
 
   const perPage = 30
 
@@ -96,19 +125,36 @@ export default function ListingPage() {
       out = out.filter((r) => r.price > 4000000)
     }
 
-    // 3. Các bộ lọc khác
+    // 3. Lọc theo tiện ích nổi bật (Amenities Filter)
+    if (selectedAmenities.length > 0) {
+      out = out.filter((r) => {
+        const listStr = Array.isArray(r.amenities)
+          ? r.amenities.join(' ')
+          : (r.amenities || '')
+        const fullText = `${listStr} ${r.description || ''} ${r.title || ''}`.toLowerCase()
+
+        // Phòng phải thỏa mãn TẤT CẢ các tiện ích đã chọn
+        return selectedAmenities.every((amenityId) => {
+          const opt = POPULAR_AMENITIES.find((a) => a.id === amenityId)
+          if (!opt) return true
+          return opt.keywords.some((kw) => fullText.includes(kw))
+        })
+      })
+    }
+
+    // 4. Các bộ lọc khác
     if (city) out = out.filter((r) => r.city === city)
     if (district) out = out.filter((r) => (r.district || '').toLowerCase().includes(district.toLowerCase()))
     if (minArea) out = out.filter((r) => (r.area || 0) >= Number(minArea))
     if (roomType) out = out.filter((r) => r.roomType === roomType)
 
-    // 4. Sắp xếp
+    // 5. Sắp xếp
     if (sort === 'price-asc') out.sort((a, b) => a.price - b.price)
     if (sort === 'price-desc') out.sort((a, b) => b.price - a.price)
     if (sort === 'new') out.sort((a, b) => (b.postedDate || '').localeCompare(a.postedDate || ''))
 
     return out
-  }, [rooms, keyword, priceRange, city, district, minArea, roomType, sort])
+  }, [rooms, keyword, priceRange, selectedAmenities, city, district, minArea, roomType, sort])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const shown = filtered.slice((page - 1) * perPage, page * perPage)
@@ -119,12 +165,19 @@ export default function ListingPage() {
   }
 
   const hasActiveFilter = Boolean(
-    keyword || priceRange !== 'all' || city || district || minArea || roomType
+    keyword ||
+      priceRange !== 'all' ||
+      selectedAmenities.length > 0 ||
+      city ||
+      district ||
+      minArea ||
+      roomType
   )
 
   const handleResetFilters = () => {
     setKeyword('')
     setPriceRange('all')
+    setSelectedAmenities([])
     setCity('')
     setDistrict('')
     setMinArea('')
@@ -253,7 +306,7 @@ export default function ListingPage() {
           {/* Diện tích */}
           <input
             type="number"
-            placeholder="Diện tích tối thiểu (m²)"
+            placeholder="Diện tích (m²)"
             value={minArea}
             onChange={(e) => handleFilterChange(setMinArea, e.target.value)}
           />
@@ -274,52 +327,53 @@ export default function ListingPage() {
           </select>
         </section>
 
-        {/* Row 3: Nút chọn khoảng giá nhanh & Đặt lại bộ lọc */}
-        <div className="filter-tags-row">
-          <div className="filter-price-pills">
-            <span className="price-pills-label">Khoảng giá nhanh:</span>
-            <button
-              type="button"
-              className={`price-pill-btn ${priceRange === 'all' ? 'active' : ''}`}
-              onClick={() => handleFilterChange(setPriceRange, 'all')}
-            >
-              Tất cả
-            </button>
-            <button
-              type="button"
-              className={`price-pill-btn ${priceRange === 'under1.5' ? 'active' : ''}`}
-              onClick={() => handleFilterChange(setPriceRange, 'under1.5')}
-            >
-              Dưới 1.5 tr
-            </button>
-            <button
-              type="button"
-              className={`price-pill-btn ${priceRange === '1.5-2.5' ? 'active' : ''}`}
-              onClick={() => handleFilterChange(setPriceRange, '1.5-2.5')}
-            >
-              1.5 – 2.5 tr
-            </button>
-            <button
-              type="button"
-              className={`price-pill-btn ${priceRange === '2.5-4' ? 'active' : ''}`}
-              onClick={() => handleFilterChange(setPriceRange, '2.5-4')}
-            >
-              2.5 – 4 tr
-            </button>
-            <button
-              type="button"
-              className={`price-pill-btn ${priceRange === 'above4' ? 'active' : ''}`}
-              onClick={() => handleFilterChange(setPriceRange, 'above4')}
-            >
-              Trên 4 tr
-            </button>
+        {/* Tiện ích nhanh & Nút đặt lại bộ lọc */}
+        <div className="filter-amenities-row">
+          <div className="amenities-row-header">
+            <span className="amenities-row-label">Tiện ích ưu tiên:</span>
+            {hasActiveFilter && (
+              <button
+                type="button"
+                className="btn-reset-all-filters"
+                onClick={handleResetFilters}
+                title="Đặt lại toàn bộ bộ lọc về mặc định"
+              >
+                Đặt lại bộ lọc ✕
+              </button>
+            )}
           </div>
-
-          {hasActiveFilter && (
-            <button type="button" className="btn-reset-all-filters" onClick={handleResetFilters}>
-              Đặt lại bộ lọc ✕
-            </button>
-          )}
+          <div className="amenities-pills-list">
+            {POPULAR_AMENITIES.map((item) => {
+              const isChecked = selectedAmenities.includes(item.id)
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`amenity-checkbox-btn ${isChecked ? 'checked' : ''}`}
+                  onClick={() => toggleAmenity(item.id)}
+                  title={`Lọc phòng có ${item.label}`}
+                >
+                  <span className="amenity-checkbox-square">
+                    {isChecked && (
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="amenity-checkbox-text">{item.label}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 

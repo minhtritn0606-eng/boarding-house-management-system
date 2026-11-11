@@ -24,6 +24,52 @@ function formatRelativeTime(dateStr?: string): string {
   }
 }
 
+type NotificationCategory = 'appointment' | 'rejected' | 'approved' | 'pending' | 'system'
+
+function NotificationTypeIcon({ type }: { type: NotificationCategory }) {
+  if (type === 'appointment') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+    )
+  }
+  if (type === 'rejected') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="15" y1="9" x2="9" y2="15" />
+        <line x1="9" y1="9" x2="15" y2="15" />
+      </svg>
+    )
+  }
+  if (type === 'approved') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <polyline points="22 4 12 14.01 9 11.01" />
+      </svg>
+    )
+  }
+  if (type === 'pending') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    )
+  }
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  )
+}
+
 export default function NotificationBell() {
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
@@ -114,6 +160,23 @@ export default function NotificationBell() {
     }
   }
 
+  const counts = useMemo(() => {
+    let appointment = 0
+    let rejected = 0
+    let approved = 0
+    for (const n of notifications) {
+      const t = (n.title || '').toLowerCase()
+      if (n.type === 'appointment' || t.includes('lịch hẹn') || t.includes('xem phòng')) {
+        appointment++
+      } else if (n.type === 'rejected' || t.includes('từ chối') || t.includes('tạm dừng')) {
+        rejected++
+      } else if (n.type === 'approved' || t.includes('duyệt')) {
+        approved++
+      }
+    }
+    return { all: notifications.length, appointment, rejected, approved }
+  }, [notifications])
+
   const filteredNotifications = useMemo(() => {
     if (activeFilter === 'appointment') {
       return notifications.filter(
@@ -133,45 +196,44 @@ export default function NotificationBell() {
     return notifications
   }, [notifications, activeFilter])
 
-  const getNotificationStyle = (type?: string, title?: string) => {
+  const getNotificationMeta = (type?: string, title?: string): {
+    iconType: NotificationCategory
+    iconBg: string
+    iconColor: string
+  } => {
     const lowerTitle = (title || '').toLowerCase()
     if (type === 'appointment' || lowerTitle.includes('lịch hẹn') || lowerTitle.includes('xem phòng')) {
       return {
-        tagText: 'Lịch hẹn xem',
-        tagBg: '#eff6ff',
-        tagColor: '#1d4ed8',
-        borderLeft: '3px solid #3b82f6',
+        iconType: 'appointment',
+        iconBg: '#eff6ff',
+        iconColor: '#2563eb',
       }
     }
     if (type === 'rejected' || lowerTitle.includes('từ chối') || lowerTitle.includes('tạm dừng')) {
       return {
-        tagText: 'Từ chối duyệt',
-        tagBg: '#fee2e2',
-        tagColor: '#991b1b',
-        borderLeft: '3px solid #ef4444',
+        iconType: 'rejected',
+        iconBg: '#fff1f2',
+        iconColor: '#e11d48',
       }
     }
     if (type === 'approved' || lowerTitle.includes('đã duyệt') || lowerTitle.includes('thành công')) {
       return {
-        tagText: 'Đã duyệt',
-        tagBg: '#dcfce7',
-        tagColor: '#166534',
-        borderLeft: '3px solid #10b981',
+        iconType: 'approved',
+        iconBg: '#ecfdf5',
+        iconColor: '#059669',
       }
     }
     if (type === 'pending' || lowerTitle.includes('chờ duyệt') || lowerTitle.includes('xác minh')) {
       return {
-        tagText: 'Chờ duyệt',
-        tagBg: '#fef3c7',
-        tagColor: '#b45309',
-        borderLeft: '3px solid #f59e0b',
+        iconType: 'pending',
+        iconBg: '#fffbeb',
+        iconColor: '#d97706',
       }
     }
     return {
-      tagText: 'Thông báo',
-      tagBg: '#eff6ff',
-      tagColor: '#1d4ed8',
-      borderLeft: '3px solid #3b82f6',
+      iconType: 'system',
+      iconBg: '#f8fafc',
+      iconColor: '#64748b',
     }
   }
 
@@ -222,8 +284,12 @@ export default function NotificationBell() {
                 type="button"
                 className="btn-mark-all-read"
                 onClick={handleMarkAllAsRead}
+                title="Đánh dấu tất cả là đã đọc"
               >
-                Đánh dấu đã đọc
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>Đánh dấu đã đọc</span>
               </button>
             )}
           </div>
@@ -235,28 +301,28 @@ export default function NotificationBell() {
               className={`notif-tab ${activeFilter === 'all' ? 'active' : ''}`}
               onClick={() => setActiveFilter('all')}
             >
-              Tất cả ({notifications.length})
+              Tất cả ({counts.all})
             </button>
             <button
               type="button"
               className={`notif-tab ${activeFilter === 'appointment' ? 'active' : ''}`}
               onClick={() => setActiveFilter('appointment')}
             >
-              Lịch hẹn
+              Lịch hẹn {counts.appointment > 0 ? `(${counts.appointment})` : ''}
             </button>
             <button
               type="button"
               className={`notif-tab ${activeFilter === 'rejected' ? 'active' : ''}`}
               onClick={() => setActiveFilter('rejected')}
             >
-              Bị từ chối
+              Bị từ chối {counts.rejected > 0 ? `(${counts.rejected})` : ''}
             </button>
             <button
               type="button"
               className={`notif-tab ${activeFilter === 'approved' ? 'active' : ''}`}
               onClick={() => setActiveFilter('approved')}
             >
-              Đã duyệt
+              Đã duyệt {counts.approved > 0 ? `(${counts.approved})` : ''}
             </button>
           </div>
 
@@ -268,48 +334,48 @@ export default function NotificationBell() {
               </div>
             ) : filteredNotifications.length === 0 ? (
               <div className="notification-empty">
+                <div className="empty-bell-icon">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                </div>
                 <p className="empty-title">Không có thông báo nào</p>
                 <p className="empty-sub">
-                  Kết quả kiểm duyệt bài đăng và cập nhật hệ thống sẽ xuất hiện tại đây.
+                  Bạn chưa có thông báo mới trong danh mục này.
                 </p>
               </div>
             ) : (
               <div className="notification-list">
                 {filteredNotifications.map((item) => {
-                  const styleConfig = getNotificationStyle(item.type, item.title)
+                  const meta = getNotificationMeta(item.type, item.title)
                   const isUnread = !item.is_read || item.is_read === 0
 
                   return (
                     <div
                       key={item.id}
                       className={`notification-item ${isUnread ? 'is-unread' : ''}`}
-                      style={{ borderLeft: styleConfig.borderLeft }}
                       onClick={() => handleMarkAsRead(item)}
-                      title="Nhấn để xem chi tiết"
                     >
+                      <div
+                        className="item-icon-wrapper"
+                        style={{ background: meta.iconBg, color: meta.iconColor }}
+                      >
+                        <NotificationTypeIcon type={meta.iconType} />
+                      </div>
+
                       <div className="item-content">
-                        <div className="item-header-line">
-                          <span
-                            className="item-status-tag"
-                            style={{ background: styleConfig.tagBg, color: styleConfig.tagColor }}
-                          >
-                            {styleConfig.tagText}
-                          </span>
+                        <div className="item-top-row">
+                          <span className="item-title">{item.title}</span>
                           <span className="item-time">
                             {formatRelativeTime(item.created_at)}
                           </span>
                         </div>
 
-                        <strong className="item-title">{item.title}</strong>
-
                         <p className="item-message">{item.message}</p>
-
-                        <div className="item-action-hint">
-                          Bấm để xem nội dung đầy đủ &rarr;
-                        </div>
                       </div>
 
-                      {isUnread && <span className="unread-dot" title="Chưa đọc"></span>}
+                      {isUnread && <span className="unread-dot" title="Chưa đọc" />}
                     </div>
                   )
                 })}
@@ -327,7 +393,11 @@ export default function NotificationBell() {
                 navigate('/notifications')
               }}
             >
-              Mở trang thông báo chi tiết &rarr;
+              <span>Mở trang thông báo chi tiết</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
             </button>
           </div>
         </div>

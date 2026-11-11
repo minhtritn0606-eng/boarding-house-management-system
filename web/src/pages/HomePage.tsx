@@ -13,8 +13,8 @@ export default function HomePage() {
   })
   const newest = [...availableRooms]
     .sort((a, b) => (b.postedDate || '').localeCompare(a.postedDate || ''))
-    .slice(0, 4)
-  const cheap = [...availableRooms].sort((a, b) => a.price - b.price).slice(0, 4)
+    .slice(0, 6)
+  const cheap = [...availableRooms].sort((a, b) => a.price - b.price).slice(0, 6)
 
   return (
     <main>

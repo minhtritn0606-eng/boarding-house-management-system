@@ -207,7 +207,7 @@ export default function DetailPage() {
             color: '#92400e',
             padding: '12px 18px',
             borderRadius: '10px',
-            marginBottom: '20px',
+            marginBottom: '0',
             fontSize: '0.92rem',
             lineHeight: '1.5',
           }}
@@ -223,7 +223,7 @@ export default function DetailPage() {
             color: '#991b1b',
             padding: '12px 18px',
             borderRadius: '10px',
-            marginBottom: '20px',
+            marginBottom: '0',
             fontSize: '0.92rem',
             lineHeight: '1.5',
           }}
@@ -281,7 +281,9 @@ export default function DetailPage() {
             </div>
 
             <h1 className="room-detail-title">{room.title}</h1>
-            <p className="room-address-line">Địa chỉ: {room.address}</p>
+            <p className="room-address-line">
+              Địa chỉ: {room.address}{room.district && !room.address.toLowerCase().includes(room.district.toLowerCase()) ? `, ${room.district}` : ''}
+            </p>
           </div>
 
           <div className="detail-price-card">

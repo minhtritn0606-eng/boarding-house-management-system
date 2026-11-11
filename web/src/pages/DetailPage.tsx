@@ -293,17 +293,15 @@ export default function DetailPage() {
 
           {/* Thống kê lượt quan tâm của bài đăng */}
           <div className="detail-engagement-bar">
-            <span className="engagement-item" title="Số lượt xem bài đăng">
-              {room.viewCount || 0} lượt xem
-            </span>
-            <span className="engagement-dot">•</span>
-            <span className="engagement-item" title="Số lượt bấm gọi hoặc nhắn Zalo">
-              {(room.contactClicks || 0) + (room.zaloClicks || 0)} lượt liên hệ
-            </span>
-            <span className="engagement-dot">•</span>
-            <span className="engagement-item" title="Số yêu cầu xem phòng đã gửi">
-              {room.appointmentCount || 0} lịch hẹn
-            </span>
+            <div className="engagement-item" title="Số lượt xem bài đăng">
+              <strong>{room.viewCount || 0}</strong> lượt xem
+            </div>
+            <div className="engagement-item" title="Số lượt bấm gọi hoặc nhắn Zalo">
+              <strong>{(room.contactClicks || 0) + (room.zaloClicks || 0)}</strong> lượt liên hệ
+            </div>
+            <div className="engagement-item" title="Số yêu cầu xem phòng đã gửi">
+              <strong>{room.appointmentCount || 0}</strong> lịch hẹn
+            </div>
           </div>
 
           <div className="detail-specs-grid">

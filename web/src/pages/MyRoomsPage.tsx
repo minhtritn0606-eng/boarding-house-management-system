@@ -58,7 +58,7 @@ export default function MyRoomsPage() {
   }, [location.state])
 
   useEffect(() => {
-    if (isAuthenticated && activeTab === 'appointments') {
+    if (isAuthenticated) {
       loadAppointments()
     }
   }, [isAuthenticated, activeTab])
@@ -303,7 +303,10 @@ export default function MyRoomsPage() {
               <span className="analytics-icon">📅</span>
               <div className="analytics-info">
                 <span className="analytics-num">
-                  {appointments.length}
+                  {Math.max(
+                    myRooms.reduce((acc, r) => acc + (r.appointmentCount || 0), 0),
+                    appointments.length
+                  )}
                 </span>
                 <span className="analytics-label">Lịch hẹn xem phòng</span>
               </div>

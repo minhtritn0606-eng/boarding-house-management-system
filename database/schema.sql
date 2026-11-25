@@ -15,6 +15,9 @@ USE boarding_house_db;
 -- ------------------------------------------------------------------------------
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS post_amenities;
+DROP TABLE IF EXISTS room_amenities;
+DROP TABLE IF EXISTS amenities;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS viewing_requests;
@@ -44,9 +47,6 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(20) DEFAULT NULL,
     role ENUM('admin', 'landlord', 'poster', 'tenant', 'visitor') NOT NULL DEFAULT 'visitor',
-    property_name VARCHAR(150) DEFAULT NULL,
-    property_address VARCHAR(255) DEFAULT NULL,
-    property_image LONGTEXT DEFAULT NULL,
     approval_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
     approved_at TIMESTAMP NULL DEFAULT NULL,
     rejection_reason VARCHAR(255) DEFAULT NULL,
@@ -283,6 +283,35 @@ CREATE TABLE messages (
     CONSTRAINT fk_messages_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 2.14. BẢNG DANH MỤC TIỆN ÍCH CHUẨN (amenities - Chuẩn hóa 1NF)
+CREATE TABLE amenities (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    icon VARCHAR(50) DEFAULT 'check-circle',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2.15. BẢNG LIÊN KẾT BÀI ĐĂNG - TIỆN ÍCH (post_amenities)
+CREATE TABLE post_amenities (
+    post_id BIGINT NOT NULL,
+    amenity_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (post_id, amenity_id),
+    CONSTRAINT fk_pa_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_pa_amenity FOREIGN KEY (amenity_id) REFERENCES amenities(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2.16. BẢNG LIÊN KẾT PHÒNG NỘI BỘ - TIỆN ÍCH (room_amenities)
+CREATE TABLE room_amenities (
+    room_id BIGINT NOT NULL,
+    amenity_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (room_id, amenity_id),
+    CONSTRAINT fk_ra_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ra_amenity FOREIGN KEY (amenity_id) REFERENCES amenities(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ------------------------------------------------------------------------------
 -- 3. CHỈ MỤC TỐI ƯU TỐC ĐỘ TRUY VẤN (INDEXES)
 -- ------------------------------------------------------------------------------
@@ -299,6 +328,7 @@ CREATE INDEX idx_viewing_requests_landlord ON viewing_requests(landlord_id);
 CREATE INDEX idx_viewing_requests_status ON viewing_requests(status);
 CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read);
 CREATE INDEX idx_messages_room ON messages(room_id);
+CREATE INDEX idx_posts_views ON posts(view_count);
 
 -- ------------------------------------------------------------------------------
 -- 4. DỮ LIỆU MẪU ĐÀ NẴNG HOÀN CHỈNH (SEED DATA)

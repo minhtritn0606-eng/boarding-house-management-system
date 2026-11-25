@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import './App.css'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
@@ -15,6 +16,16 @@ import MyRoomsPage from './pages/MyRoomsPage'
 import NotificationsPage from './pages/NotificationsPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import ChatBot from './components/ChatBot'
+
+function ScrollToTop() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [pathname])
+
+  return null
+}
 
 function UserLayout() {
   const location = useLocation()
@@ -48,6 +59,8 @@ export default function App() {
       <RoomProvider>
         <ToastProvider>
           <BrowserRouter>
+            {/* 🔝 Tự động cuộn lên đầu trang mỗi khi chuyển trang / bấm vào xem chi tiết phòng */}
+            <ScrollToTop />
             <Routes>
               {/* 🛡️ Trang Admin độc lập với giao diện riêng biệt toàn màn hình */}
               <Route path="/admin" element={<AdminDashboardPage />} />

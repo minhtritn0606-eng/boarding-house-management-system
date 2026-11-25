@@ -7,6 +7,7 @@ const {
   deleteHouse,
 } = require('../models/houseModel');
 const { getPool } = require('../config/database');
+const { resolveValidUser } = require('../utils/userResolver');
 
 async function listHousesHandler(req, res) {
   try {
@@ -20,7 +21,6 @@ async function listHousesHandler(req, res) {
 
 async function createHouseHandler(req, res) {
   try {
-    const userId = req.user?.id || 2;
     const { name, address, city, description } = req.body;
 
     if (!name || !address || !city) {
@@ -28,6 +28,9 @@ async function createHouseHandler(req, res) {
     }
 
     const pool = await getPool();
+    const currentUser = await resolveValidUser(pool, req.user);
+    const userId = currentUser.id;
+
     let landlordId;
     const [landlords] = await pool.query('SELECT id FROM landlords WHERE user_id = ?', [userId]);
     if (landlords.length > 0) {

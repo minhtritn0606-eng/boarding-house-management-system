@@ -6,10 +6,10 @@ const {
   listPublishedRooms,
 } = require('../models/roomModel');
 const { getPool } = require('../config/database');
+const { resolveValidUser } = require('../utils/userResolver');
 
 async function createRoomHandler(req, res) {
   try {
-    const userId = req.user?.id || 2;
     const { boardingHouseId, title, description, price, roomType, area, floor, amenities, images, address, city, district, latitude, longitude } = req.body;
 
     if (!title || price === undefined) {
@@ -17,6 +17,8 @@ async function createRoomHandler(req, res) {
     }
 
     const pool = await getPool();
+    const currentUser = await resolveValidUser(pool, req.user);
+    const userId = currentUser.id;
 
     // 1. Find or create landlord record for this user
     let landlordId;

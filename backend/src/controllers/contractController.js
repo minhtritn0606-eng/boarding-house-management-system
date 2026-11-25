@@ -8,11 +8,13 @@ const { findRoomById } = require('../models/roomModel');
 const { findTenantById } = require('../models/tenantModel');
 const { findHouseById } = require('../models/houseModel');
 const { getPool } = require('../config/database');
+const { resolveValidUser } = require('../utils/userResolver');
 
 async function createContractHandler(req, res) {
   try {
-    const userId = req.user?.id || 2;
     const pool = await getPool();
+    const currentUser = await resolveValidUser(pool, req.user);
+    const userId = currentUser.id;
     const [landlords] = await pool.query('SELECT id FROM landlords WHERE user_id = ?', [userId]);
     const landlordId = landlords.length > 0 ? landlords[0].id : 1;
 

@@ -181,6 +181,10 @@ export const postApi = {
       body: JSON.stringify({ type }),
     })
   },
+
+  getAmenities: async () => {
+    return await request<{ amenities: any[] }>('/posts/amenities/list')
+  },
 }
 
 // Giữ lại alias roomApi để tương thích 100% với các component React hiện tại của Web

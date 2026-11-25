@@ -53,27 +53,6 @@ async function ensureUsersTable() {
       `);
     } catch (colErr) {}
 
-    try {
-      await pool.query(`
-        ALTER TABLE users 
-        ADD COLUMN property_name VARCHAR(150) NULL DEFAULT NULL AFTER role
-      `);
-    } catch (colErr) {}
-
-    try {
-      await pool.query(`
-        ALTER TABLE users 
-        ADD COLUMN property_address VARCHAR(255) NULL DEFAULT NULL AFTER property_name
-      `);
-    } catch (colErr) {}
-
-    try {
-      await pool.query(`
-        ALTER TABLE users 
-        ADD COLUMN property_image LONGTEXT NULL DEFAULT NULL AFTER property_address
-      `);
-    } catch (colErr) {}
-
     return true;
   } catch (error) {
     return false;
@@ -93,12 +72,32 @@ async function createUser({ fullName, email, password, phone, role = 'visitor', 
     try {
       const pool = await getPool();
       const [result] = await pool.query(
-        'INSERT INTO users (full_name, email, password_hash, phone, role, property_name, property_address, property_image, approval_status, approved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [fullName, normalizedEmail, hashedPassword, phone || null, role, propertyName || null, propertyAddress || null, propertyImage || null, status, approvedAt]
+        'INSERT INTO users (full_name, email, password_hash, phone, role, approval_status, approved_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [fullName, normalizedEmail, hashedPassword, phone || null, role, status, approvedAt]
       );
 
+      const userId = result.insertId;
+
+      // Chuẩn hóa CSDL: Lưu thông tin cơ sở trọ vào đúng bảng landlords và boarding_houses thay vì để dư thừa trong users
+      if (role === 'landlord' && (propertyName || propertyAddress)) {
+        try {
+          const houseName = propertyName || `Nhà trọ ${fullName}`;
+          const houseAddress = propertyAddress || 'TP. Đà Nẵng';
+          const [lRes] = await pool.query(
+            'INSERT INTO landlords (user_id, company_name, address) VALUES (?, ?, ?)',
+            [userId, houseName, houseAddress]
+          );
+          await pool.query(
+            'INSERT INTO boarding_houses (landlord_id, name, address, image_url, city, district) VALUES (?, ?, ?, ?, ?, ?)',
+            [lRes.insertId, houseName, houseAddress, propertyImage || null, 'Đà Nẵng', 'Liên Chiểu']
+          );
+        } catch (hErr) {
+          console.warn('Lưu thông tin boarding_house:', hErr.message);
+        }
+      }
+
       return {
-        id: result.insertId,
+        id: userId,
         fullName,
         email: normalizedEmail,
         phone,
@@ -143,7 +142,17 @@ async function findUserByEmail(email) {
   if (dbReady) {
     try {
       const pool = await getPool();
-      const [rows] = await pool.query('SELECT * FROM users WHERE LOWER(email) = ?', [normalizedEmail]);
+      const [rows] = await pool.query(
+        `SELECT u.*, 
+                bh.name AS property_name, 
+                bh.address AS property_address, 
+                bh.image_url AS property_image
+         FROM users u
+         LEFT JOIN landlords l ON u.id = l.user_id
+         LEFT JOIN boarding_houses bh ON l.id = bh.landlord_id
+         WHERE LOWER(u.email) = ?`,
+        [normalizedEmail]
+      );
       if (rows.length > 0) {
         const row = rows[0];
         return {
@@ -176,7 +185,17 @@ async function findUserById(id) {
   if (dbReady) {
     try {
       const pool = await getPool();
-      const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+      const [rows] = await pool.query(
+        `SELECT u.*, 
+                bh.name AS property_name, 
+                bh.address AS property_address, 
+                bh.image_url AS property_image
+         FROM users u
+         LEFT JOIN landlords l ON u.id = l.user_id
+         LEFT JOIN boarding_houses bh ON l.id = bh.landlord_id
+         WHERE u.id = ?`,
+        [id]
+      );
       if (rows.length > 0) {
         const row = rows[0];
         return {
@@ -233,10 +252,16 @@ async function getPendingUsers() {
     try {
       const pool = await getPool();
       const [rows] = await pool.query(
-        `SELECT id, full_name, email, phone, role, property_name, property_address, property_image, approval_status, created_at 
-         FROM users 
-         WHERE approval_status = 'pending' 
-         ORDER BY id DESC`
+        `SELECT u.id, u.full_name, u.email, u.phone, u.role, 
+                bh.name AS property_name, 
+                bh.address AS property_address, 
+                bh.image_url AS property_image, 
+                u.approval_status, u.created_at 
+         FROM users u
+         LEFT JOIN landlords l ON u.id = l.user_id
+         LEFT JOIN boarding_houses bh ON l.id = bh.landlord_id
+         WHERE u.approval_status = 'pending' 
+         ORDER BY u.id DESC`
       );
       return rows;
     } catch (error) {

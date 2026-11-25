@@ -86,22 +86,24 @@ async function getAllUsers(req, res) {
         u.email, 
         u.phone, 
         u.role, 
-        u.property_name,
-        u.property_address,
-        u.property_image,
+        bh.name AS property_name,
+        bh.address AS property_address,
+        bh.image_url AS property_image,
         u.approval_status,
         u.approved_at,
         u.rejection_reason,
         u.avatar, 
         u.created_at,
-        (SELECT COUNT(*) FROM boarding_houses bh 
-         JOIN landlords l ON bh.landlord_id = l.id 
-         WHERE l.user_id = u.id) AS houses_count,
+        (SELECT COUNT(*) FROM boarding_houses bh2 
+         JOIN landlords l2 ON bh2.landlord_id = l2.id 
+         WHERE l2.user_id = u.id) AS houses_count,
         (SELECT COUNT(*) FROM rooms r 
-         JOIN boarding_houses bh ON r.boarding_house_id = bh.id 
-         JOIN landlords l ON bh.landlord_id = l.id 
-         WHERE l.user_id = u.id) AS rooms_count
+         JOIN boarding_houses bh3 ON r.boarding_house_id = bh3.id 
+         JOIN landlords l3 ON bh3.landlord_id = l3.id 
+         WHERE l3.user_id = u.id) AS rooms_count
       FROM users u
+      LEFT JOIN landlords l ON u.id = l.user_id
+      LEFT JOIN boarding_houses bh ON l.id = bh.landlord_id
       WHERE 1=1
     `;
     const params = [];
@@ -142,19 +144,21 @@ async function getPendingUsers(req, res) {
     const pool = await getPool();
     const [users] = await pool.query(`
       SELECT 
-        id, 
-        full_name, 
-        email, 
-        phone, 
-        role, 
-        property_name,
-        property_address,
-        property_image,
-        approval_status, 
-        created_at 
-      FROM users 
-      WHERE approval_status = 'pending' 
-      ORDER BY id DESC
+        u.id, 
+        u.full_name, 
+        u.email, 
+        u.phone, 
+        u.role, 
+        bh.name AS property_name,
+        bh.address AS property_address,
+        bh.image_url AS property_image,
+        u.approval_status, 
+        u.created_at 
+      FROM users u
+      LEFT JOIN landlords l ON u.id = l.user_id
+      LEFT JOIN boarding_houses bh ON l.id = bh.landlord_id
+      WHERE u.approval_status = 'pending' 
+      ORDER BY u.id DESC
     `);
 
     return res.status(200).json({ users });
@@ -177,7 +181,14 @@ async function updateUserApproval(req, res) {
       return res.status(400).json({ message: 'Trạng thái phê duyệt không hợp lệ (approved hoặc rejected)' });
     }
 
-    const [userRows] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+    const [userRows] = await pool.query(
+      `SELECT u.*, bh.name AS property_name, bh.address AS property_address, bh.image_url AS property_image
+       FROM users u
+       LEFT JOIN landlords l ON u.id = l.user_id
+       LEFT JOIN boarding_houses bh ON l.id = bh.landlord_id
+       WHERE u.id = ?`,
+      [userId]
+    );
     if (userRows.length === 0) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }

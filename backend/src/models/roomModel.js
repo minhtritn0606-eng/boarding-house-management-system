@@ -1,4 +1,5 @@
 const { getPool } = require('../config/database');
+const { syncRoomAmenities } = require('./amenityModel');
 
 async function ensureRoomsTable() {
   const pool = await getPool();
@@ -44,6 +45,10 @@ async function createRoom({ boardingHouseId, title, description, price, roomType
 
   const roomId = result.insertId;
 
+  if (amenities) {
+    await syncRoomAmenities(roomId, amenities).catch(() => {});
+  }
+
   return await findRoomById(roomId);
 }
 
@@ -73,6 +78,22 @@ async function findRoomById(id) {
 
   const images = [];
 
+  // Lấy tiện ích trực tiếp từ bảng chuẩn hóa room_amenities
+  let relAmenities = [];
+  try {
+    const [aRows] = await pool.query(
+      'SELECT a.name FROM room_amenities ra JOIN amenities a ON ra.amenity_id = a.id WHERE ra.room_id = ? ORDER BY a.id ASC',
+      [id]
+    );
+    if (aRows.length > 0) {
+      relAmenities = aRows.map((r) => r.name);
+    }
+  } catch (e) {}
+
+  const finalAmenities = relAmenities.length > 0
+    ? relAmenities
+    : (row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : []);
+
   return {
     id: row.id,
     boardingHouseId: row.boarding_house_id,
@@ -90,7 +111,7 @@ async function findRoomById(id) {
     longitude: row.longitude != null ? Number(row.longitude) : undefined,
     area: Number(row.area) || 20,
     floor: row.floor || 1,
-    amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : [],
+    amenities: finalAmenities,
     ownerName: row.owner_name || 'Chủ trọ',
     ownerEmail: row.owner_email || 'nam.owner@example.com',
     contact: row.owner_phone || '0905 888 999',
@@ -158,6 +179,10 @@ async function updateRoom(id, updates) {
   if (fields.length > 0) {
     values.push(id);
     await pool.query(`UPDATE rooms SET ${fields.join(', ')} WHERE id = ?`, values);
+  }
+
+  if (updates.amenities !== undefined) {
+    await syncRoomAmenities(id, updates.amenities).catch(() => {});
   }
 
 
@@ -272,7 +297,15 @@ async function listPublishedRooms(filters = {}) {
 
   const [rows] = await pool.query(query, values);
 
+  let allRelAmenities = [];
+  try {
+    const [raRows] = await pool.query('SELECT ra.room_id, a.name FROM room_amenities ra JOIN amenities a ON ra.amenity_id = a.id ORDER BY a.id ASC');
+    allRelAmenities = raRows;
+  } catch (e) { }
+
   return rows.map((row) => {
+    const roomAms = allRelAmenities.filter((a) => a.room_id === row.id).map((a) => a.name);
+    const itemAmenities = roomAms.length > 0 ? roomAms : (row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi', 'Nóng lạnh']);
 
     return {
       id: row.id,
@@ -291,7 +324,7 @@ async function listPublishedRooms(filters = {}) {
       longitude: row.longitude != null ? Number(row.longitude) : undefined,
       area: Number(row.area) || 20,
       floor: row.floor || 1,
-      amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi', 'Nóng lạnh'],
+      amenities: itemAmenities,
       ownerName: row.owner_name || 'Anh Nam',
       ownerEmail: row.owner_email || 'nam.owner@example.com',
       contact: row.owner_phone || '0905 888 999',

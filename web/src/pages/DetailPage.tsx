@@ -25,6 +25,11 @@ export default function DetailPage() {
   const contextRoom = rooms.find((r) => String(r.id) === String(id))
   const room = contextRoom || directRoom
 
+  // Luôn tự động cuộn lên đỉnh đầu trang khi mở bài đăng trọ
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [id])
+
   useEffect(() => {
     if (!contextRoom && id) {
       setIsDirectLoading(true)

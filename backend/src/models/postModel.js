@@ -1,4 +1,5 @@
 const { getPool } = require('../config/database');
+const { syncPostAmenities } = require('./amenityModel');
 
 async function ensurePostsTable() {
   const pool = await getPool();
@@ -189,6 +190,10 @@ async function createPost({
     }
   }
 
+  if (amenities) {
+    await syncPostAmenities(postId, amenities).catch(() => {});
+  }
+
   return await findPostById(postId);
 }
 
@@ -224,6 +229,22 @@ async function findPostById(id) {
 
   const images = imgRows.length > 0 ? imgRows.map((r) => r.image_url) : defaultImages;
 
+  // Lấy tiện ích trực tiếp từ bảng quan hệ chuẩn hóa post_amenities
+  let relAmenities = [];
+  try {
+    const [aRows] = await pool.query(
+      'SELECT a.name FROM post_amenities pa JOIN amenities a ON pa.amenity_id = a.id WHERE pa.post_id = ? ORDER BY a.id ASC',
+      [id]
+    );
+    if (aRows.length > 0) {
+      relAmenities = aRows.map((r) => r.name);
+    }
+  } catch (e) {}
+
+  const finalAmenities = relAmenities.length > 0
+    ? relAmenities
+    : (row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi tốc độ cao', 'Điều hòa']);
+
   return {
     id: row.id,
     boardingHouseId: row.boarding_house_id,
@@ -237,7 +258,7 @@ async function findPostById(id) {
     district: row.district || '',
     latitude: row.latitude != null ? Number(row.latitude) : undefined,
     longitude: row.longitude != null ? Number(row.longitude) : undefined,
-    amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi', 'Nóng lạnh'],
+    amenities: finalAmenities,
     contact: row.contact_phone || row.owner_phone || '',
     contactPhone: row.contact_phone || row.owner_phone || '',
     contactName: row.contact_name || row.owner_name || 'Chủ trọ',
@@ -337,6 +358,12 @@ async function listPosts(filters = {}) {
     allImages = imgRows;
   } catch (e) { }
 
+  let allRelAmenities = [];
+  try {
+    const [paRows] = await pool.query('SELECT pa.post_id, a.name FROM post_amenities pa JOIN amenities a ON pa.amenity_id = a.id ORDER BY a.id ASC');
+    allRelAmenities = paRows;
+  } catch (e) { }
+
   const defaultImages = [
     'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800',
     'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
@@ -344,6 +371,8 @@ async function listPosts(filters = {}) {
 
   return rows.map((row) => {
     const postImgs = allImages.filter((img) => img.post_id === row.id).map((img) => img.image_url);
+    const postAms = allRelAmenities.filter((a) => a.post_id === row.id).map((a) => a.name);
+    const itemAmenities = postAms.length > 0 ? postAms : (row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi tốc độ cao', 'Điều hòa']);
 
     return {
       id: row.id,
@@ -358,7 +387,7 @@ async function listPosts(filters = {}) {
       district: row.district || '',
       latitude: row.latitude != null ? Number(row.latitude) : undefined,
       longitude: row.longitude != null ? Number(row.longitude) : undefined,
-      amenities: row.amenities ? row.amenities.split(',').map((s) => s.trim()).filter(Boolean) : ['Wifi', 'Nóng lạnh'],
+      amenities: itemAmenities,
       contact: row.contact_phone || row.owner_phone || '',
       contactPhone: row.contact_phone || row.owner_phone || '',
       contactName: row.contact_name || row.owner_name || 'Chủ trọ',
@@ -432,6 +461,10 @@ async function updatePost(id, updates) {
     } catch (e) {
       console.warn('Lỗi cập nhật ảnh bài đăng:', e.message);
     }
+  }
+
+  if (updates.amenities !== undefined) {
+    await syncPostAmenities(id, updates.amenities).catch(() => {});
   }
 
   return await findPostById(id);

@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTenants } from '../context/TenantContext'
 import { useRooms } from '../context/RoomContext'
 import { useAuth } from '../context/AuthContext'
-import type { Tenant, ContractStatus } from '../types/tenant'
+import type { Tenant, ContractStatus, Roommate } from '../types/tenant'
 import type { TabType } from '../components/BottomTabBar'
 
 interface TenantsScreenProps {
@@ -27,7 +27,16 @@ interface TenantsScreenProps {
 
 export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsScreenProps) {
   const { user } = useAuth()
-  const { tenants, addTenant, updateTenant, deleteTenant, updateContractStatus, refreshTenants } = useTenants()
+  const {
+    tenants,
+    addTenant,
+    updateTenant,
+    deleteTenant,
+    updateContractStatus,
+    refreshTenants,
+    addRoommate,
+    removeRoommate,
+  } = useTenants()
   const { rooms, getRoomsByOwner } = useRooms()
 
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -53,9 +62,18 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     }))
   }
 
+  // Roommate Modal State
+  const [isRoommateModalOpen, setIsRoommateModalOpen] = useState(false)
+  const [selectedTenantForRoommate, setSelectedTenantForRoommate] = useState<Tenant | null>(null)
+  const [rmName, setRmName] = useState('')
+  const [rmPhone, setRmPhone] = useState('')
+  const [rmIdCard, setRmIdCard] = useState('')
+  const [rmHometown, setRmHometown] = useState('')
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
+  const [isReRenting, setIsReRenting] = useState(false)
 
   // Form State
   const [formName, setFormName] = useState('')
@@ -129,14 +147,20 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     if (filterStatus !== 'all' && tenant.status !== filterStatus) {
       return false
     }
-    // Search query
+    // Search query: tên, sđt, phòng, cccd của khách đại diện HOẶC người ở cùng
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase()
       const matchName = tenant.name.toLowerCase().includes(q)
       const matchPhone = tenant.phone.includes(q)
       const matchRoom = tenant.roomNumber.toLowerCase().includes(q)
       const matchIdCard = tenant.idCard.includes(q)
-      if (!matchName && !matchPhone && !matchRoom && !matchIdCard) return false
+      const matchRoommate = (tenant.roommates || []).some((rm) =>
+        rm.name.toLowerCase().includes(q) ||
+        (rm.phone && rm.phone.includes(q)) ||
+        (rm.idCard && rm.idCard.includes(q)) ||
+        (rm.hometown && rm.hometown.toLowerCase().includes(q))
+      )
+      if (!matchName && !matchPhone && !matchRoom && !matchIdCard && !matchRoommate) return false
     }
     return true
   })
@@ -158,6 +182,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     }
 
     const firstAvailable = availableRooms[0]
+    setIsReRenting(false)
     setEditingTenant(null)
     setFormName('')
     setFormPhone('')
@@ -176,6 +201,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
 
   // Open Modal for Edit
   const handleOpenEditModal = (tenant: Tenant) => {
+    setIsReRenting(false)
     setEditingTenant(tenant)
     setFormName(tenant.name)
     setFormPhone(tenant.phone)
@@ -189,6 +215,47 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     setFormDeposit(String(tenant.deposit))
     setFormMonthlyRent(String(tenant.monthlyRent))
     setFormNotes(tenant.notes || '')
+    setIsModalOpen(true)
+  }
+
+  // Re-rent Tenant (Thuê lại phòng cho khách đã thanh lý)
+  const handleReRentTenant = (tenant: Tenant) => {
+    const availableRooms = myRooms.filter((r) => r.status === 'available')
+    if (availableRooms.length === 0) {
+      Alert.alert(
+        'Không có phòng trống',
+        'Tất cả các phòng hiện tại đều đang có khách thuê. Bạn cần có phòng còn trống trước khi cho khách này thuê lại!'
+      )
+      return
+    }
+
+    // Ưu tiên chọn lại phòng cũ nếu phòng cũ đang trống, nếu không chọn phòng trống đầu tiên
+    const oldRoomIsAvailable = availableRooms.find(
+      (r) => r.roomNumber.toLowerCase() === tenant.roomNumber.toLowerCase()
+    )
+    const selectedRoom = oldRoomIsAvailable || availableRooms[0]
+
+    const todayStr = new Date().toISOString().split('T')[0]
+    const nextYear = new Date()
+    nextYear.setFullYear(nextYear.getFullYear() + 1)
+    const nextYearStr = nextYear.toISOString().split('T')[0]
+
+    const rentPrice = String(selectedRoom ? selectedRoom.price : (tenant.monthlyRent || 2500000))
+
+    setIsReRenting(true)
+    setEditingTenant(tenant)
+    setFormName(tenant.name)
+    setFormPhone(tenant.phone)
+    setFormEmail(tenant.email || '')
+    setFormIdCard(tenant.idCard)
+    setFormHometown(tenant.hometown)
+    setFormJob(tenant.job || '')
+    setFormRoomNumber(selectedRoom.roomNumber)
+    setFormStartDate(todayStr)
+    setFormEndDate(nextYearStr)
+    setFormDeposit(rentPrice)
+    setFormMonthlyRent(rentPrice)
+    setFormNotes(tenant.notes ? `${tenant.notes} (Khách cũ thuê lại)` : 'Khách cũ thuê lại')
     setIsModalOpen(true)
   }
 
@@ -214,8 +281,8 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
 
     const matchedRoom = myRooms.find((r) => r.roomNumber.toLowerCase() === formRoomNumber.trim().toLowerCase())
     if (matchedRoom && matchedRoom.status === 'rented') {
-      const isCurrentTenantRoom = editingTenant && editingTenant.roomNumber.toLowerCase() === matchedRoom.roomNumber.toLowerCase()
-      if (!isCurrentTenantRoom) {
+      const isCurrentActiveTenantRoom = editingTenant && !isReRenting && editingTenant.status === 'active' && editingTenant.roomNumber.toLowerCase() === matchedRoom.roomNumber.toLowerCase()
+      if (!isCurrentActiveTenantRoom) {
         Alert.alert(
           'Phòng đang được thuê',
           `Phòng ${matchedRoom.roomNumber} hiện đang có khách thuê${matchedRoom.tenantName ? ` (${matchedRoom.tenantName})` : ''}. Bạn chỉ được chọn phòng còn trống để check-in!`
@@ -225,6 +292,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     }
 
     const rentAmount = matchedRoom ? Number(matchedRoom.price) : (Number(formMonthlyRent) || 2000000)
+    const newStatus: ContractStatus = isReRenting ? 'active' : (editingTenant ? editingTenant.status : 'active')
 
     const tenantPayload = {
       name: formName.trim(),
@@ -235,24 +303,32 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
       job: formJob.trim() || undefined,
       roomId: matchedRoom ? matchedRoom.id : `room_${formRoomNumber}`,
       roomNumber: formRoomNumber,
-      houseName: '',
+      houseName: matchedRoom?.houseName || editingTenant?.houseName || 'Nhà trọ',
       rentStartDate: formStartDate,
       rentEndDate: formEndDate,
       deposit: Number(formDeposit) || 0,
       monthlyRent: rentAmount,
-      status: (editingTenant ? editingTenant.status : 'active') as ContractStatus,
+      status: newStatus,
       notes: formNotes.trim() || undefined,
     }
 
     if (editingTenant) {
       updateTenant(editingTenant.id, tenantPayload)
-      Alert.alert('Thành công', 'Đã cập nhật thông tin khách thuê!')
+      if (isReRenting) {
+        Alert.alert(
+          'Thuê lại thành công',
+          `Khách ${formName} đã được nhận vào phòng ${formRoomNumber} thành công!`
+        )
+      } else {
+        Alert.alert('Thành công', 'Đã cập nhật thông tin khách thuê!')
+      }
     } else {
       addTenant(tenantPayload)
       Alert.alert('Thành công', 'Đã thêm khách thuê và hợp đồng mới thành công!')
     }
 
     setIsModalOpen(false)
+    setIsReRenting(false)
   }
 
   // Call Tenant
@@ -308,7 +384,58 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     )
   }
 
+  // Roommate Handlers
+  const handleOpenAddRoommate = (tenant: Tenant) => {
+    setSelectedTenantForRoommate(tenant)
+    setRmName('')
+    setRmPhone('')
+    setRmIdCard('')
+    setRmHometown('')
+    setIsRoommateModalOpen(true)
+  }
+
+  const handleSaveRoommate = async () => {
+    if (!selectedTenantForRoommate) return
+    if (!rmName.trim()) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập họ và tên của người ở cùng.')
+      return
+    }
+
+    try {
+      await addRoommate(selectedTenantForRoommate.id, {
+        name: rmName.trim(),
+        phone: rmPhone.trim() || undefined,
+        idCard: rmIdCard.trim() || undefined,
+        hometown: rmHometown.trim() || undefined,
+      })
+      setIsRoommateModalOpen(false)
+      Alert.alert('Đã lưu', `Đã thêm ${rmName.trim()} vào danh sách người ở phòng ${selectedTenantForRoommate.roomNumber}.`)
+    } catch {
+      Alert.alert('Lỗi', 'Không thể thêm người ở cùng. Vui lòng thử lại!')
+    }
+  }
+
+  const handleRemoveRoommate = (tenant: Tenant, roommate: Roommate) => {
+    Alert.alert(
+      'Xóa người ở cùng',
+      `Bạn có chắc muốn xóa thông tin của "${roommate.name}" khỏi phòng ${tenant.roomNumber}?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xác nhận xóa',
+          style: 'destructive',
+          onPress: async () => {
+            await removeRoommate(tenant.id, roommate.id)
+          },
+        },
+      ]
+    )
+  }
+
   const activeCount = tenants.filter((t) => t.status === 'active').length
+  const totalOccupants = tenants
+    .filter((t) => t.status === 'active')
+    .reduce((sum, t) => sum + 1 + (t.roommates?.length || 0), 0)
 
   return (
     <View style={styles.safeArea}>
@@ -319,7 +446,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
         <View style={styles.headerTextGroup}>
           <Text style={styles.headerTitle}>Khách thuê & Hợp đồng</Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {activeCount} khách đang thuê • {tenants.length} tổng hồ sơ
+            {activeCount} hợp đồng ({totalOccupants} người ở) • {tenants.length} tổng hồ sơ
           </Text>
         </View>
 
@@ -434,6 +561,16 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                           </Text>
                           <Text style={styles.dotSeparator}>•</Text>
                           <Text style={styles.phoneSubTag}>{item.phone}</Text>
+                          {isActive && (
+                            <>
+                              <Text style={styles.dotSeparator}>•</Text>
+                              <View style={styles.occupantPill}>
+                                <Text style={styles.occupantPillText}>
+                                  {1 + (item.roommates?.length || 0)} người
+                                </Text>
+                              </View>
+                            </>
+                          )}
                         </View>
                       </View>
                     </View>
@@ -493,6 +630,90 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                                 <Text style={styles.noteText}>📝 {item.notes}</Text>
                               </View>
                             ) : null}
+                          </View>
+
+                          {/* Người ở cùng (Roommates Section) */}
+                          <View style={styles.roommatesSection}>
+                            <View style={styles.roommatesHeaderRow}>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Text style={styles.roommatesTitle}>
+                                    Người ở cùng
+                                  </Text>
+                                  <View style={styles.roommateCountBadge}>
+                                    <Text style={styles.roommateCountBadgeText}>
+                                      {item.roommates?.length || 0}
+                                    </Text>
+                                  </View>
+                                </View>
+                                <Text style={styles.roommatesSubtitle}>
+                                  Khai báo tạm trú & đối chiếu CCCD
+                                </Text>
+                              </View>
+                              <TouchableOpacity
+                                style={styles.addRoommateBtn}
+                                onPress={() => handleOpenAddRoommate(item)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.addRoommateBtnText}>+ Thêm người</Text>
+                              </TouchableOpacity>
+                            </View>
+
+                            {(!item.roommates || item.roommates.length === 0) ? (
+                              <View style={styles.emptyRoommatesBox}>
+                                <Text style={styles.emptyRoommatesText}>
+                                  Phòng hiện chỉ có 1 khách đại diện ký hợp đồng. Bấm "+ Thêm người" để lưu thông tin người ở cùng/ở ghép.
+                                </Text>
+                              </View>
+                            ) : (
+                              <View style={styles.roommateList}>
+                                {item.roommates.map((rm) => (
+                                  <View key={rm.id} style={styles.roommateItem}>
+                                    <View style={styles.roommateAvatar}>
+                                      <Text style={styles.roommateAvatarText}>👤</Text>
+                                    </View>
+                                    <View style={styles.roommateDetails}>
+                                      <View style={styles.roommateNameRow}>
+                                        <Text style={styles.roommateNameText} numberOfLines={1}>
+                                          {rm.name}
+                                        </Text>
+                                        <TouchableOpacity
+                                          onPress={() => handleRemoveRoommate(item, rm)}
+                                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                          style={styles.roommateDeleteBtn}
+                                        >
+                                          <Text style={styles.roommateDeleteBtnText}>✕</Text>
+                                        </TouchableOpacity>
+                                      </View>
+
+                                      <View style={styles.roommateTagsRow}>
+                                        {rm.phone ? (
+                                          <TouchableOpacity
+                                            style={styles.roommateTagCall}
+                                            onPress={() => handleCallTenant(rm.phone!)}
+                                            activeOpacity={0.7}
+                                          >
+                                            <Text style={styles.roommateTagCallText}>📞 {rm.phone}</Text>
+                                          </TouchableOpacity>
+                                        ) : null}
+
+                                        {rm.idCard ? (
+                                          <View style={styles.roommateTag}>
+                                            <Text style={styles.roommateTagText}>CCCD: {rm.idCard}</Text>
+                                          </View>
+                                        ) : null}
+
+                                        {rm.hometown ? (
+                                          <View style={styles.roommateTag}>
+                                            <Text style={styles.roommateTagText}>Quê: {rm.hometown}</Text>
+                                          </View>
+                                        ) : null}
+                                      </View>
+                                    </View>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
                           </View>
 
                           {/* Action Buttons (Đã bỏ nút nhắn tin) */}
@@ -561,22 +782,32 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                             </View>
                           </View>
 
-                          <View style={styles.terminatedActionsRow}>
+                          <View style={styles.terminatedActionsContainer}>
                             <TouchableOpacity
-                              style={styles.actionCallBtn}
-                              onPress={() => handleCallTenant(item.phone)}
+                              style={styles.actionReRentBtn}
+                              onPress={() => handleReRentTenant(item)}
                               activeOpacity={0.8}
                             >
-                              <Text style={styles.actionCallBtnText}>📞 Gọi lại</Text>
+                              <Text style={styles.actionReRentBtnText}>🔄 Thuê lại phòng (Tái ký HĐ)</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity
-                              style={[styles.actionDeleteBtn, { flex: 2, marginLeft: 8 }]}
-                              onPress={() => handleDeleteTenant(item)}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.actionDeleteBtnText}>🗑️ Xóa vĩnh viễn hồ sơ</Text>
-                            </TouchableOpacity>
+                            <View style={styles.terminatedActionsRow}>
+                              <TouchableOpacity
+                                style={styles.actionCallBtn}
+                                onPress={() => handleCallTenant(item.phone)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.actionCallBtnText}>📞 Gọi lại</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.actionDeleteBtn, { flex: 1.6, marginLeft: 8 }]}
+                                onPress={() => handleDeleteTenant(item)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.actionDeleteBtnText}>🗑️ Xóa hồ sơ</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </>
                       )}
@@ -595,7 +826,11 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingTenant ? 'Chỉnh sửa thông tin khách thuê' : 'Thêm khách thuê & Hợp đồng mới'}
+                {isReRenting
+                  ? 'Tái ký hợp đồng & Thuê lại phòng'
+                  : editingTenant
+                    ? 'Chỉnh sửa thông tin khách thuê'
+                    : 'Thêm khách thuê & Hợp đồng mới'}
               </Text>
               <TouchableOpacity onPress={() => setIsModalOpen(false)}>
                 <Text style={styles.modalCloseText}>✕</Text>
@@ -687,9 +922,9 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
                 {myRooms.map((r) => {
                   const isSelected = formRoomNumber.toLowerCase() === r.roomNumber.toLowerCase()
-                  const isCurrentTenantRoom = editingTenant && editingTenant.roomNumber.toLowerCase() === r.roomNumber.toLowerCase()
-                  const isRented = r.status === 'rented' && !isCurrentTenantRoom
-                  const isAvailable = r.status === 'available' || isCurrentTenantRoom
+                  const isCurrentActiveTenantRoom = editingTenant && !isReRenting && editingTenant.status === 'active' && editingTenant.roomNumber.toLowerCase() === r.roomNumber.toLowerCase()
+                  const isRented = r.status === 'rented' && !isCurrentActiveTenantRoom
+                  const isAvailable = r.status === 'available' || isCurrentActiveTenantRoom
 
                   return (
                     <TouchableOpacity
@@ -794,7 +1029,104 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleSaveTenant} activeOpacity={0.8}>
-                <Text style={styles.modalSubmitText}>{editingTenant ? 'Cập nhật' : 'Lưu hợp đồng'}</Text>
+                <Text style={styles.modalSubmitText}>
+                  {isReRenting ? 'Xác nhận thuê lại' : editingTenant ? 'Cập nhật' : 'Lưu hợp đồng'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Add Roommate Modal */}
+      <Modal
+        visible={isRoommateModalOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsRoommateModalOpen(false)}
+      >
+        <SafeAreaView style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.modalTitle}>Thêm người ở cùng</Text>
+                <Text style={styles.modalSubtitleRoommate} numberOfLines={1}>
+                  {selectedTenantForRoommate
+                    ? `Phòng ${selectedTenantForRoommate.roomNumber} • Đ/d: ${selectedTenantForRoommate.name}`
+                    : ''}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsRoommateModalOpen(false)}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalScroll}>
+              <View style={{ marginBottom: 10 }}>
+                <Text style={styles.fieldLabel}>Họ và tên người ở cùng (*)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="VD: Trần Văn B"
+                  value={rmName}
+                  onChangeText={setRmName}
+                />
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.fieldLabel}>Số điện thoại</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="VD: 0912 345 678"
+                    keyboardType="phone-pad"
+                    value={rmPhone}
+                    onChangeText={setRmPhone}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.fieldLabel}>Số CCCD / CMND</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="VD: 048201000123"
+                    keyboardType="number-pad"
+                    value={rmIdCard}
+                    onChangeText={setRmIdCard}
+                  />
+                </View>
+              </View>
+
+              <View style={{ marginBottom: 10 }}>
+                <Text style={styles.fieldLabel}>Quê quán (nếu có)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="VD: Quảng Trị, Huế, Đà Nẵng..."
+                  value={rmHometown}
+                  onChangeText={setRmHometown}
+                />
+              </View>
+
+              <View style={{ backgroundColor: '#eff6ff', borderRadius: 8, padding: 10, marginTop: 4, borderWidth: 1, borderColor: '#bfdbfe' }}>
+                <Text style={{ fontSize: 11, color: '#1e40af', lineHeight: 16 }}>
+                  💡 Thông tin người ở cùng được lưu vào cơ sở dữ liệu riêng, phục vụ khai báo tạm trú chính xác theo quy định.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsRoommateModalOpen(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelText}>Hủy bỏ</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalSubmitBtn}
+                onPress={handleSaveRoommate}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalSubmitText}>Lưu người ở</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1207,6 +1539,27 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontWeight: '700',
   },
+  terminatedActionsContainer: {
+    marginTop: 4,
+  },
+  actionReRentBtn: {
+    backgroundColor: '#10b981',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  actionReRentBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   terminatedActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1341,5 +1694,164 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  occupantPill: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  occupantPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1d4ed8',
+  },
+  roommatesSection: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  roommatesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  roommatesTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  roommateCountBadge: {
+    backgroundColor: '#2563eb',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  roommateCountBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  roommatesSubtitle: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 1,
+  },
+  addRoommateBtn: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#2563eb',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  addRoommateBtnText: {
+    color: '#2563eb',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  emptyRoommatesBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+  },
+  emptyRoommatesText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  roommateList: {
+    gap: 8,
+  },
+  roommateItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  roommateAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  roommateAvatarText: {
+    fontSize: 14,
+  },
+  roommateDetails: {
+    flex: 1,
+  },
+  roommateNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  roommateNameText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+    flex: 1,
+  },
+  roommateDeleteBtn: {
+    padding: 2,
+    marginLeft: 6,
+  },
+  roommateDeleteBtnText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '700',
+  },
+  roommateTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  roommateTag: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  roommateTagText: {
+    fontSize: 10,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  roommateTagCall: {
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  roommateTagCallText: {
+    fontSize: 10,
+    color: '#059669',
+    fontWeight: '600',
+  },
+  modalSubtitleRoommate: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
   },
 })

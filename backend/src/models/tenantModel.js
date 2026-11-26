@@ -20,6 +20,31 @@ async function ensureTenantsTable() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  // Tạo bảng quan hệ 1-N chuẩn RDBMS cho Người ở cùng (không lưu JSON)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tenant_roommates (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      tenant_id BIGINT NOT NULL,
+      name VARCHAR(100) NOT NULL,
+      phone VARCHAR(20) NULL,
+      id_card VARCHAR(50) NULL,
+      hometown VARCHAR(150) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_tenant_id (tenant_id)
+    )
+  `);
+
+  // Dọn dẹp cột JSON cũ nếu có trong bảng tenants để đồng bộ chuẩn quan hệ
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM tenants LIKE 'roommates'");
+    if (cols.length > 0) {
+      await pool.query('ALTER TABLE tenants DROP COLUMN roommates');
+    }
+  } catch (err) {
+    // Bỏ qua nếu không có quyền drop
+  }
 }
 
 async function createTenant({
@@ -33,6 +58,7 @@ async function createTenant({
   job,
   emergencyContact,
   note,
+  roommates = [],
   roomId,
   roomNumber,
   rentStartDate,
@@ -42,6 +68,7 @@ async function createTenant({
 }) {
   await ensureTenantsTable();
   const pool = await getPool();
+
   const [result] = await pool.query(
     `INSERT INTO tenants (landlord_id, full_name, email, phone, id_card, identity_number, hometown, job, emergency_contact, note)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -60,6 +87,19 @@ async function createTenant({
   );
 
   const tenantId = result.insertId;
+
+  // Lưu danh sách người ở cùng vào bảng quan hệ riêng tenant_roommates
+  if (Array.isArray(roommates) && roommates.length > 0) {
+    for (const rm of roommates) {
+      if (rm && rm.name) {
+        await pool.query(
+          `INSERT INTO tenant_roommates (tenant_id, name, phone, id_card, hometown)
+           VALUES (?, ?, ?, ?, ?)`,
+          [tenantId, rm.name, rm.phone || null, rm.idCard || rm.id_card || null, rm.hometown || null]
+        );
+      }
+    }
+  }
 
   // Resolve target roomId if provided
   let targetRoomId = null;
@@ -133,7 +173,13 @@ async function findTenantById(id) {
     [id]
   );
   if (rows.length === 0) return null;
-  return formatTenantRow(rows[0]);
+  const tenant = formatTenantRow(rows[0]);
+  const [roommates] = await pool.query(
+    'SELECT * FROM tenant_roommates WHERE tenant_id = ? ORDER BY id ASC',
+    [id]
+  );
+  tenant.roommates = roommates.map(formatRoommateRow);
+  return tenant;
 }
 
 async function listTenants(filters = {}) {
@@ -172,7 +218,27 @@ async function listTenants(filters = {}) {
 
   query += ' ORDER BY t.id ASC';
   const [rows] = await pool.query(query, values);
-  return rows.map(formatTenantRow);
+  const tenants = rows.map(formatTenantRow);
+
+  if (tenants.length > 0) {
+    const tenantIds = tenants.map((t) => Number(t.id));
+    const [roommateRows] = await pool.query(
+      'SELECT * FROM tenant_roommates WHERE tenant_id IN (?) ORDER BY id ASC',
+      [tenantIds]
+    );
+    const map = new Map();
+    for (const rm of roommateRows) {
+      const key = String(rm.tenant_id);
+      const arr = map.get(key) || [];
+      arr.push(formatRoommateRow(rm));
+      map.set(key, arr);
+    }
+    for (const t of tenants) {
+      t.roommates = map.get(t.id) || [];
+    }
+  }
+
+  return tenants;
 }
 
 function parseRoomNumber(title, roomId) {
@@ -201,6 +267,16 @@ function parseRoomNumber(title, roomId) {
   return roomId ? `P.${roomId}` : t.slice(0, 15);
 }
 
+function formatRoommateRow(row) {
+  return {
+    id: String(row.id),
+    name: row.name,
+    phone: row.phone || '',
+    idCard: row.id_card || '',
+    hometown: row.hometown || '',
+  };
+}
+
 function formatTenantRow(row) {
   const roomNum = parseRoomNumber(row.room_title, row.room_id);
 
@@ -226,6 +302,7 @@ function formatTenantRow(row) {
     monthlyRent: Number(row.rent_amount) || Number(row.room_price) || 2500000,
     status: row.contract_status === 'active' ? 'active' : (row.contract_status === 'expired' ? 'expired' : 'terminated'),
     notes: row.note || '',
+    roommates: [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -233,6 +310,7 @@ function formatTenantRow(row) {
 
 async function updateTenant(id, updates) {
   await ensureTenantsTable();
+  const pool = await getPool();
   const fields = [];
   const values = [];
 
@@ -265,10 +343,23 @@ async function updateTenant(id, updates) {
     values.push(updates.note || updates.notes);
   }
 
-  const pool = await getPool();
   if (fields.length > 0) {
     values.push(id);
     await pool.query(`UPDATE tenants SET ${fields.join(', ')} WHERE id = ?`, values);
+  }
+
+  // Đồng bộ danh sách người ở cùng vào bảng quan hệ riêng tenant_roommates
+  if (updates.roommates !== undefined && Array.isArray(updates.roommates)) {
+    await pool.query('DELETE FROM tenant_roommates WHERE tenant_id = ?', [id]);
+    for (const rm of updates.roommates) {
+      if (rm && rm.name) {
+        await pool.query(
+          `INSERT INTO tenant_roommates (tenant_id, name, phone, id_card, hometown)
+           VALUES (?, ?, ?, ?, ?)`,
+          [id, rm.name, rm.phone || null, rm.idCard || rm.id_card || null, rm.hometown || null]
+        );
+      }
+    }
   }
 
   // Handle room reassignment if roomId or roomNumber provided
@@ -298,17 +389,31 @@ async function updateTenant(id, updates) {
       }
 
       const contractNum = `HD-${new Date().getFullYear()}-${targetRoomId}`;
+      const startDate = updates.rentStartDate || new Date().toISOString().split('T')[0];
+      const endDate = updates.rentEndDate || '2027-12-31';
+      const depAmt = Number(updates.deposit) || Number(updates.monthlyRent) || 2500000;
+      const rentAmt = Number(updates.monthlyRent) || Number(updates.deposit) || 2500000;
+
       await pool.query(
         `INSERT INTO contracts (contract_number, landlord_id, tenant_id, room_id, start_date, end_date, deposit_amount, rent_amount, status)
-         VALUES (?, 1, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR), 2500000, 2500000, 'active')`,
-        [contractNum, id, targetRoomId]
+         VALUES (?, 1, ?, ?, ?, ?, ?, ?, 'active')`,
+        [contractNum, id, targetRoomId, startDate, endDate, depAmt, rentAmt]
       );
       await pool.query("UPDATE rooms SET status = 'rented' WHERE id = ?", [targetRoomId]);
     }
   }
 
+  if (updates.status === 'active') {
+    await pool.query("UPDATE contracts SET status = 'active' WHERE tenant_id = ? ORDER BY id DESC LIMIT 1", [id]);
+  }
+
   if (updates.status === 'terminated' || updates.status === 'expired' || updates.status === 'cancelled') {
-    const [contracts] = await pool.query('SELECT room_id FROM contracts WHERE tenant_id = ?', [id]);
+    try {
+    await pool.query('DELETE FROM tenant_roommates WHERE tenant_id = ?', [id]);
+  } catch (e) {
+    // ignore
+  }
+  const [contracts] = await pool.query('SELECT room_id FROM contracts WHERE tenant_id = ?', [id]);
     await pool.query("UPDATE contracts SET status = 'cancelled' WHERE tenant_id = ?", [id]);
     for (const c of contracts) {
       if (c.room_id) {
@@ -332,6 +437,11 @@ async function deleteTenant(id) {
     await pool.query('DELETE FROM utility_bills WHERE tenant_id = ?', [id]);
   } catch (e) {
     // ignore if utility_bills does not exist or empty
+  }
+  try {
+    await pool.query('DELETE FROM tenant_roommates WHERE tenant_id = ?', [id]);
+  } catch (e) {
+    // ignore
   }
   const [contracts] = await pool.query('SELECT room_id FROM contracts WHERE tenant_id = ?', [id]);
   await pool.query('DELETE FROM contracts WHERE tenant_id = ?', [id]);

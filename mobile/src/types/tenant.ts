@@ -1,5 +1,13 @@
 export type ContractStatus = 'active' | 'expired' | 'pending' | 'terminated'
 
+export interface Roommate {
+  id: string
+  name: string
+  phone?: string
+  idCard?: string // CCCD / CMND
+  hometown?: string
+}
+
 export interface Tenant {
   id: string
   name: string
@@ -19,6 +27,7 @@ export interface Tenant {
   status: ContractStatus
   contractNumber: string
   notes?: string
+  roommates?: Roommate[]
 }
 
 export interface ContractItem {

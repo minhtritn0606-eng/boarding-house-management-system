@@ -33,6 +33,7 @@ async function createTenantHandler(req, res) {
       rentEndDate,
       deposit,
       monthlyRent,
+      roommates,
     } = req.body;
 
     const tenantName = fullName || name;
@@ -57,6 +58,7 @@ async function createTenantHandler(req, res) {
       rentEndDate,
       deposit,
       monthlyRent,
+      roommates,
     });
 
     return res.status(201).json({ message: 'Tenant added successfully', tenant });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Svg, { G, Circle } from 'react-native-svg'
 import { useAuth } from '../context/AuthContext'
 import { useRooms } from '../context/RoomContext'
 import { useTenants } from '../context/TenantContext'
@@ -32,7 +33,115 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
   const rentedRooms = myRooms.filter((r) => r.status === 'rented').length
   const availableRooms = myRooms.filter((r) => r.status === 'available').length
   const activeTenants = tenants.filter((t) => t.status === 'active').length
+  const totalOccupants = tenants
+    .filter((t) => t.status === 'active')
+    .reduce((sum, t) => sum + 1 + (t.roommates?.length || 0), 0)
   const unpaidBillsCount = bills.filter((b) => b.status === 'unpaid' || b.status === 'overdue').length
+
+  // Thống kê chuyên sâu về nhà trọ
+  const occupancyRate = totalRooms > 0 ? Math.round((rentedRooms / totalRooms) * 100) : 0
+
+  const potentialRevenue = useMemo(() => {
+    return myRooms.reduce((sum, r) => sum + (Number(r.price) || 0), 0)
+  }, [myRooms])
+
+  const currentRentalRevenue = useMemo(() => {
+    return myRooms
+      .filter((r) => r.status === 'rented')
+      .reduce((sum, r) => sum + (Number(r.price) || 0), 0)
+  }, [myRooms])
+
+  const avgRoomPrice = totalRooms > 0 ? Math.round(potentialRevenue / totalRooms) : 0
+
+  const roomTypeStats = useMemo(() => {
+    const privateRooms = myRooms.filter((r) => r.roomType === 'private').length
+    const sharedRooms = myRooms.filter((r) => r.roomType === 'shared').length
+    const studioRooms = myRooms.filter((r) => r.roomType === 'studio').length
+    return [
+      { key: 'private', label: 'Khép kín', count: privateRooms },
+      { key: 'shared', label: 'Ở ghép', count: sharedRooms },
+      { key: 'studio', label: 'Studio', count: studioRooms },
+    ]
+  }, [myRooms])
+
+  const donutSlices = useMemo(() => {
+    if (totalRooms === 0) return []
+    const R = 44
+    const C = 2 * Math.PI * R
+    let accumulatedAngle = 0
+    const colors = ['#2563eb', '#8b5cf6', '#f97316']
+
+    return roomTypeStats
+      .filter((item) => item.count > 0)
+      .map((item, idx) => {
+        const pct = item.count / totalRooms
+        const strokeDasharray = `${pct * C} ${C}`
+        const strokeDashoffset = -accumulatedAngle * C
+        accumulatedAngle += pct
+        return {
+          ...item,
+          color: colors[idx % colors.length],
+          strokeDasharray,
+          strokeDashoffset,
+          percentage: Math.round(pct * 100),
+        }
+      })
+  }, [roomTypeStats, totalRooms])
+
+  const floorStats = useMemo(() => {
+    const map = new Map<number, { total: number; rented: number; available: number }>()
+    myRooms.forEach((r) => {
+      const f = Number(r.floor) || 1
+      const cur = map.get(f) || { total: 0, rented: 0, available: 0 }
+      cur.total += 1
+      if (r.status === 'rented') cur.rented += 1
+      else cur.available += 1
+      map.set(f, cur)
+    })
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([floor, data]) => ({ floor, ...data }))
+  }, [myRooms])
+
+  const formatShortMillions = (num: number) => {
+    if (!num || num === 0) return '0'
+    const inMillions = num / 1000000
+    if (inMillions >= 1) {
+      return inMillions % 1 === 0 ? `${inMillions}tr` : `${inMillions.toFixed(1)}tr`
+    }
+    return `${Math.round(num / 1000)}k`
+  }
+
+  // 6 tháng gần nhất cho biểu đồ cột doanh thu
+  const monthlyRevenueData = useMemo(() => {
+    const now = new Date()
+    const result = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const m = d.getMonth() + 1
+      const y = d.getFullYear()
+      const monthBills = bills.filter((b) => Number(b.month) === m && Number(b.year) === y)
+      const paid = monthBills.filter((b) => b.status === 'paid').reduce((s, b) => s + (b.totalAmount || 0), 0)
+      const unpaid = monthBills.filter((b) => b.status !== 'paid').reduce((s, b) => s + (b.totalAmount || 0), 0)
+      const total = paid + unpaid
+      result.push({
+        label: `T${m}`,
+        fullLabel: `Tháng ${m}/${y}`,
+        month: m,
+        year: y,
+        paid,
+        unpaid,
+        total: total > 0 ? total : (i === 0 ? currentRentalRevenue : 0),
+        isCurrent: i === 0,
+      })
+    }
+    return result
+  }, [bills, currentRentalRevenue])
+
+  const maxMonthlyRevenue = useMemo(() => {
+    const maxVal = Math.max(...monthlyRevenueData.map((d) => d.total), 1)
+    return maxVal > 0 ? maxVal : 5000000
+  }, [monthlyRevenueData])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -117,8 +226,10 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
               onPress={() => onNavigateTab && onNavigateTab('tenants')}
               activeOpacity={0.8}
             >
-              <Text style={[styles.statValue, { color: '#2563eb' }]}>{activeTenants}</Text>
-              <Text style={styles.statLabel}>Khách đang thuê</Text>
+              <Text style={[styles.statValue, { color: '#2563eb' }]}>{totalOccupants}</Text>
+              <Text style={styles.statLabel}>
+                {totalOccupants > activeTenants ? `Người ở (${activeTenants} HĐ)` : 'Khách đang thuê'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -150,69 +261,279 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
+        {/* Boarding House Detailed Statistics & Visual Charts */}
+        <View style={styles.analyticsSection}>
+          <Text style={styles.sectionTitle}>Chỉ số khai thác & Biểu đồ trực quan</Text>
 
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => onNavigateTab && onNavigateTab('appointments')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: '#f1f5f9' }]}>
-              <Text style={styles.actionIconText}>◷</Text>
+          {/* Biểu đồ 1: Biểu đồ cột Doanh thu 6 tháng gần nhất */}
+          <View style={styles.analyticsCard}>
+            <View style={styles.revenueChartHeader}>
+              <Text style={styles.analyticsCardTitle}>Biểu đồ doanh thu 6 tháng</Text>
+              <View style={styles.revenueLegendRow}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#2563eb' }]} />
+                  <Text style={styles.legendText}>Đã thu</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#f87171' }]} />
+                  <Text style={styles.legendText}>Chưa thu</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Lịch hẹn xem phòng</Text>
-              <Text style={styles.actionDesc}>Duyệt yêu cầu hẹn, gọi điện thoại & nhắn Zalo cho khách</Text>
-            </View>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => onNavigateTab && onNavigateTab('rooms', { action: 'addRoom' })}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: '#f1f5f9' }]}>
-              <Text style={styles.actionIconText}>+</Text>
-            </View>
-            <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Thêm phòng trọ mới</Text>
-              <Text style={styles.actionDesc}>Tạo phòng, thiết lập giá thuê, diện tích & tiện ích</Text>
-            </View>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
+            {/* Bar Chart Container */}
+            <View style={styles.chartContainer}>
+              {/* Background Reference Lines */}
+              <View style={styles.chartGridLines}>
+                <View style={styles.chartGridLine} />
+                <View style={styles.chartGridLine} />
+                <View style={styles.chartGridLine} />
+              </View>
 
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => onNavigateTab && onNavigateTab('tenants', { action: 'checkin' })}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: '#f1f5f9' }]}>
-              <Text style={styles.actionIconText}>◎</Text>
-            </View>
-            <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Tiếp nhận khách thuê (Check-in)</Text>
-              <Text style={styles.actionDesc}>Lập hợp đồng vào phòng trống, đồng bộ trạng thái</Text>
-            </View>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
+              {/* Bars Row */}
+              <View style={styles.chartBarsRow}>
+                {monthlyRevenueData.map((item, idx) => {
+                  const isZero = !item.total || item.total <= 0
+                  const barHeightPercent = isZero
+                    ? 0
+                    : Math.max(8, Math.min(100, Math.round((item.total / maxMonthlyRevenue) * 100)))
 
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => onNavigateTab && onNavigateTab('bills', { action: 'createBill' })}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: '#f1f5f9' }]}>
-              <Text style={styles.actionIconText}>◇</Text>
+                  const paidRatio = item.total > 0 ? item.paid / item.total : 1
+                  const unpaidRatio = item.total > 0 ? item.unpaid / item.total : 0
+
+                  return (
+                    <View key={`${item.month}-${idx}`} style={styles.chartBarCol}>
+                      {/* Amount on Top */}
+                      <Text
+                        style={[
+                          styles.barTopAmount,
+                          isZero && styles.barTopAmountZero,
+                          item.isCurrent && !isZero && styles.barTopAmountActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {isZero ? '0' : formatShortMillions(item.total)}
+                      </Text>
+
+                      {/* Bar Track & Fill */}
+                      <View style={styles.barTrack}>
+                        {/* Background track line */}
+                        <View style={styles.barTrackBg} />
+
+                        {/* Seamless Stacked Bar */}
+                        {!isZero && (
+                          <View style={[styles.barFillContainer, { height: `${barHeightPercent}%` }]}>
+                            {/* Unpaid on top (if any) */}
+                            {item.unpaid > 0 && (
+                              <View style={[styles.barPartUnpaid, { flex: unpaidRatio }]} />
+                            )}
+                            {/* Paid on bottom (if any) */}
+                            {item.paid > 0 && (
+                              <View
+                                style={[
+                                  styles.barPartPaid,
+                                  { flex: paidRatio },
+                                  item.isCurrent && styles.barPartPaidCurrent,
+                                ]}
+                              />
+                            )}
+                          </View>
+                        )}
+
+                        {/* If zero: subtle 2px baseline */}
+                        {isZero && <View style={styles.barZeroBaseline} />}
+                      </View>
+
+                      {/* Month Label */}
+                      <View style={[styles.monthLabelPill, item.isCurrent && styles.monthLabelPillActive]}>
+                        <Text style={[styles.monthLabelText, item.isCurrent && styles.monthLabelTextActive]}>
+                          {item.label}
+                        </Text>
+                      </View>
+                    </View>
+                  )
+                })}
+              </View>
             </View>
-            <View style={styles.actionInfo}>
-              <Text style={styles.actionTitle}>Ghi chỉ số & Lập hóa đơn</Text>
-              <Text style={styles.actionDesc}>Tính tiền điện nước tự động & gửi bill qua Zalo</Text>
+          </View>
+
+          {/* Biểu đồ 2: Tỷ lệ lấp đầy & Thanh tiến trình xếp chồng theo tầng */}
+          <View style={styles.analyticsCard}>
+            <View style={styles.analyticsCardHeader}>
+              <View>
+                <Text style={styles.analyticsCardTitle}>Tỷ lệ lấp đầy phòng</Text>
+                <Text style={styles.analyticsCardSubtitle}>
+                  Đã cho thuê {rentedRooms}/{totalRooms} phòng
+                </Text>
+              </View>
+              <View style={styles.rateBadge}>
+                <Text style={styles.rateBadgeText}>{occupancyRate}%</Text>
+              </View>
             </View>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
+
+            {/* Overall Progress Bar */}
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${occupancyRate}%` },
+                ]}
+              />
+            </View>
+
+            {/* Breakdown Indicators */}
+            <View style={styles.breakdownRow}>
+              <View style={styles.breakdownItem}>
+                <View style={[styles.dot, { backgroundColor: '#10b981' }]} />
+                <Text style={styles.breakdownLabel}>Đang thuê:</Text>
+                <Text style={styles.breakdownValue}>{rentedRooms} phòng</Text>
+              </View>
+              <View style={styles.breakdownItem}>
+                <View style={[styles.dot, { backgroundColor: '#f59e0b' }]} />
+                <Text style={styles.breakdownLabel}>Còn trống:</Text>
+                <Text style={styles.breakdownValue}>{availableRooms} phòng </Text>
+              </View>
+            </View>
+
+            {/* Biểu đồ xếp chồng theo tầng */}
+            {floorStats.length > 0 && (
+              <View style={styles.floorStackSection}>
+                <View style={styles.chartHeaderWithLegend}>
+                  <Text style={styles.subChartTitle}>Tiến độ lấp đầy theo tầng</Text>
+                  <View style={styles.chartLegendRow}>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
+                      <Text style={styles.legendText}>Thuê</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: '#fcd34d' }]} />
+                      <Text style={styles.legendText}>Trống</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.floorBarsContainer}>
+                  {floorStats.map((item) => {
+                    const floorOccupancy = item.total > 0 ? Math.round((item.rented / item.total) * 100) : 0
+                    return (
+                      <TouchableOpacity
+                        key={item.floor}
+                        style={styles.floorBarCard}
+                        onPress={() => onNavigateTab && onNavigateTab('rooms')}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.floorBarMetaRow}>
+                          <Text style={styles.floorBarTitle}>Tầng {item.floor}</Text>
+                          <Text style={styles.floorBarRatioText}>
+                            {item.rented}/{item.total} phòng ({floorOccupancy}%)
+                          </Text>
+                        </View>
+
+                        {/* Stacked Progress Bar */}
+                        <View style={styles.floorStackedTrack}>
+                          <View
+                            style={[
+                              styles.floorStackedRented,
+                              { width: `${floorOccupancy}%` },
+                            ]}
+                          />
+                          <View
+                            style={[
+                              styles.floorStackedAvailable,
+                              { width: `${100 - floorOccupancy}%` },
+                            ]}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Biểu đồ 3: Biểu đồ tròn cơ cấu loại phòng */}
+          <View style={styles.analyticsCard}>
+            <Text style={styles.analyticsCardTitle}>Cơ cấu loại phòng</Text>
+
+            <View style={styles.donutChartContainer}>
+              {/* Donut SVG */}
+              <View style={styles.donutSvgWrap}>
+                <Svg width={120} height={120} viewBox="0 0 120 120">
+                  <G rotation="-90" origin="60, 60">
+                    <Circle
+                      cx="60"
+                      cy="60"
+                      r="44"
+                      stroke="#f1f5f9"
+                      strokeWidth="16"
+                      fill="transparent"
+                    />
+                    {donutSlices.map((slice) => (
+                      <Circle
+                        key={slice.key}
+                        cx="60"
+                        cy="60"
+                        r="44"
+                        stroke={slice.color}
+                        strokeWidth="16"
+                        strokeDasharray={slice.strokeDasharray}
+                        strokeDashoffset={slice.strokeDashoffset}
+                        fill="transparent"
+                      />
+                    ))}
+                  </G>
+                </Svg>
+                {/* Center text inside donut hole */}
+                <View style={styles.donutCenterLabel}>
+                  <Text style={styles.donutCenterValue}>{totalRooms}</Text>
+                  <Text style={styles.donutCenterSub}>phòng</Text>
+                </View>
+              </View>
+
+              {/* Legend & Details Column */}
+              <View style={styles.donutLegendCol}>
+                {roomTypeStats.map((item, idx) => {
+                  const colors = ['#2563eb', '#8b5cf6', '#f97316']
+                  const pct = totalRooms > 0 ? Math.round((item.count / totalRooms) * 100) : 0
+                  return (
+                    <View key={item.key} style={styles.donutLegendRow}>
+                      <View style={[styles.donutLegendDot, { backgroundColor: colors[idx % colors.length] }]} />
+                      <View style={styles.donutLegendMeta}>
+                        <Text style={styles.donutLegendName}>{item.label}</Text>
+                        <Text style={styles.donutLegendCount}>
+                          {item.count} phòng <Text style={styles.donutLegendPct}>({pct}%)</Text>
+                        </Text>
+                      </View>
+                    </View>
+                  )
+                })}
+              </View>
+            </View>
+          </View>
+
+          {/* Card 4: Ước tính doanh thu & Đơn giá */}
+          <View style={styles.analyticsCard}>
+            <Text style={styles.analyticsCardTitle}>Ước tính doanh thu & Đơn giá</Text>
+
+            <View style={styles.financeGrid}>
+              <View style={styles.financeItem}>
+                <Text style={styles.financeLabel}>Tiềm năng tối đa (100%)</Text>
+                <Text style={[styles.financeValue, { color: '#0f172a' }]}>{formatVND(potentialRevenue)}</Text>
+                <Text style={styles.financeSub}>Khi lấp đầy tất cả phòng</Text>
+              </View>
+              <View style={[styles.financeItem, { borderLeftWidth: 1, borderLeftColor: '#f1f5f9', paddingLeft: 12 }]}>
+                <Text style={styles.financeLabel}>Thực tế từ phòng đang thuê</Text>
+                <Text style={[styles.financeValue, { color: '#059669' }]}>{formatVND(currentRentalRevenue)}</Text>
+                <Text style={styles.financeSub}>Từ {rentedRooms} phòng hiện tại</Text>
+              </View>
+            </View>
+
+            <View style={styles.avgPriceRow}>
+              <Text style={styles.avgPriceLabel}>Giá thuê bình quân / phòng:</Text>
+              <Text style={styles.avgPriceValue}>{formatVND(avgRoomPrice)}/tháng</Text>
+            </View>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -427,17 +748,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  actionsSection: {
+  analyticsSection: {
     paddingHorizontal: 18,
     marginTop: 24,
-    gap: 10,
+    gap: 14,
   },
-  actionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  analyticsCard: {
     backgroundColor: '#ffffff',
-    padding: 14,
     borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
@@ -446,38 +765,417 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
-  actionIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  analyticsCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+    marginBottom: 12,
   },
-  actionIcon: {
-    fontSize: 20,
-  },
-  actionIconText: {
-    fontSize: 18,
-    color: '#0f172a',
-    fontWeight: '700',
-  },
-  actionInfo: {
-    flex: 1,
-  },
-  actionTitle: {
+  analyticsCardTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#0f172a',
   },
-  actionDesc: {
+  analyticsCardSubtitle: {
     fontSize: 12,
     color: '#64748b',
     marginTop: 2,
   },
-  actionArrow: {
+  rateBadge: {
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  rateBadgeText: {
+    color: '#059669',
     fontSize: 14,
+    fontWeight: '800',
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: '#fef3c7',
+    borderRadius: 999,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#10b981',
+    borderRadius: 999,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+  },
+  breakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  breakdownLabel: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  breakdownValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  financeGrid: {
+    flexDirection: 'row',
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  financeItem: {
+    flex: 1,
+  },
+  financeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  financeValue: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  financeSub: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  avgPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  avgPriceLabel: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  avgPriceValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  // Donut Chart Styles
+  donutChartContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  donutSvgWrap: {
+    width: 120,
+    height: 120,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donutCenterLabel: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donutCenterValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0f172a',
+    lineHeight: 24,
+  },
+  donutCenterSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  donutLegendCol: {
+    flex: 1,
+    paddingLeft: 20,
+    gap: 10,
+  },
+  donutLegendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  donutLegendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  donutLegendMeta: {
+    flex: 1,
+  },
+  donutLegendName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  donutLegendCount: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 1,
+    fontWeight: '500',
+  },
+  donutLegendPct: {
     color: '#2563eb',
     fontWeight: '700',
+  },
+
+  // Chart Styles
+  revenueChartHeader: {
+    marginBottom: 8,
+  },
+  revenueLegendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginTop: 6,
+  },
+  chartLegendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  chartContainer: {
+    height: 160,
+    marginTop: 10,
+    justifyContent: 'flex-end',
+    position: 'relative',
+  },
+  chartGridLines: {
+    position: 'absolute',
+    top: 10,
+    left: 0,
+    right: 0,
+    bottom: 24,
+    justifyContent: 'space-between',
+  },
+  chartGridLine: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+  },
+  chartBarsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: '100%',
+    paddingBottom: 2,
+    zIndex: 2,
+  },
+  chartBarCol: {
+    flex: 1,
+    alignItems: 'center',
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  barTopAmount: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  barTopAmountZero: {
+    color: '#cbd5e1',
+    fontWeight: '500',
+  },
+  barTopAmountActive: {
+    color: '#2563eb',
+    fontWeight: '800',
+  },
+  barTrack: {
+    width: 20,
+    height: 110,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  barTrackBg: {
+    position: 'absolute',
+    bottom: 0,
+    width: 12,
+    height: '100%',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 6,
+  },
+  barFillContainer: {
+    width: 12,
+    borderRadius: 6,
+    overflow: 'hidden',
+    flexDirection: 'column',
+    zIndex: 2,
+  },
+  barPartUnpaid: {
+    width: '100%',
+    backgroundColor: '#f87171',
+  },
+  barPartPaid: {
+    width: '100%',
+    backgroundColor: '#2563eb',
+  },
+  barPartPaidCurrent: {
+    backgroundColor: '#1d4ed8',
+  },
+  barZeroBaseline: {
+    width: 12,
+    height: 2,
+    backgroundColor: '#cbd5e1',
+    borderRadius: 1,
+    zIndex: 2,
+  },
+  monthLabelPill: {
+    marginTop: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  monthLabelPillActive: {
+    backgroundColor: '#eff6ff',
+  },
+  monthLabelText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  monthLabelTextActive: {
+    color: '#2563eb',
+    fontWeight: '800',
+  },
+  floorStackSection: {
+    marginTop: 18,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  subChartTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  chartHeaderWithLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  floorBarsContainer: {
+    gap: 10,
+  },
+  floorBarCard: {
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  floorBarMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  floorBarTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  floorBarRatioText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  floorStackedTrack: {
+    height: 8,
+    backgroundColor: '#fef3c7',
+    borderRadius: 999,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  floorStackedRented: {
+    height: '100%',
+    backgroundColor: '#10b981',
+  },
+  floorStackedAvailable: {
+    height: '100%',
+    backgroundColor: '#fde68a',
+  },
+  floorList: {
+    marginTop: 8,
+    gap: 6,
+  },
+  floorItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  floorItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  floorBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  floorCountSub: {
+    fontSize: 11,
+    color: '#64748b',
+  },
+  floorItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  floorRentedBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  floorAvailBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#d97706',
+  },
+  floorFullBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563eb',
   },
 })

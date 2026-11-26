@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import type { Tenant, ContractStatus } from '../types/tenant'
+import type { Tenant, ContractStatus, Roommate } from '../types/tenant'
 import { mobileTenantApi } from '../services/api'
 import { useAuth } from './AuthContext'
 import { useRooms, parseRoomNumber } from './RoomContext'
@@ -13,6 +13,8 @@ interface TenantContextType {
   deleteTenant: (id: string) => Promise<void>
   updateContractStatus: (id: string, status: ContractStatus) => Promise<void>
   getTenantsByHouse: (houseName?: string) => Tenant[]
+  addRoommate: (tenantId: string, roommate: Omit<Roommate, 'id'>) => Promise<void>
+  removeRoommate: (tenantId: string, roommateId: string) => Promise<void>
 }
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined)
@@ -60,6 +62,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
               ? 'terminated'
               : (t.status === 'expired' ? 'expired' : (t.status || 'active')),
             notes: t.notes || t.note || '',
+            roommates: Array.isArray(t.roommates) ? t.roommates : [],
           }
         })
         setTenants(mapped)
@@ -106,6 +109,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         rentEndDate: tenantData.rentEndDate,
         deposit: tenantData.deposit,
         monthlyRent: tenantData.monthlyRent,
+        roommates: tenantData.roommates || [],
       })
       if (res && res.tenant) {
         setTenants((prev) => [res.tenant, ...prev])
@@ -118,6 +122,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     const nextSeq = tenants.length + 1
     const newTenant: Tenant = {
       ...tenantData,
+      roommates: tenantData.roommates || [],
       id: `tenant_${Date.now()}`,
       contractNumber: `HD-2026-${String(nextSeq).padStart(3, '0')}`,
     }
@@ -125,9 +130,19 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   }
 
   const updateTenant = async (id: string, updatedData: Partial<Tenant>) => {
+    const target = tenants.find((t) => t.id === id)
     setTenants((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updatedData } : item))
     )
+
+    // Nếu chuyển sang active và có phòng (ví dụ: thuê lại phòng), tự động xếp khách vào phòng
+    if (updatedData.status === 'active' && updatedData.roomNumber) {
+      const roomNum = updatedData.roomNumber
+      const hName = updatedData.houseName || target?.houseName || 'Nhà trọ'
+      const tName = updatedData.name || target?.name || 'Khách thuê'
+      const tPhone = updatedData.phone || target?.phone || ''
+      await occupyRoom(roomNum, hName, tName, tPhone)
+    }
 
     try {
       await mobileTenantApi.updateTenant(id, {
@@ -141,10 +156,36 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         roomId: updatedData.roomId,
         roomNumber: updatedData.roomNumber,
         status: updatedData.status,
+        roommates: updatedData.roommates,
+        deposit: updatedData.deposit,
+        monthlyRent: updatedData.monthlyRent,
+        rentStartDate: updatedData.rentStartDate,
+        rentEndDate: updatedData.rentEndDate,
       })
     } catch (e: any) {
       console.log('Mobile update tenant error:', e.message)
     }
+  }
+
+  const addRoommate = async (tenantId: string, roommateData: Omit<Roommate, 'id'>) => {
+    const target = tenants.find((t) => t.id === tenantId)
+    if (!target) return
+
+    const newRoommate: Roommate = {
+      ...roommateData,
+      id: `rm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    }
+
+    const updatedRoommates = [...(target.roommates || []), newRoommate]
+    await updateTenant(tenantId, { roommates: updatedRoommates })
+  }
+
+  const removeRoommate = async (tenantId: string, roommateId: string) => {
+    const target = tenants.find((t) => t.id === tenantId)
+    if (!target) return
+
+    const updatedRoommates = (target.roommates || []).filter((r) => r.id !== roommateId)
+    await updateTenant(tenantId, { roommates: updatedRoommates })
   }
 
   const deleteTenant = async (id: string) => {
@@ -195,6 +236,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         deleteTenant,
         updateContractStatus,
         getTenantsByHouse,
+        addRoommate,
+        removeRoommate,
       }}
     >
       {children}

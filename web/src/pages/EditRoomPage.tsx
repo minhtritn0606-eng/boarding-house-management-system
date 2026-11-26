@@ -428,15 +428,31 @@ export default function EditRoomPage() {
                     : 'Đang chờ Admin duyệt (Chưa hiển thị công khai)'}
                 </div>
               ) : (
-                <select
+                <div
                   id="room-status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
-                  style={{ fontWeight: 600, color: status === 'available' ? '#059669' : '#dc2626' }}
+                  style={{
+                    padding: '9px 14px',
+                    borderRadius: '8px',
+                    background: status === 'available' ? '#f0fdf4' : '#fef2f2',
+                    color: status === 'available' ? '#166534' : '#991b1b',
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                    border: '1px solid ' + (status === 'available' ? '#bbf7d0' : '#fecaca'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
                 >
-                  <option value="available">Còn phòng (Đang nhận khách)</option>
-                  <option value="rented">Đã cho thuê (Hết phòng)</option>
-                </select>
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: status === 'available' ? '#22c55e' : '#ef4444',
+                    }}
+                  />
+                  {status === 'available' ? 'Còn trống (Đang nhận khách)' : 'Đang thuê'}
+                </div>
               )}
             </div>
 

@@ -463,15 +463,13 @@ export default function MyRoomsPage() {
                                 Bị từ chối
                               </span>
                             ) : (
-                              <button
-                                type="button"
+                              <span
                                 className={`status-toggle-btn ${isAvailable ? 'available' : 'rented'}`}
-                                onClick={() => handleToggleStatus(room.id, isAvailable)}
-                                title="Nhấn để đổi trạng thái"
+                                style={{ cursor: 'default' }}
                               >
                                 <span className="dot"></span>
                                 {isAvailable ? 'Còn phòng' : 'Đã thuê'}
-                              </button>
+                              </span>
                             )}
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>{room.postedDate || '—'}</td>

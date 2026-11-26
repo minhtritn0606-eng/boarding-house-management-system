@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   View,
   Text,
@@ -57,7 +57,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
     addRoom,
     updateRoom,
     deleteRoom,
-    toggleRoomStatus,
     togglePublishRoom,
     getRoomsByOwner,
     vacateRoom,
@@ -72,7 +71,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
       if (refreshRooms) {
         await refreshRooms()
       }
-    } catch {}
+    } catch { }
     setIsRefreshing(false)
   }
 
@@ -80,6 +79,16 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
 
   const [filterStatus, setFilterStatus] = useState<'all' | 'rented' | 'available'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [filterFloor, setFilterFloor] = useState<'all' | number>('all')
+  const [isFloorModalOpen, setIsFloorModalOpen] = useState(false)
+  const [expandedRoomIds, setExpandedRoomIds] = useState<Record<string, boolean>>({})
+
+  const toggleExpandRoom = (id: string) => {
+    setExpandedRoomIds((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }))
+  }
 
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -123,27 +132,44 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
   const [formArea, setFormArea] = useState('')
   const [formFloor, setFormFloor] = useState('1')
   const [formRoomType, setFormRoomType] = useState<RoomType>('private')
-  const [formStatus, setFormStatus] = useState<RoomStatus>('available')
   const [formAmenities, setFormAmenities] = useState<string[]>([])
   const [formNote, setFormNote] = useState('')
 
-  // Filter Logic
-  const filteredRooms = myRooms.filter((room) => {
-    // Status filter
-    if (filterStatus !== 'all' && room.status !== filterStatus) return false
-    // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      const matchNumber = room.roomNumber.toLowerCase().includes(q)
-      const matchTitle = room.title.toLowerCase().includes(q)
-      const matchTenant = (room.tenantName || '').toLowerCase().includes(q)
-      if (!matchNumber && !matchTitle && !matchTenant) return false
-    }
-    return true
-  })
+  // Floor Filter Logic
+  const availableFloors = useMemo(() => {
+    const floorSet = new Set<number>()
+    myRooms.forEach((r) => {
+      const f = Number(r.floor) || 1
+      floorSet.add(f)
+    })
+    const sorted = Array.from(floorSet).sort((a, b) => a - b)
+    return sorted.length > 0 ? sorted : [1]
+  }, [myRooms])
 
-  const rentedCount = myRooms.filter((r) => r.status === 'rented').length
-  const availableCount = myRooms.filter((r) => r.status === 'available').length
+  const roomsInScope = useMemo(() => {
+    if (filterFloor === 'all') return myRooms
+    return myRooms.filter((r) => (Number(r.floor) || 1) === filterFloor)
+  }, [myRooms, filterFloor])
+
+  // Filter Logic
+  const filteredRooms = useMemo(() => {
+    return roomsInScope.filter((room) => {
+      // Status filter
+      if (filterStatus !== 'all' && room.status !== filterStatus) return false
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matchNumber = room.roomNumber.toLowerCase().includes(q)
+        const matchTitle = room.title.toLowerCase().includes(q)
+        const matchTenant = (room.tenantName || '').toLowerCase().includes(q)
+        if (!matchNumber && !matchTitle && !matchTenant) return false
+      }
+      return true
+    })
+  }, [roomsInScope, filterStatus, searchQuery])
+
+  const rentedCount = roomsInScope.filter((r) => r.status === 'rented').length
+  const availableCount = roomsInScope.filter((r) => r.status === 'available').length
 
   const openAddModal = () => {
     setFormRoomNumber('')
@@ -152,7 +178,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
     setFormArea('')
     setFormFloor('1')
     setFormRoomType('private')
-    setFormStatus('available')
     setFormAmenities(['Wifi tốc độ cao', 'Nóng lạnh'])
     setFormNote('')
     setEditingRoom(null)
@@ -167,7 +192,6 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
     setFormArea(String(room.area))
     setFormFloor(String(room.floor || 1))
     setFormRoomType(room.roomType)
-    setFormStatus(room.status)
     setFormAmenities(room.amenities || [])
     setFormNote(room.note || '')
     setIsAddModalOpen(true)
@@ -199,7 +223,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
         area: areaNum,
         floor: floorNum,
         roomType: formRoomType,
-        status: formStatus,
+        status: editingRoom.status, // Giữ nguyên trạng thái thực tế của phòng, không đổi thủ công tại form
         amenities: formAmenities,
         note: formNote.trim(),
       })
@@ -242,7 +266,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
   return (
     <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Top App Header */}
       <View style={styles.topHeader}>
         <View style={styles.headerTextGroup}>
@@ -267,20 +291,42 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
           />
         }
       >
-        {/* Search Input */}
-        <View style={styles.searchBox}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm số phòng, tên phòng hoặc khách thuê..."
-            placeholderTextColor="#94a3b8"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={styles.clearSearchText}>✕</Text>
-            </TouchableOpacity>
-          ) : null}
+        {/* Search & Floor Filter */}
+        <View style={styles.searchRow}>
+          <View style={styles.searchBox}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm số phòng, tên phòng..."
+              placeholderTextColor="#94a3b8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Text style={styles.clearSearchText}>✕</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.floorFilterBtn,
+              filterFloor !== 'all' && styles.floorFilterBtnActive,
+            ]}
+            onPress={() => setIsFloorModalOpen(true)}
+            activeOpacity={0.7}
+            delayPressIn={0}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Text
+              style={[
+                styles.floorFilterBtnText,
+                filterFloor !== 'all' && styles.floorFilterBtnTextActive,
+              ]}
+            >
+              {filterFloor === 'all' ? 'Tất cả tầng ▾' : `Tầng ${filterFloor} ▾`}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Status Filter Tabs */}
@@ -290,7 +336,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
             onPress={() => setFilterStatus('all')}
           >
             <Text style={[styles.filterTabText, filterStatus === 'all' && styles.filterTabTextActive]}>
-              Tất cả ({myRooms.length})
+              Tất cả ({roomsInScope.length})
             </Text>
           </TouchableOpacity>
 
@@ -326,196 +372,334 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
         {/* Rooms List */}
         {filteredRooms.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyIcon}>🏢</Text>
-            <Text style={styles.emptyTitle}>Không tìm thấy phòng phù hợp</Text>
+            <Text style={styles.emptyTitle}>Không tìm thấy phòng</Text>
             <Text style={styles.emptyDesc}>
               Hãy thử thay đổi bộ lọc hoặc thêm phòng trọ mới vào hệ thống.
             </Text>
             <TouchableOpacity style={styles.emptyAddBtn} onPress={openAddModal}>
-              <Text style={styles.emptyAddBtnText}>➕ Thêm phòng ngay</Text>
+              <Text style={styles.emptyAddBtnText}> Thêm phòng ngay</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.roomList}>
             {filteredRooms.map((room, idx) => {
               const isAvailable = room.status === 'available'
+              const isExpanded = !!expandedRoomIds[room.id]
+              const roomTypeLabel =
+                room.roomType === 'studio'
+                  ? 'Studio'
+                  : room.roomType === 'shared'
+                    ? 'Ở ghép'
+                    : 'Khép kín'
+
               return (
-                <View key={`${room.id}-${idx}`} style={styles.roomCard}>
-                  {/* Card Header */}
-                  <View style={styles.cardHeader}>
-                    <View style={styles.roomBadgeRow}>
-                      <View style={styles.roomNumberPill}>
-                        <Text style={styles.roomNumberText}>{room.roomNumber}</Text>
+                <View
+                  key={`${room.id}-${idx}`}
+                  style={[styles.roomCard, isExpanded && styles.roomCardExpanded]}
+                >
+                  {/* Collapsible Header: Chạm để mở rộng / thu gọn */}
+                  <TouchableOpacity
+                    style={styles.cardHeaderTouchable}
+                    onPress={() => toggleExpandRoom(room.id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.cardHeader}>
+                      {/* Left: Số phòng & Thông tin phòng */}
+                      <View style={styles.roomHeaderLeft}>
+                        <View style={styles.roomNumberPill}>
+                          <Text style={styles.roomNumberText}>{room.roomNumber}</Text>
+                        </View>
+                        <View style={styles.roomMetaCol}>
+                          <Text style={styles.roomTitle} numberOfLines={1}>
+                            {room.title}
+                          </Text>
+                          <Text style={styles.roomSubInfo}>
+                            {roomTypeLabel} • {room.area}m² • Tầng {room.floor || 1}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={styles.houseTag}>
-                        {room.roomType === 'studio' ? 'Phòng Studio' : room.roomType === 'shared' ? 'Phòng ở ghép' : 'Phòng khép kín'}
-                      </Text>
-                    </View>
 
-                    {/* Status Toggle Button */}
-                    <TouchableOpacity
-                      style={[
-                        styles.statusToggleBtn,
-                        isAvailable ? styles.statusAvailable : styles.statusRented,
-                      ]}
-                      onPress={() => toggleRoomStatus(room.id)}
-                      activeOpacity={0.7}
-                    >
-                      <View
-                        style={[
-                          styles.statusDot,
-                          { backgroundColor: isAvailable ? '#f59e0b' : '#22c55e' },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.statusToggleText,
-                          { color: isAvailable ? '#92400e' : '#166534' },
-                        ]}
-                      >
-                        {isAvailable ? 'Còn trống' : 'Đang thuê'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Room Title */}
-                  <Text style={styles.roomTitle}>{room.title}</Text>
-
-                  {/* Key Metrics */}
-                  <View style={styles.metricRow}>
-                    <View style={styles.metricItem}>
-                      <Text style={styles.metricLabel}>Giá thuê</Text>
-                      <Text style={styles.metricPrice}>
-                        {room.price.toLocaleString('vi-VN')}₫
-                        <Text style={styles.metricPeriod}>/tháng</Text>
-                      </Text>
+                      {/* Right: Giá thuê & Trạng thái */}
+                      <View style={styles.roomHeaderRight}>
+                        <Text style={styles.headerPrice}>
+                          {room.price.toLocaleString('vi-VN')}₫
+                          <Text style={styles.headerPeriod}>/th</Text>
+                        </Text>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            isAvailable ? styles.statusAvailable : styles.statusRented,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.statusDot,
+                              { backgroundColor: isAvailable ? '#f59e0b' : '#22c55e' },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              { color: isAvailable ? '#92400e' : '#166534' },
+                            ]}
+                          >
+                            {isAvailable ? 'Còn trống' : 'Đang thuê'}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                    <View style={styles.metricItem}>
-                      <Text style={styles.metricLabel}>Diện tích</Text>
-                      <Text style={styles.metricValue}>{room.area} m²</Text>
-                    </View>
-                    <View style={styles.metricItem}>
-                      <Text style={styles.metricLabel}>Tầng</Text>
-                      <Text style={styles.metricValue}>Tầng {room.floor || 1}</Text>
-                    </View>
-                  </View>
+                  </TouchableOpacity>
 
-                  {/* Tenant Info if Rented */}
-                  {!isAvailable && room.tenantName && (
-                    <View style={styles.tenantBox}>
-                      <Text style={styles.tenantIcon}>👤</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.tenantName}>Khách: {room.tenantName}</Text>
-                        {room.tenantPhone && (
-                          <Text style={styles.tenantPhone}>📞 {room.tenantPhone}</Text>
+                  {/* Chi tiết chỉ hiển thị khi mở rộng */}
+                  {isExpanded && (
+                    <View style={styles.expandedContent}>
+                      {/* Thông tin khách thuê nếu phòng đang cho thuê */}
+                      {!isAvailable && room.tenantName && (
+                        <View style={styles.tenantBox}>
+                          <Text style={styles.tenantIcon}>👤</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.tenantName}>
+                              Khách thuê: {room.tenantName}
+                            </Text>
+                            {room.tenantPhone && (
+                              <Text style={styles.tenantPhone}>{room.tenantPhone}</Text>
+                            )}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Tiện nghi phòng trọ */}
+                      {(room.amenities || []).length > 0 && (
+                        <View style={styles.amenityRow}>
+                          {(room.amenities || []).map((am, i) => (
+                            <View key={i} style={styles.amenityTag}>
+                              <Text style={styles.amenityText}>{am}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Cụm thao tác nghiệp vụ (Đã bỏ icon bút chì và thùng rác) */}
+                      <View style={styles.cardActionsContainer}>
+                        {!isAvailable ? (
+                          <>
+                            {/* Hàng 1: Lập hóa đơn & Hồ sơ khách thuê */}
+                            <View style={styles.actionsRow}>
+                              <TouchableOpacity
+                                style={[styles.actionBtn, styles.billBtn]}
+                                onPress={() =>
+                                  onNavigateTab &&
+                                  onNavigateTab('bills', {
+                                    action: 'createBill',
+                                    roomNumber: room.roomNumber,
+                                    houseName: room.houseName,
+                                    tenantName: room.tenantName,
+                                    tenantPhone: room.tenantPhone,
+                                    roomFee: room.price,
+                                  })
+                                }
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.billBtnText}>Lập hóa đơn</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.actionBtn, styles.tenantProfileBtn]}
+                                onPress={() =>
+                                  onNavigateTab &&
+                                  onNavigateTab('tenants', { searchQuery: room.roomNumber })
+                                }
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.tenantProfileBtnText}>Hồ sơ khách</Text>
+                              </TouchableOpacity>
+                            </View>
+
+                            {/* Hàng 2: Chỉnh sửa, Trả phòng, Xóa (Bỏ icon bút chì và thùng rác) */}
+                            <View style={styles.actionsRow}>
+                              <TouchableOpacity
+                                style={[styles.actionBtn, styles.editBtn]}
+                                onPress={() => openEditModal(room)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.editBtnText}>Chỉnh sửa</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.actionBtn, styles.checkoutBtn]}
+                                onPress={() => handleCheckOutRoom(room)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.checkoutBtnText}>Trả phòng</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.actionBtn, styles.deleteBtn]}
+                                onPress={() => handleDeleteRoom(room)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.deleteBtnText}>Xóa</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </>
+                        ) : (
+                          <>
+                            {/* Hàng 1: Tiếp nhận khách Check-in */}
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.checkinBtn]}
+                              onPress={() =>
+                                onNavigateTab &&
+                                onNavigateTab('tenants', {
+                                  action: 'checkin',
+                                  roomNumber: room.roomNumber,
+                                  houseName: room.houseName,
+                                  monthlyRent: room.price,
+                                })
+                              }
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.checkinBtnText}>Tiếp nhận khách (Check-in)</Text>
+                            </TouchableOpacity>
+
+                            {/* Hàng 2: Chỉnh sửa & Xóa (Bỏ icon bút chì và thùng rác) */}
+                            <View style={styles.actionsRow}>
+                              <TouchableOpacity
+                                style={[styles.actionBtn, styles.editBtn]}
+                                onPress={() => openEditModal(room)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.editBtnText}>Chỉnh sửa</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.actionBtn, styles.deleteBtn]}
+                                onPress={() => handleDeleteRoom(room)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.deleteBtnText}>Xóa phòng</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </>
                         )}
                       </View>
                     </View>
                   )}
-
-                  {/* Amenities Tags */}
-                  <View style={styles.amenityRow}>
-                    {(room.amenities || []).slice(0, 3).map((am, i) => (
-                      <View key={i} style={styles.amenityTag}>
-                        <Text style={styles.amenityText}>{am}</Text>
-                      </View>
-                    ))}
-                    {(room.amenities || []).length > 3 && (
-                      <View style={[styles.amenityTag, styles.amenityMore]}>
-                        <Text style={styles.amenityMoreText}>
-                          +{(room.amenities || []).length - 3}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Cross Actions Bar */}
-                  {!isAvailable ? (
-                    <View style={styles.crossActionsRow}>
-                      <TouchableOpacity
-                        style={[styles.crossActionBtn, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
-                        onPress={() =>
-                          onNavigateTab &&
-                          onNavigateTab('bills', {
-                            action: 'createBill',
-                            roomNumber: room.roomNumber,
-                            houseName: room.houseName,
-                            tenantName: room.tenantName,
-                            tenantPhone: room.tenantPhone,
-                            roomFee: room.price,
-                          })
-                        }
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.crossActionText, { color: '#1d4ed8' }]}>🧾 Lập hóa đơn</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.crossActionBtn, { backgroundColor: '#faf5ff', borderColor: '#e9d5ff' }]}
-                        onPress={() =>
-                          onNavigateTab &&
-                          onNavigateTab('tenants', { searchQuery: room.roomNumber })
-                        }
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.crossActionText, { color: '#7e22ce' }]}>👤 Khách thuê</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.crossActionBtn, { backgroundColor: '#fff1f2', borderColor: '#fecdd3' }]}
-                        onPress={() => handleCheckOutRoom(room)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.crossActionText, { color: '#e11d48' }]}>🚪 Trả phòng</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.crossActionsRow}>
-                      <TouchableOpacity
-                        style={[
-                          styles.crossActionBtn,
-                          { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', flex: 1, paddingVertical: 10 },
-                        ]}
-                        onPress={() =>
-                          onNavigateTab &&
-                          onNavigateTab('tenants', {
-                            action: 'checkin',
-                            roomNumber: room.roomNumber,
-                            houseName: room.houseName,
-                            monthlyRent: room.price,
-                          })
-                        }
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.crossActionText, { color: '#15803d', fontWeight: '700' }]}>
-                          ➕ Tiếp nhận khách vào phòng này (Check-in) ➔
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {/* Card Actions */}
-                  <View style={styles.cardFooter}>
-                    <TouchableOpacity
-                      style={styles.cardActionBtn}
-                      onPress={() => openEditModal(room)}
-                    >
-                      <Text style={styles.cardActionText}>✏️ Chỉnh sửa</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.cardActionBtn, styles.deleteActionBtn]}
-                      onPress={() => handleDeleteRoom(room)}
-                    >
-                      <Text style={styles.deleteActionText}>🗑️ Xóa</Text>
-                    </TouchableOpacity>
-                  </View>
                 </View>
               )
             })}
           </View>
         )}
       </ScrollView>
+
+      {/* Floor Filter Modal (Ngăn kéo trượt từ dưới lên che cả bottom menu) */}
+      <Modal
+        visible={isFloorModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsFloorModalOpen(false)}
+      >
+        <View style={styles.floorModalOverlay}>
+          {/* Backdrop chạm ra ngoài để đóng */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setIsFloorModalOpen(false)}
+          />
+
+          {/* Ngăn kéo trượt từ đáy màn hình che cả menu */}
+          <View style={styles.floorModalContent}>
+            <View style={styles.floorModalHeader}>
+              <Text style={styles.floorModalTitle}>Lọc theo tầng</Text>
+              <TouchableOpacity
+                onPress={() => setIsFloorModalOpen(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.floorModalCloseBtn}
+              >
+                <Text style={styles.modalCloseBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.floorOptionsContainer}>
+              {/* Tất cả các tầng */}
+              <TouchableOpacity
+                style={[
+                  styles.floorOptionItem,
+                  filterFloor === 'all' && styles.floorOptionItemActive,
+                ]}
+                onPress={() => {
+                  setFilterFloor('all')
+                  setIsFloorModalOpen(false)
+                }}
+                activeOpacity={0.7}
+                delayPressIn={0}
+              >
+                <Text
+                  style={[
+                    styles.floorOptionText,
+                    filterFloor === 'all' && styles.floorOptionTextActive,
+                  ]}
+                >
+                  Tất cả các tầng
+                </Text>
+                <View style={styles.floorOptionRight}>
+                  <Text
+                    style={[
+                      styles.floorOptionCount,
+                      filterFloor === 'all' && styles.floorOptionCountActive,
+                    ]}
+                  >
+                    {myRooms.length} phòng
+                  </Text>
+                  {filterFloor === 'all' && <Text style={styles.checkMark}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+
+              {/* Từng tầng: Chỉ hiển thị tầng và số lượng phòng */}
+              {availableFloors.map((fl) => {
+                const isSelected = filterFloor === fl
+                const count = myRooms.filter(
+                  (r) => (Number(r.floor) || 1) === fl
+                ).length
+                return (
+                  <TouchableOpacity
+                    key={fl}
+                    style={[
+                      styles.floorOptionItem,
+                      isSelected && styles.floorOptionItemActive,
+                    ]}
+                    onPress={() => {
+                      setFilterFloor(fl)
+                      setIsFloorModalOpen(false)
+                    }}
+                    activeOpacity={0.7}
+                    delayPressIn={0}
+                  >
+                    <Text
+                      style={[
+                        styles.floorOptionText,
+                        isSelected && styles.floorOptionTextActive,
+                      ]}
+                    >
+                      Tầng {fl}
+                    </Text>
+                    <View style={styles.floorOptionRight}>
+                      <Text
+                        style={[
+                          styles.floorOptionCount,
+                          isSelected && styles.floorOptionCountActive,
+                        ]}
+                      >
+                        {count} phòng
+                      </Text>
+                      {isSelected && <Text style={styles.checkMark}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Add / Edit Room Modal */}
       <Modal
@@ -592,47 +776,34 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
                 </View>
               </View>
 
-              {/* Room Status: Ẩn khi tạo phòng mới (mặc định luôn là Còn trống), chỉ hiển thị khi Chỉnh sửa phòng */}
-              {editingRoom && (
-                <>
-                  <Text style={styles.formLabel}>Trạng thái phòng</Text>
-                  <View style={styles.typeRow}>
+              {/* Room Type */}
+              <Text style={styles.formLabel}>Loại phòng</Text>
+              <View style={styles.typeRow}>
+                {[
+                  { key: 'private', label: 'Khép kín' },
+                  { key: 'shared', label: 'Ở ghép' },
+                  { key: 'studio', label: 'Studio' },
+                ].map((t) => {
+                  const isSelected = formRoomType === t.key
+                  return (
                     <TouchableOpacity
-                      style={[
-                        styles.typeBtn,
-                        formStatus === 'available' && styles.typeBtnActive,
-                      ]}
-                      onPress={() => setFormStatus('available')}
+                      key={t.key}
+                      style={[styles.typeBtn, isSelected && styles.typeBtnActive]}
+                      onPress={() => setFormRoomType(t.key as RoomType)}
+                      activeOpacity={0.7}
                     >
                       <Text
                         style={[
                           styles.typeBtnText,
-                          formStatus === 'available' && styles.typeBtnTextActive,
+                          isSelected && styles.typeBtnTextActive,
                         ]}
                       >
-                        Còn trống
+                        {t.label}
                       </Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.typeBtn,
-                        formStatus === 'rented' && styles.typeBtnActive,
-                      ]}
-                      onPress={() => setFormStatus('rented')}
-                    >
-                      <Text
-                        style={[
-                          styles.typeBtnText,
-                          formStatus === 'rented' && styles.typeBtnTextActive,
-                        ]}
-                      >
-                        Đang thuê
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
+                  )
+                })}
+              </View>
 
               {/* Amenities */}
               <Text style={styles.formLabel}>Tiện nghi phòng trọ</Text>
@@ -745,16 +916,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     paddingBottom: 32,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 14,
+    gap: 8,
+  },
   searchBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginTop: 14,
     borderRadius: 12,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    height: 42,
+  },
+  floorFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
+  },
+  floorFilterBtnActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+  floorFilterBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  floorFilterBtnTextActive: {
+    color: '#1d4ed8',
+    fontWeight: '700',
   },
   searchIcon: {
     fontSize: 16,
@@ -833,51 +1035,81 @@ const styles = StyleSheet.create({
   },
   roomCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  roomCardExpanded: {
+    borderColor: '#cbd5e1',
+  },
+  cardHeaderTouchable: {
+    paddingVertical: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
-  roomBadgeRow: {
+  roomHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flex: 1,
+    marginRight: 8,
   },
   roomNumberPill: {
     backgroundColor: '#0f172a',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 6,
+    marginRight: 10,
   },
   roomNumberText: {
     color: '#ffffff',
     fontWeight: '800',
     fontSize: 13,
   },
-  houseTag: {
+  roomMetaCol: {
+    flex: 1,
+  },
+  roomTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 2,
+  },
+  roomSubInfo: {
     fontSize: 11,
     color: '#64748b',
     fontWeight: '500',
   },
-  statusToggleBtn: {
+  roomHeaderRight: {
+    alignItems: 'flex-end',
+  },
+  headerPrice: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#2563eb',
+    marginBottom: 3,
+  },
+  headerPeriod: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#64748b',
+  },
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 999,
     borderWidth: 1,
-    gap: 5,
+    gap: 4,
   },
   statusAvailable: {
     backgroundColor: '#fefce8',
@@ -892,60 +1124,27 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  statusToggleText: {
-    fontSize: 11,
+  statusBadgeText: {
+    fontSize: 10.5,
     fontWeight: '700',
   },
-  roomTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 12,
-  },
-  metricRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-  },
-  metricItem: {
-    flex: 1,
-  },
-  metricLabel: {
-    fontSize: 10,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    fontWeight: '600',
-  },
-  metricPrice: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#2563eb',
-    marginTop: 2,
-  },
-  metricPeriod: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#64748b',
-  },
-  metricValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginTop: 2,
+  expandedContent: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
   },
   tenantBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#eff6ff',
     padding: 8,
-    borderRadius: 10,
-    marginBottom: 10,
-    gap: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 6,
   },
   tenantIcon: {
-    fontSize: 16,
+    fontSize: 14,
   },
   tenantName: {
     fontSize: 12,
@@ -960,56 +1159,96 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   amenityTag: {
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 5,
   },
   amenityText: {
     fontSize: 11,
     color: '#475569',
     fontWeight: '500',
   },
-  amenityMore: {
-    backgroundColor: '#e2e8f0',
-  },
-  amenityMoreText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    gap: 10,
+  cardActionsContainer: {
+    gap: 8,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    paddingTop: 10,
+    paddingTop: 8,
   },
-  cardActionBtn: {
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
     flex: 1,
-    paddingVertical: 7,
-    borderRadius: 8,
+    paddingVertical: 8,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  billBtn: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  billBtnText: {
+    color: '#1d4ed8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tenantProfileBtn: {
+    backgroundColor: '#faf5ff',
+    borderWidth: 1,
+    borderColor: '#e9d5ff',
+  },
+  tenantProfileBtnText: {
+    color: '#7e22ce',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  checkinBtn: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    paddingVertical: 9,
+  },
+  checkinBtnText: {
+    color: '#15803d',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  editBtn: {
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    alignItems: 'center',
   },
-  cardActionText: {
+  editBtnText: {
+    color: '#334155',
     fontSize: 12,
     fontWeight: '600',
-    color: '#334155',
   },
-  deleteActionBtn: {
+  checkoutBtn: {
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+  },
+  checkoutBtnText: {
+    color: '#e11d48',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  deleteBtn: {
     backgroundColor: '#fef2f2',
+    borderWidth: 1,
     borderColor: '#fecaca',
   },
-  deleteActionText: {
+  deleteBtnText: {
+    color: '#dc2626',
     fontSize: 12,
     fontWeight: '600',
-    color: '#dc2626',
   },
   emptyBox: {
     padding: 36,
@@ -1046,6 +1285,91 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '700',
+  },
+
+  // Floor Drawer Modal Styles (Kéo từ dưới lên che cả bottom menu)
+  floorModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  floorModalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingTop: 18,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 24,
+  },
+  floorModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  floorModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  floorModalCloseBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+  },
+  floorOptionsContainer: {
+    gap: 8,
+  },
+  floorOptionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  floorOptionItemActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+  floorOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  floorOptionTextActive: {
+    color: '#1d4ed8',
+    fontWeight: '700',
+  },
+  floorOptionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  floorOptionCount: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  floorOptionCountActive: {
+    color: '#2563eb',
+    fontWeight: '700',
+  },
+  checkMark: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2563eb',
   },
 
   // Modal Styles

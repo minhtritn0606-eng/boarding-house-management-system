@@ -125,6 +125,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         price: roomData.price,
         roomType: roomData.roomType,
         area: roomData.area,
+        floor: Number(roomData.floor) || 1,
         amenities: roomData.amenities,
         isPublished: false, // Phòng tạo trên mobile là phòng nội bộ, không tự đăng lên web
       })
@@ -138,6 +139,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
     const newRoom: MobileRoom = {
       ...roomData,
+      floor: Number(roomData.floor) || 1,
       id: `m_room_${Date.now()}`,
       ownerEmail: user?.email || roomData.ownerEmail || '',
     }
@@ -150,7 +152,16 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     )
 
     try {
-      await mobileRoomApi.updateRoom(id, updatedData)
+      const payload: any = { ...updatedData }
+      if (updatedData.roomNumber && updatedData.title) {
+        if (!updatedData.title.startsWith(updatedData.roomNumber)) {
+          payload.title = `${updatedData.roomNumber} - ${updatedData.title}`
+        }
+      }
+      if (updatedData.floor !== undefined) {
+        payload.floor = Number(updatedData.floor) || 1
+      }
+      await mobileRoomApi.updateRoom(id, payload)
     } catch (e: any) {
       console.log('Mobile update room error:', e.message)
     }

@@ -36,7 +36,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     setIsRefreshing(true)
     try {
       if (refreshTenants) await refreshTenants()
-    } catch {}
+    } catch { }
     setIsRefreshing(false)
   }
 
@@ -44,6 +44,14 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
 
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({})
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }))
+  }
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -63,10 +71,37 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
   const [formMonthlyRent, setFormMonthlyRent] = useState('2500000')
   const [formNotes, setFormNotes] = useState('')
 
+  const matchedSelectedRoom = myRooms.find(
+    (r) => r.roomNumber.toLowerCase() === formRoomNumber.trim().toLowerCase()
+  )
+
   // Xử lý khi được chuyển hướng từ màn hình khác (Ví dụ: bấm Nhận khách từ thẻ phòng)
   useEffect(() => {
     if (initialAction) {
       if (initialAction.action === 'checkin') {
+        const availableRooms = myRooms.filter((r) => r.status === 'available')
+        let targetRoom = null
+
+        if (initialAction.roomNumber) {
+          targetRoom = myRooms.find((r) => r.roomNumber.toLowerCase() === initialAction.roomNumber.toLowerCase())
+          if (targetRoom && targetRoom.status === 'rented') {
+            Alert.alert(
+              'Phòng đang được thuê',
+              `Phòng ${targetRoom.roomNumber} hiện đang có khách thuê. Vui lòng chọn một phòng còn trống để check-in!`
+            )
+            return
+          }
+        }
+
+        const chosenRoom = targetRoom || availableRooms[0]
+        if (!chosenRoom && availableRooms.length === 0) {
+          Alert.alert(
+            'Không có phòng trống',
+            'Tất cả các phòng hiện tại đều đang có người thuê. Bạn cần trả phòng trước khi check-in khách mới!'
+          )
+          return
+        }
+
         setEditingTenant(null)
         setFormName('')
         setFormPhone('')
@@ -74,10 +109,10 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
         setFormIdCard('')
         setFormHometown('')
         setFormJob('')
-        setFormRoomNumber(initialAction.roomNumber || 'P.101')
+        setFormRoomNumber(chosenRoom ? chosenRoom.roomNumber : '')
         setFormStartDate(new Date().toISOString().split('T')[0])
         setFormEndDate('2027-08-01')
-        const rentStr = String(initialAction.monthlyRent || '2500000')
+        const rentStr = String(initialAction.monthlyRent || (chosenRoom ? chosenRoom.price : '2500000'))
         setFormDeposit(rentStr)
         setFormMonthlyRent(rentStr)
         setFormNotes('')
@@ -113,6 +148,16 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
 
   // Open Modal for Add
   const handleOpenAddModal = () => {
+    const availableRooms = myRooms.filter((r) => r.status === 'available')
+    if (availableRooms.length === 0) {
+      Alert.alert(
+        'Không có phòng trống',
+        'Tất cả các phòng hiện tại đều đang có khách thuê. Bạn cần trả phòng trước khi tiếp nhận khách mới!'
+      )
+      return
+    }
+
+    const firstAvailable = availableRooms[0]
     setEditingTenant(null)
     setFormName('')
     setFormPhone('')
@@ -120,11 +165,11 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     setFormIdCard('')
     setFormHometown('')
     setFormJob('')
-    setFormRoomNumber('P.103')
+    setFormRoomNumber(firstAvailable.roomNumber)
     setFormStartDate(new Date().toISOString().split('T')[0])
     setFormEndDate('2027-08-01')
-    setFormDeposit('2000000')
-    setFormMonthlyRent('2000000')
+    setFormDeposit(String(firstAvailable.price))
+    setFormMonthlyRent(String(firstAvailable.price))
     setFormNotes('')
     setIsModalOpen(true)
   }
@@ -162,7 +207,24 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
       return
     }
 
-    const matchedRoom = myRooms.find((r) => r.roomNumber.toLowerCase() === formRoomNumber.toLowerCase())
+    if (!formRoomNumber.trim()) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng chọn phòng để check-in khách thuê!')
+      return
+    }
+
+    const matchedRoom = myRooms.find((r) => r.roomNumber.toLowerCase() === formRoomNumber.trim().toLowerCase())
+    if (matchedRoom && matchedRoom.status === 'rented') {
+      const isCurrentTenantRoom = editingTenant && editingTenant.roomNumber.toLowerCase() === matchedRoom.roomNumber.toLowerCase()
+      if (!isCurrentTenantRoom) {
+        Alert.alert(
+          'Phòng đang được thuê',
+          `Phòng ${matchedRoom.roomNumber} hiện đang có khách thuê${matchedRoom.tenantName ? ` (${matchedRoom.tenantName})` : ''}. Bạn chỉ được chọn phòng còn trống để check-in!`
+        )
+        return
+      }
+    }
+
+    const rentAmount = matchedRoom ? Number(matchedRoom.price) : (Number(formMonthlyRent) || 2000000)
 
     const tenantPayload = {
       name: formName.trim(),
@@ -177,7 +239,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
       rentStartDate: formStartDate,
       rentEndDate: formEndDate,
       deposit: Number(formDeposit) || 0,
-      monthlyRent: Number(formMonthlyRent) || 0,
+      monthlyRent: rentAmount,
       status: (editingTenant ? editingTenant.status : 'active') as ContractStatus,
       notes: formNotes.trim() || undefined,
     }
@@ -324,241 +386,202 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
           <View style={styles.listContainer}>
             {filteredTenants.map((item, idx) => {
               const isActive = item.status === 'active'
+              const isExpanded = !!expandedIds[item.id]
 
-              if (!isActive) {
-                return (
-                  <View key={`${item.id}-${idx}`} style={[styles.tenantCard, styles.tenantCardTerminated]}>
-                    {/* Header */}
+              return (
+                <View
+                  key={`${item.id}-${idx}`}
+                  style={[styles.tenantCard, !isActive && styles.tenantCardTerminated]}
+                >
+                  {/* Collapsible Header */}
+                  <TouchableOpacity
+                    style={styles.cardHeaderTouchable}
+                    onPress={() => toggleExpand(item.id)}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.cardHeader}>
-                      <View style={[styles.avatarCircle, { backgroundColor: '#cbd5e1' }]}>
+                      <View style={[styles.avatarCircle, !isActive && { backgroundColor: '#f1f5f9', borderColor: '#e2e8f0' }]}>
                         <Text style={styles.avatarText}>👤</Text>
                       </View>
                       <View style={styles.cardHeaderInfo}>
                         <View style={styles.nameRow}>
-                          <Text style={[styles.tenantName, { color: '#64748b' }]}>{item.name}</Text>
-                          <View style={[styles.statusBadge, styles.statusBadgeTerminated]}>
-                            <Text style={[styles.statusBadgeText, styles.statusBadgeTextTerminated]}>
-                              ĐÃ THANH LÝ
+                          <Text style={[styles.tenantName, !isActive && { color: '#64748b' }]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              isActive ? styles.statusBadgeActive : styles.statusBadgeTerminated,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.statusBadgeText,
+                                isActive ? styles.statusBadgeTextActive : styles.statusBadgeTextTerminated,
+                              ]}
+                            >
+                              {isActive ? 'ĐANG THUÊ' : 'ĐÃ THANH LÝ'}
                             </Text>
                           </View>
                         </View>
-                        <Text style={styles.contractCode}>HĐ cũ: {item.contractNumber}</Text>
-                      </View>
-                    </View>
-
-                    {/* Compact info box */}
-                    <View style={styles.terminatedDetailsBox}>
-                      <View style={styles.terminatedRow}>
-                        <Text style={styles.terminatedLabel}>🏠 Phòng từng ở:</Text>
-                        <Text style={styles.terminatedValueBold}>
-                          {item.roomNumber === 'Chưa xếp phòng'
-                            ? 'Chưa xếp phòng'
-                            : item.roomNumber.toLowerCase().startsWith('phòng')
-                            ? item.roomNumber
-                            : `Phòng ${item.roomNumber}`}
-                        </Text>
-                      </View>
-
-                      <View style={styles.terminatedRow}>
-                        <Text style={styles.terminatedLabel}>📞 Số điện thoại:</Text>
-                        <Text style={styles.terminatedValueBold}>{item.phone}</Text>
-                      </View>
-
-                      {item.idCard ? (
-                        <View style={styles.terminatedRow}>
-                          <Text style={styles.terminatedLabel}>🪪 CCCD/CMND:</Text>
-                          <Text style={styles.terminatedValue}>{item.idCard}</Text>
-                        </View>
-                      ) : null}
-
-                      <View style={styles.terminatedRow}>
-                        <Text style={styles.terminatedLabel}>📅 Ngày kết thúc:</Text>
-                        <Text style={styles.terminatedValue}>{item.rentEndDate || 'Đã trả phòng'}</Text>
-                      </View>
-                    </View>
-
-                    {/* Actions */}
-                    <View style={styles.terminatedActionsRow}>
-                      <TouchableOpacity
-                        style={styles.actionCallBtn}
-                        onPress={() => handleCallTenant(item.phone)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionCallBtnText}>📞 Gọi lại</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.actionDeleteBtn, { flex: 2, marginLeft: 8 }]}
-                        onPress={() => handleDeleteTenant(item)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionDeleteBtnText}>🗑️ Xóa vĩnh viễn hồ sơ</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )
-              }
-
-              return (
-                <View key={`${item.id}-${idx}`} style={styles.tenantCard}>
-                  {/* Card Header */}
-                  <View style={styles.cardHeader}>
-                    <View style={styles.avatarCircle}>
-                      <Text style={styles.avatarText}>👤</Text>
-                    </View>
-                    <View style={styles.cardHeaderInfo}>
-                      <View style={styles.nameRow}>
-                        <Text style={styles.tenantName}>{item.name}</Text>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            isActive ? styles.statusBadgeActive : styles.statusBadgeTerminated,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              isActive ? styles.statusBadgeTextActive : styles.statusBadgeTextTerminated,
-                            ]}
-                          >
-                            {isActive ? 'ĐANG THUÊ' : 'ĐÃ THANH LÝ'}
+                        <View style={styles.subInfoRow}>
+                          <Text style={[styles.roomSubTag, !isActive && { color: '#64748b' }]}>
+                            {item.roomNumber === 'Chưa xếp phòng'
+                              ? 'Chưa xếp phòng'
+                              : item.roomNumber.toLowerCase().startsWith('phòng')
+                                ? item.roomNumber
+                                : `Phòng ${item.roomNumber}`}
                           </Text>
+                          <Text style={styles.dotSeparator}>•</Text>
+                          <Text style={styles.phoneSubTag}>{item.phone}</Text>
                         </View>
                       </View>
-                      <Text style={styles.contractCode}>HĐ: {item.contractNumber}</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
 
-                  {/* Room banner */}
-                  <View style={styles.roomBanner}>
-                    <Text style={styles.roomBannerText}>
-                      🏠{' '}
-                      <Text style={styles.roomHighlight}>
-                        {item.roomNumber === 'Chưa xếp phòng'
-                          ? 'Chưa xếp phòng'
-                          : item.roomNumber.toLowerCase().startsWith('phòng')
-                          ? item.roomNumber
-                          : `Phòng ${item.roomNumber}`}
-                      </Text>
-                    </Text>
-                  </View>
-
-                  {/* Details grid */}
-                  <View style={styles.detailsGrid}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>📞 Điện thoại:</Text>
-                      <Text style={styles.detailValueBold}>{item.phone}</Text>
-                    </View>
-
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>🪪 CCCD/CMND:</Text>
-                      <Text style={styles.detailValue}>{item.idCard}</Text>
-                    </View>
-
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>📍 Quê quán:</Text>
-                      <Text style={styles.detailValue}>{item.hometown}</Text>
-                    </View>
-
-                    {item.job && (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>💼 Nghề nghiệp:</Text>
-                        <Text style={styles.detailValue}>{item.job}</Text>
-                      </View>
-                    )}
-
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>💵 Giá thuê:</Text>
-                      <Text style={styles.priceHighlight}>{formatVND(item.monthlyRent)}/tháng</Text>
-                    </View>
-
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>🔒 Tiền cọc:</Text>
-                      <Text style={styles.detailValue}>{formatVND(item.deposit)}</Text>
-                    </View>
-
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>📅 Thời hạn HĐ:</Text>
-                      <Text style={styles.detailValue}>
-                        {item.rentStartDate} ➔ {item.rentEndDate}
-                      </Text>
-                    </View>
-
-                    {item.notes && (
-                      <View style={styles.noteBox}>
-                        <Text style={styles.noteText}>📝 {item.notes}</Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Action Buttons */}
-                  <View style={styles.cardActionsContainer}>
-                    {/* Hàng 1: Thao tác nghiệp vụ liên kết */}
-                    <View style={styles.cardActionsRow}>
-                      <TouchableOpacity
-                        style={styles.actionBillBtn}
-                        onPress={() =>
-                          onNavigateTab &&
-                          onNavigateTab('bills', {
-                            action: 'createBill',
-                            roomNumber: item.roomNumber,
-                            houseName: item.houseName,
-                            tenantName: item.name,
-                            tenantPhone: item.phone,
-                            roomFee: item.monthlyRent,
-                          })
-                        }
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionBillBtnText}>🧾 Lập hóa đơn tháng này</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.actionSmsBtn}
-                        onPress={() => handleSmsTenant(item.phone, item.name, item.roomNumber)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionSmsBtnText}>💬 Nhắn tin</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Hàng 2: Gọi điện, Sửa, Thanh lý */}
-                    <View style={styles.cardActionsRow}>
-                      <TouchableOpacity
-                        style={styles.actionCallBtn}
-                        onPress={() => handleCallTenant(item.phone)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionCallBtnText}>📞 Gọi điện</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.actionEditBtn}
-                        onPress={() => handleOpenEditModal(item)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.actionEditBtnText}>✏️ Sửa HĐ</Text>
-                      </TouchableOpacity>
-
+                  {/* Chi tiết hiển thị khi bấm mở rộng */}
+                  {isExpanded && (
+                    <View style={styles.expandedContent}>
                       {isActive ? (
-                        <TouchableOpacity
-                          style={styles.actionEndBtn}
-                          onPress={() => handleTerminateContract(item)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={styles.actionEndBtnText}>🚪 Trả phòng</Text>
-                        </TouchableOpacity>
+                        <>
+                          <View style={styles.detailsGrid}>
+                            <View style={styles.detailRow}>
+                              <Text style={styles.detailLabel}>Mã hợp đồng:</Text>
+                              <Text style={styles.detailValueBold}>{item.contractNumber}</Text>
+                            </View>
+
+                            {item.idCard ? (
+                              <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>CCCD / CMND:</Text>
+                                <Text style={styles.detailValue}>{item.idCard}</Text>
+                              </View>
+                            ) : null}
+
+                            {item.hometown ? (
+                              <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Quê quán:</Text>
+                                <Text style={styles.detailValue}>{item.hometown}</Text>
+                              </View>
+                            ) : null}
+
+                            {item.job ? (
+                              <View style={styles.detailRow}>
+                                <Text style={styles.detailLabel}>Nghề nghiệp:</Text>
+                                <Text style={styles.detailValue}>{item.job}</Text>
+                              </View>
+                            ) : null}
+
+                            <View style={styles.detailRow}>
+                              <Text style={styles.detailLabel}>Giá thuê phòng:</Text>
+                              <Text style={styles.priceHighlight}>{formatVND(item.monthlyRent)}/tháng</Text>
+                            </View>
+
+                            <View style={styles.detailRow}>
+                              <Text style={styles.detailLabel}>Tiền cọc:</Text>
+                              <Text style={styles.detailValue}>{formatVND(item.deposit)}</Text>
+                            </View>
+
+                            <View style={styles.detailRow}>
+                              <Text style={styles.detailLabel}>Thời hạn HĐ:</Text>
+                              <Text style={styles.detailValue}>
+                                {item.rentStartDate} ➔ {item.rentEndDate}
+                              </Text>
+                            </View>
+
+                            {item.notes ? (
+                              <View style={styles.noteBox}>
+                                <Text style={styles.noteText}>📝 {item.notes}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+
+                          {/* Action Buttons (Đã bỏ nút nhắn tin) */}
+                          <View style={styles.cardActionsContainer}>
+                            <TouchableOpacity
+                              style={styles.actionBillBtn}
+                              onPress={() =>
+                                onNavigateTab &&
+                                onNavigateTab('bills', {
+                                  action: 'createBill',
+                                  roomNumber: item.roomNumber,
+                                  houseName: item.houseName,
+                                  tenantName: item.name,
+                                  tenantPhone: item.phone,
+                                  roomFee: item.monthlyRent,
+                                })
+                              }
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.actionBillBtnText}>🧾 Lập hóa đơn tháng này</Text>
+                            </TouchableOpacity>
+
+                            <View style={styles.cardActionsRow}>
+                              <TouchableOpacity
+                                style={styles.actionCallBtn}
+                                onPress={() => handleCallTenant(item.phone)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.actionCallBtnText}>📞 Gọi điện</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.actionEditBtn}
+                                onPress={() => handleOpenEditModal(item)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.actionEditBtnText}>✏️ Sửa HĐ</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.actionEndBtn}
+                                onPress={() => handleTerminateContract(item)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.actionEndBtnText}>🚪 Trả phòng</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </>
                       ) : (
-                        <TouchableOpacity
-                          style={styles.actionDeleteBtn}
-                          onPress={() => handleDeleteTenant(item)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={styles.actionDeleteBtnText}>🗑️ Xóa</Text>
-                        </TouchableOpacity>
+                        <>
+                          <View style={styles.terminatedDetailsBox}>
+                            <View style={styles.terminatedRow}>
+                              <Text style={styles.terminatedLabel}>Mã HĐ cũ:</Text>
+                              <Text style={styles.terminatedValueBold}>{item.contractNumber}</Text>
+                            </View>
+                            {item.idCard ? (
+                              <View style={styles.terminatedRow}>
+                                <Text style={styles.terminatedLabel}>CCCD/CMND:</Text>
+                                <Text style={styles.terminatedValue}>{item.idCard}</Text>
+                              </View>
+                            ) : null}
+                            <View style={styles.terminatedRow}>
+                              <Text style={styles.terminatedLabel}>Ngày kết thúc:</Text>
+                              <Text style={styles.terminatedValue}>{item.rentEndDate || 'Đã trả phòng'}</Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.terminatedActionsRow}>
+                            <TouchableOpacity
+                              style={styles.actionCallBtn}
+                              onPress={() => handleCallTenant(item.phone)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.actionCallBtnText}>📞 Gọi lại</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.actionDeleteBtn, { flex: 2, marginLeft: 8 }]}
+                              onPress={() => handleDeleteTenant(item)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.actionDeleteBtnText}>🗑️ Xóa vĩnh viễn hồ sơ</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </>
                       )}
                     </View>
-                  </View>
+                  )}
                 </View>
               )
             })}
@@ -580,40 +603,43 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
             </View>
 
             <ScrollView contentContainerStyle={styles.modalScroll}>
-              <Text style={styles.fieldLabel}>Họ và tên khách thuê (*)</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="VD: Nguyễn Văn A"
-                value={formName}
-                onChangeText={setFormName}
-              />
-
+              {/* Row 1: Họ tên + SĐT */}
               <View style={styles.formRow}>
-                <View style={{ flex: 1, marginRight: 8 }}>
+                <View style={{ flex: 1.2, marginRight: 8 }}>
+                  <Text style={styles.fieldLabel}>Họ và tên (*)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="VD: Nguyễn Văn A"
+                    value={formName}
+                    onChangeText={setFormName}
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 8 }}>
                   <Text style={styles.fieldLabel}>Số điện thoại (*)</Text>
                   <TextInput
                     style={styles.formInput}
-                    placeholder="VD: 0988 123 456"
+                    placeholder="0988 123 456"
                     keyboardType="phone-pad"
                     value={formPhone}
                     onChangeText={setFormPhone}
                   />
                 </View>
-                <View style={{ flex: 1, marginLeft: 8 }}>
+              </View>
+
+              {/* Row 2: CCCD + Quê quán */}
+              <View style={styles.formRow}>
+                <View style={{ flex: 1, marginRight: 8 }}>
                   <Text style={styles.fieldLabel}>CCCD / CMND (*)</Text>
                   <TextInput
                     style={styles.formInput}
-                    placeholder="VD: 048200001234"
+                    placeholder="048200001234"
                     keyboardType="number-pad"
                     value={formIdCard}
                     onChangeText={setFormIdCard}
                   />
                 </View>
-              </View>
-
-              <View style={styles.formRow}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.fieldLabel}>Quê quán / Tỉnh thành</Text>
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.fieldLabel}>Quê quán</Text>
                   <TextInput
                     style={styles.formInput}
                     placeholder="VD: Quảng Nam"
@@ -621,78 +647,97 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                     onChangeText={setFormHometown}
                   />
                 </View>
-                <View style={{ flex: 1, marginLeft: 8 }}>
+              </View>
+
+              {/* Row 3: Nghề nghiệp + Email */}
+              <View style={styles.formRow}>
+                <View style={{ flex: 1, marginRight: 8 }}>
                   <Text style={styles.fieldLabel}>Nghề nghiệp</Text>
                   <TextInput
                     style={styles.formInput}
-                    placeholder="VD: Kỹ sư / Sinh viên"
+                    placeholder="Kỹ sư / Sinh viên"
                     value={formJob}
                     onChangeText={setFormJob}
                   />
                 </View>
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.fieldLabel}>Email</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="tenant@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={formEmail}
+                    onChangeText={setFormEmail}
+                  />
+                </View>
               </View>
 
-              <Text style={styles.fieldLabel}>Email</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="VD: tenant@example.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={formEmail}
-                onChangeText={setFormEmail}
-              />
-
-              {/* Room Selection */}
-              <Text style={styles.fieldLabel}>Chọn phòng để Check-in / Gán hợp đồng</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {/* Room Selection Header with Auto Rent Price Badge */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 4 }}>
+                <Text style={styles.fieldLabel}>Chọn phòng Check-in</Text>
+                {matchedSelectedRoom && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0fdf4', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#bbf7d0' }}>
+                    <Text style={{ fontSize: 11, color: '#166534', fontWeight: '700' }}>
+                      Giá thuê: {formatVND(matchedSelectedRoom.price)}/tháng
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
                 {myRooms.map((r) => {
                   const isSelected = formRoomNumber.toLowerCase() === r.roomNumber.toLowerCase()
-                  const isAvailable = r.status === 'available'
+                  const isCurrentTenantRoom = editingTenant && editingTenant.roomNumber.toLowerCase() === r.roomNumber.toLowerCase()
+                  const isRented = r.status === 'rented' && !isCurrentTenantRoom
+                  const isAvailable = r.status === 'available' || isCurrentTenantRoom
+
                   return (
                     <TouchableOpacity
                       key={r.id}
                       style={[
                         styles.modalChip,
                         isSelected && styles.modalChipActive,
-                        !isAvailable && !isSelected && { borderColor: '#fed7aa', backgroundColor: '#fff7ed' },
+                        isRented && { borderColor: '#e2e8f0', backgroundColor: '#f8fafc', opacity: 0.55 },
                       ]}
                       onPress={() => {
+                        if (isRented) {
+                          Alert.alert(
+                            'Phòng đang được thuê',
+                            `Phòng ${r.roomNumber} hiện đang có khách thuê${r.tenantName ? ` (${r.tenantName})` : ''}. Bạn chỉ được chọn phòng đang còn trống để check-in!`
+                          )
+                          return
+                        }
                         setFormRoomNumber(r.roomNumber)
                         setFormMonthlyRent(String(r.price))
-                        setFormDeposit(String(r.price))
+                        if (!formDeposit || formDeposit === '0' || formDeposit === '2000000' || formDeposit === '2500000') {
+                          setFormDeposit(String(r.price))
+                        }
                       }}
+                      activeOpacity={isRented ? 1 : 0.7}
                     >
                       <Text
                         style={[
                           styles.modalChipText,
                           isSelected && styles.modalChipTextActive,
-                          !isAvailable && !isSelected && { color: '#c2410c' },
+                          isRented && { color: '#94a3b8' },
                         ]}
                       >
-                        {r.roomNumber} ({isAvailable ? 'Trống 🟢' : 'Đang thuê 🔴'})
+                        {r.roomNumber} {isAvailable ? '• Trống 🟢' : '• Đang thuê 🔒'}
                       </Text>
                     </TouchableOpacity>
                   )
                 })}
               </ScrollView>
 
-              <Text style={styles.fieldLabel}>Số phòng (hoặc tự nhập)</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="VD: P.103"
-                value={formRoomNumber}
-                onChangeText={setFormRoomNumber}
-              />
-
+              {/* Row 4: Số phòng + Tiền cọc */}
               <View style={styles.formRow}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.fieldLabel}>Giá thuê (VNĐ/tháng)</Text>
+                  <Text style={styles.fieldLabel}>Số phòng</Text>
                   <TextInput
                     style={styles.formInput}
-                    placeholder="2500000"
-                    keyboardType="number-pad"
-                    value={formMonthlyRent}
-                    onChangeText={setFormMonthlyRent}
+                    placeholder="VD: P.101"
+                    value={formRoomNumber}
+                    onChangeText={setFormRoomNumber}
                   />
                 </View>
                 <View style={{ flex: 1, marginLeft: 8 }}>
@@ -707,9 +752,10 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                 </View>
               </View>
 
+              {/* Row 5: Ngày bắt đầu + Ngày kết thúc */}
               <View style={styles.formRow}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.fieldLabel}>Ngày bắt đầu thuê</Text>
+                  <Text style={styles.fieldLabel}>Ngày bắt đầu</Text>
                   <TextInput
                     style={styles.formInput}
                     placeholder="YYYY-MM-DD"
@@ -718,7 +764,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                   />
                 </View>
                 <View style={{ flex: 1, marginLeft: 8 }}>
-                  <Text style={styles.fieldLabel}>Ngày kết thúc hợp đồng</Text>
+                  <Text style={styles.fieldLabel}>Ngày kết thúc</Text>
                   <TextInput
                     style={styles.formInput}
                     placeholder="YYYY-MM-DD"
@@ -728,11 +774,11 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                 </View>
               </View>
 
-              <Text style={styles.fieldLabel}>Ghi chú thêm</Text>
+              {/* Row 6: Ghi chú thêm (Gọn gàng) */}
+              <Text style={styles.fieldLabel}>Ghi chú thêm (tùy chọn)</Text>
               <TextInput
-                style={[styles.formInput, { height: 64 }]}
-                placeholder="Ghi chú về tiền cọc, đồ đạc bàn giao, ngày thanh toán..."
-                multiline
+                style={[styles.formInput, { height: 38, marginBottom: 4 }]}
+                placeholder="Ghi chú về đồ đạc bàn giao, chu kỳ..."
                 value={formNotes}
                 onChangeText={setFormNotes}
               />
@@ -906,10 +952,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  cardHeaderTouchable: {
+    paddingVertical: 2,
+  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   avatarCircle: {
     width: 44,
@@ -937,6 +985,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#0f172a',
+    flex: 1,
+    marginRight: 8,
+  },
+  subInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  roomSubTag: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  dotSeparator: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  phoneSubTag: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  expandedContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -1031,34 +1107,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionBillBtn: {
-    flex: 2,
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#bfdbfe',
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 2,
   },
   actionBillBtnText: {
     color: '#1d4ed8',
     fontSize: 12,
     fontWeight: '700',
-  },
-  actionSmsBtn: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionSmsBtnText: {
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '600',
   },
   actionCallBtn: {
     flex: 1,
@@ -1206,25 +1267,25 @@ const styles = StyleSheet.create({
   },
   modalScroll: {
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 10,
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#334155',
-    marginBottom: 6,
-    marginTop: 6,
+    marginBottom: 4,
+    marginTop: 4,
   },
   formInput: {
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     fontSize: 13,
     color: '#0f172a',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   formRow: {
     flexDirection: 'row',

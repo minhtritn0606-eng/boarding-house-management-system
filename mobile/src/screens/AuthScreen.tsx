@@ -341,18 +341,7 @@ export default function AuthScreen() {
                   {isLoading ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (
-                    <Text style={styles.submitBtnText}>Đăng Ký Tài Khoản</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-                  disabled={isLoading}
-                  activeOpacity={0.85}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator color="#ffffff" />
-                  ) : (
-                    <Text style={styles.submitBtnText}>Gửi Đăng Ký Tài Khoản 🚀</Text>
+                    <Text style={styles.submitBtnText}>Gửi Đăng Ký Tài Khoản</Text>
                   )}
                 </TouchableOpacity>
               </View>

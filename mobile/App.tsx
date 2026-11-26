@@ -10,6 +10,7 @@ import { BillProvider } from './src/context/BillContext'
 import AuthScreen from './src/screens/AuthScreen'
 import HomeScreen from './src/screens/HomeScreen'
 import RoomsScreen from './src/screens/RoomsScreen'
+import AppointmentsScreen from './src/screens/AppointmentsScreen'
 import TenantsScreen from './src/screens/TenantsScreen'
 import BillsScreen from './src/screens/BillsScreen'
 import BottomTabBar, { type TabType } from './src/components/BottomTabBar'
@@ -48,6 +49,8 @@ function MainApp() {
         return <HomeScreen onNavigateTab={handleNavigate} />
       case 'rooms':
         return <RoomsScreen onNavigateTab={handleNavigate} initialAction={tabPayload} />
+      case 'appointments':
+        return <AppointmentsScreen onNavigateTab={handleNavigate} initialAction={tabPayload} />
       case 'tenants':
         return <TenantsScreen onNavigateTab={handleNavigate} initialAction={tabPayload} />
       case 'bills':
@@ -58,7 +61,7 @@ function MainApp() {
   }
 
   return (
-    <SafeAreaView style={styles.mainContainer}>
+    <SafeAreaView style={styles.mainContainer} edges={['top', 'left', 'right']}>
       <StatusBar style="light" />
       <View style={styles.screenWrapper}>{renderActiveScreen()}</View>
       <BottomTabBar

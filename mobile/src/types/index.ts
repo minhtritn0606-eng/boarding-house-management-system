@@ -3,6 +3,6 @@ export interface LandlordUser {
   name: string
   email: string
   phone: string
-  role: 'landlord'
+  role: 'landlord' | 'poster'
   avatar?: string
 }

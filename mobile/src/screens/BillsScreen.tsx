@@ -11,6 +11,7 @@ import {
   Alert,
   Share,
   Platform,
+  RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useBills } from '../context/BillContext'
@@ -38,9 +39,20 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
     getLastBillForRoom,
     totalUnpaidAmount,
     totalPaidAmount,
+    refreshBills,
   } = useBills()
   const { tenants } = useTenants()
   const { rooms, getRoomsByOwner } = useRooms()
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      if (refreshBills) await refreshBills()
+    } catch {}
+    setIsRefreshing(false)
+  }
 
   const myRooms = getRoomsByOwner(user?.email)
 
@@ -345,14 +357,14 @@ Vui lòng thanh toán qua STK chủ trọ.`
     (Number(formOtherFee) || 0)
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
 
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Hóa Đơn & Tiện Ích</Text>
-          <Text style={styles.headerSubtitle}>
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.headerTitle}>Hóa đơn & Dịch vụ</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
             {selectedMonth === 'all' ? `Tất cả các tháng năm ${selectedYear}` : `Tháng ${selectedMonth}/${selectedYear}`} • {filteredBills.length} hóa đơn
           </Text>
         </View>
@@ -362,17 +374,28 @@ Vui lòng thanh toán qua STK chủ trọ.`
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#0f172a"
+            colors={['#0f172a']}
+          />
+        }
+      >
         {/* Revenue Stats Banner */}
         <View style={styles.statsBanner}>
           <View style={[styles.statCol, { borderRightWidth: 1, borderRightColor: '#e2e8f0' }]}>
-            <Text style={styles.statColLabel}>🟢 ĐÃ THU ĐƯỢC</Text>
-            <Text style={[styles.statColValue, { color: '#16a34a' }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={styles.statColLabel}>ĐÃ THU ĐƯỢC</Text>
+            <Text style={[styles.statColValue, { color: '#059669' }]} numberOfLines={1} adjustsFontSizeToFit>
               {formatVND(totalPaidAmount)}
             </Text>
           </View>
           <View style={styles.statCol}>
-            <Text style={styles.statColLabel}>🔴 CẦN THU / CÒN NỢ</Text>
+            <Text style={styles.statColLabel}>CẦN THU / CÒN NỢ</Text>
             <Text style={[styles.statColValue, { color: '#dc2626' }]} numberOfLines={1} adjustsFontSizeToFit>
               {formatVND(totalUnpaidAmount)}
             </Text>
@@ -453,10 +476,10 @@ Vui lòng thanh toán qua STK chủ trọ.`
           </View>
         ) : (
           <View style={styles.listContainer}>
-            {filteredBills.map((bill) => {
+            {filteredBills.map((bill, idx) => {
               const isPaid = bill.status === 'paid'
               return (
-                <View key={bill.id} style={styles.billCard}>
+                <View key={`${bill.id}-${idx}`} style={styles.billCard}>
                   {/* Bill Top Bar */}
                   <View style={styles.billCardHeader}>
                     <View style={styles.roomTagRow}>
@@ -844,7 +867,7 @@ Vui lòng thanh toán qua STK chủ trọ.`
           </View>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -856,16 +879,24 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#0f172a',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 16,
-    paddingBottom: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  headerTextGroup: {
+    flex: 1,
+    paddingRight: 12,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#f8fafc',
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
     fontSize: 12,
@@ -873,15 +904,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addBtn: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '600',
   },
   container: {
     flexGrow: 1,

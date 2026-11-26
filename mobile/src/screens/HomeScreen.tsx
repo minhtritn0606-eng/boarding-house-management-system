@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../context/AuthContext'
@@ -21,9 +22,10 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
   const { user, logout } = useAuth()
-  const { rooms, getRoomsByOwner } = useRooms()
+  const { rooms, getRoomsByOwner, refreshRooms } = useRooms()
   const { tenants } = useTenants()
-  const { bills, totalUnpaidAmount, totalPaidAmount } = useBills()
+  const { bills, totalUnpaidAmount, totalPaidAmount, refreshBills } = useBills()
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const myRooms = getRoomsByOwner(user?.email)
   const totalRooms = myRooms.length
@@ -32,77 +34,90 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
   const activeTenants = tenants.filter((t) => t.status === 'active').length
   const unpaidBillsCount = bills.filter((b) => b.status === 'unpaid' || b.status === 'overdue').length
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await Promise.all([
+        refreshRooms ? refreshRooms() : Promise.resolve(),
+        refreshBills ? refreshBills() : Promise.resolve(),
+      ])
+    } catch { }
+    setIsRefreshing(false)
+  }
+
   const formatVND = (num: number) => {
     return num.toLocaleString('vi-VN') + ' đ'
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Header Profile Banner */}
-        <View style={styles.header}>
-          <View style={styles.profileRow}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>👤</Text>
-            </View>
-            <View style={styles.profileInfo}>
-              <View style={styles.badgeRow}>
-                <View style={styles.roleBadge}>
-                  <Text style={styles.roleBadgeText}>CHỦ TRỌ</Text>
-                </View>
-              </View>
-              <Text style={styles.userName}>{user?.name || 'Chủ trọ'}</Text>
-              <Text style={styles.userEmail}>📧 {user?.email}</Text>
-            </View>
-          </View>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.8}>
-            <Text style={styles.logoutBtnText}>Đăng xuất ⎋</Text>
-          </TouchableOpacity>
+      {/* Unified Top Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.headerTitle}>Tổng quan</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            {user?.name || 'Chủ trọ'} • Chủ trọ
+          </Text>
         </View>
+
+        <TouchableOpacity style={styles.headerActionBtn} onPress={logout} activeOpacity={0.8}>
+          <Text style={styles.headerActionText}>Đăng xuất</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#0f172a"
+            colors={['#0f172a']}
+          />
+        }
+      >
+
 
         {/* Stats Grid */}
         <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>📊 Tổng quan hệ thống</Text>
+          <Text style={styles.sectionTitle}>Tổng quan hệ thống</Text>
           <View style={styles.statsGrid}>
             <TouchableOpacity
-              style={[styles.statCard, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
+              style={[styles.statCard, { backgroundColor: '#ffffff', borderColor: '#e2e8f0' }]}
               onPress={() => onNavigateTab && onNavigateTab('rooms')}
               activeOpacity={0.8}
             >
-              <Text style={styles.statIcon}>🏢</Text>
-              <Text style={[styles.statValue, { color: '#1d4ed8' }]}>{totalRooms}</Text>
+              <Text style={[styles.statValue, { color: '#0f172a' }]}>{totalRooms}</Text>
               <Text style={styles.statLabel}>Tổng số phòng</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.statCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}
+              style={[styles.statCard, { backgroundColor: '#ffffff', borderColor: '#e2e8f0' }]}
               onPress={() => onNavigateTab && onNavigateTab('rooms', { filterStatus: 'rented' })}
               activeOpacity={0.8}
             >
-              <Text style={styles.statIcon}>🟢</Text>
-              <Text style={[styles.statValue, { color: '#15803d' }]}>{rentedRooms}</Text>
+              <Text style={[styles.statValue, { color: '#059669' }]}>{rentedRooms}</Text>
               <Text style={styles.statLabel}>Đang cho thuê</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.statCard, { backgroundColor: '#fefce8', borderColor: '#fef08a' }]}
+              style={[styles.statCard, { backgroundColor: '#ffffff', borderColor: '#e2e8f0' }]}
               onPress={() => onNavigateTab && onNavigateTab('rooms', { filterStatus: 'available' })}
               activeOpacity={0.8}
             >
-              <Text style={styles.statIcon}>🟡</Text>
-              <Text style={[styles.statValue, { color: '#a16207' }]}>{availableRooms}</Text>
+              <Text style={[styles.statValue, { color: '#d97706' }]}>{availableRooms}</Text>
               <Text style={styles.statLabel}>Phòng còn trống</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.statCard, { backgroundColor: '#faf5ff', borderColor: '#e9d5ff' }]}
+              style={[styles.statCard, { backgroundColor: '#ffffff', borderColor: '#e2e8f0' }]}
               onPress={() => onNavigateTab && onNavigateTab('tenants')}
               activeOpacity={0.8}
             >
-              <Text style={styles.statIcon}>👥</Text>
-              <Text style={[styles.statValue, { color: '#7e22ce' }]}>{activeTenants}</Text>
+              <Text style={[styles.statValue, { color: '#2563eb' }]}>{activeTenants}</Text>
               <Text style={styles.statLabel}>Khách đang thuê</Text>
             </TouchableOpacity>
           </View>
@@ -110,15 +125,15 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
 
         {/* Revenue Summary Card */}
         <View style={styles.revenueSection}>
-          <Text style={styles.sectionTitle}>💰 Doanh thu & Hóa đơn tháng</Text>
+          <Text style={styles.sectionTitle}>Doanh thu & Hóa đơn tháng</Text>
           <View style={styles.revenueCard}>
             <View style={styles.revenueRow}>
               <View style={styles.revenueCol}>
-                <Text style={styles.revenueLabel}>Đã thu (Tháng 8)</Text>
-                <Text style={[styles.revenueValue, { color: '#16a34a' }]}>{formatVND(totalPaidAmount)}</Text>
+                <Text style={styles.revenueLabel}>Đã thu tháng này</Text>
+                <Text style={[styles.revenueValue, { color: '#059669' }]}>{formatVND(totalPaidAmount)}</Text>
               </View>
-              <View style={[styles.revenueCol, { borderLeftWidth: 1, borderLeftColor: '#e2e8f0', paddingLeft: 16 }]}>
-                <Text style={styles.revenueLabel}>Cần thu / Còn nợ ({unpaidBillsCount})</Text>
+              <View style={[styles.revenueCol, { borderLeftWidth: 1, borderLeftColor: '#f1f5f9', paddingLeft: 16 }]}>
+                <Text style={styles.revenueLabel}>Chưa thu ({unpaidBillsCount})</Text>
                 <Text style={[styles.revenueValue, { color: '#dc2626' }]}>{formatVND(totalUnpaidAmount)}</Text>
               </View>
             </View>
@@ -129,7 +144,7 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
               activeOpacity={0.8}
             >
               <Text style={styles.viewBillsText}>
-                {unpaidBillsCount > 0 ? `⚠️ Có ${unpaidBillsCount} hóa đơn chưa thu ➔` : `Xem chi tiết ${bills.length} hóa đơn ➔`}
+                {unpaidBillsCount > 0 ? `Có ${unpaidBillsCount} hóa đơn chưa thu ›` : `Xem chi tiết ${bills.length} hóa đơn ›`}
               </Text>
             </TouchableOpacity>
           </View>
@@ -137,21 +152,36 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>⚡ Thao tác nghiệp vụ nhanh</Text>
+          <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => onNavigateTab && onNavigateTab('appointments')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#f1f5f9' }]}>
+              <Text style={styles.actionIconText}>◷</Text>
+            </View>
+            <View style={styles.actionInfo}>
+              <Text style={styles.actionTitle}>Lịch hẹn xem phòng</Text>
+              <Text style={styles.actionDesc}>Duyệt yêu cầu hẹn, gọi điện thoại & nhắn Zalo cho khách</Text>
+            </View>
+            <Text style={styles.actionArrow}>›</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => onNavigateTab && onNavigateTab('rooms', { action: 'addRoom' })}
             activeOpacity={0.8}
           >
-            <View style={[styles.actionIconBox, { backgroundColor: '#eff6ff' }]}>
-              <Text style={styles.actionIcon}>➕</Text>
+            <View style={[styles.actionIconBox, { backgroundColor: '#f1f5f9' }]}>
+              <Text style={styles.actionIconText}>+</Text>
             </View>
             <View style={styles.actionInfo}>
               <Text style={styles.actionTitle}>Thêm phòng trọ mới</Text>
               <Text style={styles.actionDesc}>Tạo phòng, thiết lập giá thuê, diện tích & tiện ích</Text>
             </View>
-            <Text style={styles.actionArrow}>➔</Text>
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -159,14 +189,14 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
             onPress={() => onNavigateTab && onNavigateTab('tenants', { action: 'checkin' })}
             activeOpacity={0.8}
           >
-            <View style={[styles.actionIconBox, { backgroundColor: '#f0fdf4' }]}>
-              <Text style={styles.actionIcon}>👤</Text>
+            <View style={[styles.actionIconBox, { backgroundColor: '#f1f5f9' }]}>
+              <Text style={styles.actionIconText}>◎</Text>
             </View>
             <View style={styles.actionInfo}>
               <Text style={styles.actionTitle}>Tiếp nhận khách thuê (Check-in)</Text>
               <Text style={styles.actionDesc}>Lập hợp đồng vào phòng trống, đồng bộ trạng thái</Text>
             </View>
-            <Text style={styles.actionArrow}>➔</Text>
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -174,18 +204,18 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
             onPress={() => onNavigateTab && onNavigateTab('bills', { action: 'createBill' })}
             activeOpacity={0.8}
           >
-            <View style={[styles.actionIconBox, { backgroundColor: '#fef3c7' }]}>
-              <Text style={styles.actionIcon}>🧾</Text>
+            <View style={[styles.actionIconBox, { backgroundColor: '#f1f5f9' }]}>
+              <Text style={styles.actionIconText}>◇</Text>
             </View>
             <View style={styles.actionInfo}>
               <Text style={styles.actionTitle}>Ghi chỉ số & Lập hóa đơn</Text>
               <Text style={styles.actionDesc}>Tính tiền điện nước tự động & gửi bill qua Zalo</Text>
             </View>
-            <Text style={styles.actionArrow}>➔</Text>
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -194,18 +224,68 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
   },
+  header: {
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
+    minHeight: 68,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  headerTextGroup: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#f8fafc',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  headerActionBtn: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#f8fafc',
+  },
   container: {
     flexGrow: 1,
     backgroundColor: '#f8fafc',
     paddingBottom: 40,
   },
-  header: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 24,
-    paddingBottom: 28,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+  profileBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    marginHorizontal: 18,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
   },
   profileRow: {
     flexDirection: 'row',
@@ -376,6 +456,11 @@ const styles = StyleSheet.create({
   },
   actionIcon: {
     fontSize: 20,
+  },
+  actionIconText: {
+    fontSize: 18,
+    color: '#0f172a',
+    fontWeight: '700',
   },
   actionInfo: {
     flex: 1,

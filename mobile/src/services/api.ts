@@ -258,3 +258,22 @@ export const mobileBillApi = {
     })
   },
 }
+
+// ================= APPOINTMENTS =================
+export const mobileAppointmentApi = {
+  getAppointments: async (status?: string) => {
+    const query = status && status !== 'all' ? `?status=${status}` : ''
+    return await mobileRequest<{ appointments: any[] }>(`/appointments${query}`)
+  },
+  updateAppointmentStatus: async (id: number | string, status: string) => {
+    return await mobileRequest<{ message: string; appointment: any }>(`/appointments/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    })
+  },
+  deleteAppointment: async (id: number | string) => {
+    return await mobileRequest<{ message: string }>(`/appointments/${id}`, {
+      method: 'DELETE',
+    })
+  },
+}

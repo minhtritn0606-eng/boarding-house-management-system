@@ -10,6 +10,7 @@ import {
   Modal,
   Alert,
   Platform,
+  RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRooms } from '../context/RoomContext'
@@ -18,16 +19,30 @@ import type { MobileRoom, RoomType, RoomStatus } from '../types/room'
 import type { TabType } from '../components/BottomTabBar'
 
 const ALL_AMENITIES = [
-  'Điều hòa',
-  'Gác lửng',
-  'Nóng lạnh',
   'Wifi tốc độ cao',
+  'Điều hòa',
+  'Máy giặt',
+  'Bình nóng lạnh',
+  'Nhà vệ sinh riêng',
   'Tủ lạnh',
-  'Máy giặt chung',
-  'Bếp riêng',
+  'Gác lửng',
+  'Chỗ để xe',
   'Ban công',
+  'Thang máy',
+  'Giờ giấc tự do',
+  'Bếp nấu ăn',
+  'Camera an ninh',
+  'Bảo vệ 24/7',
   'Khóa vân tay',
-  'Chỗ để xe riêng',
+  'Không chung chủ',
+  'Tủ quần áo',
+  'Giường nệm',
+  'Bàn làm việc',
+  'Cửa sổ',
+  'Nuôi thú cưng',
+  'Sân phơi',
+  'Tủ bếp',
+  'Tivi',
 ]
 
 interface RoomsScreenProps {
@@ -46,7 +61,20 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
     togglePublishRoom,
     getRoomsByOwner,
     vacateRoom,
+    refreshRooms,
   } = useRooms()
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      if (refreshRooms) {
+        await refreshRooms()
+      }
+    } catch {}
+    setIsRefreshing(false)
+  }
 
   const myRooms = getRoomsByOwner(user?.email)
 
@@ -212,29 +240,38 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
       
       {/* Top App Header */}
       <View style={styles.topHeader}>
-        <View>
-          <Text style={styles.screenTitle}>Quản lý Phòng trọ</Text>
-          <Text style={styles.screenSubtitle}>
-            {myRooms.length} phòng ({availableCount} trống • {rentedCount} đang thuê)
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.screenTitle}>Phòng trọ</Text>
+          <Text style={styles.screenSubtitle} numberOfLines={1}>
+            {myRooms.length} phòng • {availableCount} trống • {rentedCount} đang thuê
           </Text>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={openAddModal} activeOpacity={0.8}>
-          <Text style={styles.addBtnText}>➕ Thêm phòng</Text>
+          <Text style={styles.addBtnText}>+ Thêm phòng</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#0f172a"
+            colors={['#0f172a']}
+          />
+        }
+      >
         {/* Search Input */}
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm theo số phòng, tên phòng hoặc khách thuê..."
+            placeholder="Tìm số phòng, tên phòng hoặc khách thuê..."
             placeholderTextColor="#94a3b8"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -300,10 +337,10 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
           </View>
         ) : (
           <View style={styles.roomList}>
-            {filteredRooms.map((room) => {
+            {filteredRooms.map((room, idx) => {
               const isAvailable = room.status === 'available'
               return (
-                <View key={room.id} style={styles.roomCard}>
+                <View key={`${room.id}-${idx}`} style={styles.roomCard}>
                   {/* Card Header */}
                   <View style={styles.cardHeader}>
                     <View style={styles.roomBadgeRow}>
@@ -573,7 +610,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
                           formStatus === 'available' && styles.typeBtnTextActive,
                         ]}
                       >
-                        🟡 Còn trống
+                        Còn trống
                       </Text>
                     </TouchableOpacity>
 
@@ -590,7 +627,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
                           formStatus === 'rented' && styles.typeBtnTextActive,
                         ]}
                       >
-                        🟢 Đang cho thuê
+                        Đang thuê
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -652,7 +689,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -664,16 +701,24 @@ const styles = StyleSheet.create({
   topHeader: {
     backgroundColor: '#0f172a',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 16,
-    paddingBottom: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
+    minHeight: 68,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  headerTextGroup: {
+    flex: 1,
+    paddingRight: 12,
   },
   screenTitle: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontWeight: '700',
+    color: '#f8fafc',
+    letterSpacing: -0.3,
   },
   screenSubtitle: {
     fontSize: 12,
@@ -681,15 +726,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addBtn: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '600',
   },
   container: {
     flexGrow: 1,

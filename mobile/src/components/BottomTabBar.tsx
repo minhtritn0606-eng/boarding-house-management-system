@@ -1,36 +1,48 @@
 import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native'
 
-export type TabType = 'dashboard' | 'rooms' | 'tenants' | 'bills'
+export type TabType = 'dashboard' | 'rooms' | 'appointments' | 'tenants' | 'bills'
 
 interface Props {
   activeTab: TabType
   onTabChange: (tab: TabType) => void
   availableRoomsCount?: number
+  pendingAppointmentsCount?: number
 }
 
-export default function BottomTabBar({ activeTab, onTabChange, availableRoomsCount = 0 }: Props) {
+export default function BottomTabBar({
+  activeTab,
+  onTabChange,
+  availableRoomsCount = 0,
+  pendingAppointmentsCount = 0,
+}: Props) {
   const tabs = [
     {
       id: 'dashboard' as TabType,
       label: 'Tổng quan',
-      icon: '🏠',
+      icon: '◈',
     },
     {
       id: 'rooms' as TabType,
       label: 'Phòng trọ',
-      icon: '🏢',
+      icon: '⌂',
       badge: availableRoomsCount > 0 ? `${availableRoomsCount} trống` : undefined,
+    },
+    {
+      id: 'appointments' as TabType,
+      label: 'Lịch hẹn',
+      icon: '◷',
+      badge: pendingAppointmentsCount > 0 ? `${pendingAppointmentsCount}` : undefined,
     },
     {
       id: 'tenants' as TabType,
       label: 'Khách thuê',
-      icon: '👥',
+      icon: '◎',
     },
     {
       id: 'bills' as TabType,
       label: 'Hóa đơn',
-      icon: '💵',
+      icon: '◇',
     },
   ]
 
@@ -46,7 +58,9 @@ export default function BottomTabBar({ activeTab, onTabChange, availableRoomsCou
             activeOpacity={0.7}
           >
             <View style={styles.iconWrapper}>
-              <Text style={styles.tabIcon}>{tab.icon}</Text>
+              <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>
+                {tab.icon}
+              </Text>
               {tab.badge && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{tab.badge}</Text>
@@ -73,9 +87,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingBottom: Platform.OS === 'ios' ? 24 : 10,
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 8,
   },
   tabBtn: {
@@ -88,39 +102,49 @@ const styles = StyleSheet.create({
   tabBtnActive: {},
   iconWrapper: {
     position: 'relative',
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tabIcon: {
-    fontSize: 22,
-    marginBottom: 2,
+    fontSize: 18,
+    color: '#94a3b8',
+    fontWeight: '400',
+  },
+  tabIconActive: {
+    color: '#0f172a',
+    fontWeight: '700',
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#64748b',
+    color: '#94a3b8',
+    marginTop: 2,
+    letterSpacing: -0.1,
   },
   tabLabelActive: {
-    color: '#2563eb',
+    color: '#0f172a',
     fontWeight: '700',
   },
   activeDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#0f172a',
     marginTop: 3,
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -24,
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 5,
+    top: -2,
+    right: -14,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 4,
     paddingVertical: 1,
-    borderRadius: 999,
+    borderRadius: 8,
   },
   badgeText: {
     color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '800',
+    fontSize: 8,
+    fontWeight: '700',
   },
 })

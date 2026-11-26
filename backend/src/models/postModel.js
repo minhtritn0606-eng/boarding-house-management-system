@@ -121,6 +121,18 @@ async function ensurePostsTable() {
   }
 }
 
+let _hasPostAmenitiesCol = null;
+async function hasPostAmenitiesCol(pool) {
+  if (_hasPostAmenitiesCol !== null) return _hasPostAmenitiesCol;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM posts LIKE 'amenities'");
+    _hasPostAmenitiesCol = cols.length > 0;
+  } catch (e) {
+    _hasPostAmenitiesCol = false;
+  }
+  return _hasPostAmenitiesCol;
+}
+
 async function createPost({
   landlordId,
   boardingHouseId = null,
@@ -146,34 +158,65 @@ async function createPost({
 }) {
   await ensurePostsTable();
   const pool = await getPool();
+  const hasAmenitiesCol = await hasPostAmenitiesCol(pool);
 
-  const [res] = await pool.query(
-    `INSERT INTO posts 
-     (landlord_id, boarding_house_id, title, description, price, area, room_type, address, city, district, latitude, longitude, amenities, contact_phone, contact_name, ai_risk_score, ai_review_status, ai_flags, ai_summary, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      landlordId,
-      boardingHouseId,
-      title,
-      description,
-      price,
-      area,
-      roomType,
-      address,
-      city,
-      district || null,
-      latitude,
-      longitude,
-      Array.isArray(amenities) ? amenities.join(', ') : amenities,
-      contactPhone,
-      contactName,
-      aiRiskScore,
-      aiReviewStatus,
-      JSON.stringify(aiFlags || []),
-      aiSummary,
-      status,
-    ]
-  );
+  let res;
+  if (hasAmenitiesCol) {
+    [res] = await pool.query(
+      `INSERT INTO posts 
+       (landlord_id, boarding_house_id, title, description, price, area, room_type, address, city, district, latitude, longitude, amenities, contact_phone, contact_name, ai_risk_score, ai_review_status, ai_flags, ai_summary, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        landlordId,
+        boardingHouseId,
+        title,
+        description,
+        price,
+        area,
+        roomType,
+        address,
+        city,
+        district || null,
+        latitude,
+        longitude,
+        Array.isArray(amenities) ? amenities.join(', ') : amenities,
+        contactPhone,
+        contactName,
+        aiRiskScore,
+        aiReviewStatus,
+        JSON.stringify(aiFlags || []),
+        aiSummary,
+        status,
+      ]
+    );
+  } else {
+    [res] = await pool.query(
+      `INSERT INTO posts 
+       (landlord_id, boarding_house_id, title, description, price, area, room_type, address, city, district, latitude, longitude, contact_phone, contact_name, ai_risk_score, ai_review_status, ai_flags, ai_summary, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        landlordId,
+        boardingHouseId,
+        title,
+        description,
+        price,
+        area,
+        roomType,
+        address,
+        city,
+        district || null,
+        latitude,
+        longitude,
+        contactPhone,
+        contactName,
+        aiRiskScore,
+        aiReviewStatus,
+        JSON.stringify(aiFlags || []),
+        aiSummary,
+        status,
+      ]
+    );
+  }
 
   const postId = res.insertId;
 
@@ -428,8 +471,11 @@ async function updatePost(id, updates) {
   if (updates.latitude !== undefined) { fields.push('latitude = ?'); values.push(updates.latitude); }
   if (updates.longitude !== undefined) { fields.push('longitude = ?'); values.push(updates.longitude); }
   if (updates.amenities !== undefined) {
-    fields.push('amenities = ?');
-    values.push(Array.isArray(updates.amenities) ? updates.amenities.join(', ') : updates.amenities);
+    const hasAmenitiesCol = await hasPostAmenitiesCol(pool);
+    if (hasAmenitiesCol) {
+      fields.push('amenities = ?');
+      values.push(Array.isArray(updates.amenities) ? updates.amenities.join(', ') : updates.amenities);
+    }
   }
   const newPhone = updates.contactPhone !== undefined ? updates.contactPhone : updates.contact;
   if (newPhone !== undefined) { fields.push('contact_phone = ?'); values.push(newPhone); }

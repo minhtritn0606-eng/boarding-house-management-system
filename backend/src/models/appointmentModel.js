@@ -147,14 +147,19 @@ async function listAppointments({ landlordId, userId, roomId, status }) {
     LEFT JOIN rooms r ON v.room_id = r.id
     LEFT JOIN boarding_houses h ON r.boarding_house_id = h.id
     LEFT JOIN landlords l ON l.id = COALESCE(p.landlord_id, v.landlord_id, h.landlord_id)
-    LEFT JOIN users u ON (l.user_id = u.id OR u.phone = p.contact_phone)
+    LEFT JOIN users u ON l.user_id = u.id
     WHERE 1=1
   `;
   const values = [];
 
   if (userId) {
-    query += ' AND (l.user_id = ? OR u.id = ? OR v.landlord_id = ?)';
-    values.push(userId, userId, userId);
+    query += ` AND (
+      l.user_id = ? 
+      OR u.id = ? 
+      OR v.landlord_id = ? 
+      OR v.landlord_id IN (SELECT id FROM landlords WHERE user_id = ?)
+    )`;
+    values.push(userId, userId, userId, userId);
   } else if (landlordId) {
     query += ' AND (l.id = ? OR v.landlord_id = ?)';
     values.push(landlordId, landlordId);
@@ -173,7 +178,17 @@ async function listAppointments({ landlordId, userId, roomId, status }) {
   query += ' ORDER BY v.created_at DESC';
 
   const [rows] = await pool.query(query, values);
-  return rows.map(formatAppointmentRow);
+
+  const uniqueRows = [];
+  const seenIds = new Set();
+  for (const row of rows) {
+    if (!seenIds.has(row.id)) {
+      seenIds.add(row.id);
+      uniqueRows.push(row);
+    }
+  }
+
+  return uniqueRows.map(formatAppointmentRow);
 }
 
 async function updateAppointmentStatus(id, status) {

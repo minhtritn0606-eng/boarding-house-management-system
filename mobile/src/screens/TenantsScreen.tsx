@@ -11,6 +11,7 @@ import {
   Alert,
   Linking,
   Platform,
+  RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTenants } from '../context/TenantContext'
@@ -26,8 +27,18 @@ interface TenantsScreenProps {
 
 export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsScreenProps) {
   const { user } = useAuth()
-  const { tenants, addTenant, updateTenant, deleteTenant, updateContractStatus } = useTenants()
+  const { tenants, addTenant, updateTenant, deleteTenant, updateContractStatus, refreshTenants } = useTenants()
   const { rooms, getRoomsByOwner } = useRooms()
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      if (refreshTenants) await refreshTenants()
+    } catch {}
+    setIsRefreshing(false)
+  }
 
   const myRooms = getRoomsByOwner(user?.email)
 
@@ -238,14 +249,14 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
   const activeCount = tenants.filter((t) => t.status === 'active').length
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
 
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>👥 Khách Thuê & Hợp Đồng</Text>
-          <Text style={styles.headerSubtitle}>
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.headerTitle}>Khách thuê & Hợp đồng</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
             {activeCount} khách đang thuê • {tenants.length} tổng hồ sơ
           </Text>
         </View>
@@ -255,10 +266,20 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#0f172a"
+            colors={['#0f172a']}
+          />
+        }
+      >
         {/* Search Bar */}
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
             placeholder="Tìm tên, số điện thoại, số phòng, CCCD..."
@@ -301,12 +322,12 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
           </View>
         ) : (
           <View style={styles.listContainer}>
-            {filteredTenants.map((item) => {
+            {filteredTenants.map((item, idx) => {
               const isActive = item.status === 'active'
 
               if (!isActive) {
                 return (
-                  <View key={item.id} style={[styles.tenantCard, styles.tenantCardTerminated]}>
+                  <View key={`${item.id}-${idx}`} style={[styles.tenantCard, styles.tenantCardTerminated]}>
                     {/* Header */}
                     <View style={styles.cardHeader}>
                       <View style={[styles.avatarCircle, { backgroundColor: '#cbd5e1' }]}>
@@ -379,7 +400,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
               }
 
               return (
-                <View key={item.id} style={styles.tenantCard}>
+                <View key={`${item.id}-${idx}`} style={styles.tenantCard}>
                   {/* Card Header */}
                   <View style={styles.cardHeader}>
                     <View style={styles.avatarCircle}>
@@ -733,7 +754,7 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
           </View>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -745,16 +766,24 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#0f172a',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 16,
-    paddingBottom: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  headerTextGroup: {
+    flex: 1,
+    paddingRight: 12,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#f8fafc',
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
     fontSize: 12,
@@ -762,15 +791,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addBtn: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '600',
   },
   container: {
     flexGrow: 1,

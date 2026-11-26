@@ -25,23 +25,54 @@ async function ensureRoomsTable() {
   // Table rooms is ensured for internal management
 }
 
+let _hasRoomAmenitiesCol = null;
+async function hasRoomAmenitiesCol(pool) {
+  if (_hasRoomAmenitiesCol !== null) return _hasRoomAmenitiesCol;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM rooms LIKE 'amenities'");
+    _hasRoomAmenitiesCol = cols.length > 0;
+  } catch (e) {
+    _hasRoomAmenitiesCol = false;
+  }
+  return _hasRoomAmenitiesCol;
+}
+
 async function createRoom({ boardingHouseId, title, description, price, roomType = 'standard', area, floor = 1, amenities, images = [], isPublished = false }) {
   await ensureRoomsTable();
   const pool = await getPool();
-  const [result] = await pool.query(
-    'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, floor, amenities, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [
-      boardingHouseId,
-      title,
-      description || null,
-      price,
-      roomType,
-      area || null,
-      floor || 1,
-      Array.isArray(amenities) ? amenities.join(', ') : amenities || null,
-      isPublished ? 1 : 0,
-    ]
-  );
+  const hasAmenitiesCol = await hasRoomAmenitiesCol(pool);
+
+  let result;
+  if (hasAmenitiesCol) {
+    [result] = await pool.query(
+      'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, floor, amenities, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        boardingHouseId,
+        title,
+        description || null,
+        price,
+        roomType,
+        area || null,
+        floor || 1,
+        Array.isArray(amenities) ? amenities.join(', ') : amenities || null,
+        isPublished ? 1 : 0,
+      ]
+    );
+  } else {
+    [result] = await pool.query(
+      'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, floor, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        boardingHouseId,
+        title,
+        description || null,
+        price,
+        roomType,
+        area || null,
+        floor || 1,
+        isPublished ? 1 : 0,
+      ]
+    );
+  }
 
   const roomId = result.insertId;
 
@@ -172,8 +203,11 @@ async function updateRoom(id, updates) {
     values.push(updates.floor);
   }
   if (updates.amenities !== undefined) {
-    fields.push('amenities = ?');
-    values.push(Array.isArray(updates.amenities) ? updates.amenities.join(', ') : updates.amenities);
+    const hasAmenitiesCol = await hasRoomAmenitiesCol(pool);
+    if (hasAmenitiesCol) {
+      fields.push('amenities = ?');
+      values.push(Array.isArray(updates.amenities) ? updates.amenities.join(', ') : updates.amenities);
+    }
   }
 
   if (fields.length > 0) {

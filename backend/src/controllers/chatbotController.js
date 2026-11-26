@@ -1,5 +1,6 @@
 const { getPool } = require('../config/database');
 const { generateGeminiChatReply } = require('../services/geminiService');
+const { listPosts } = require('../models/postModel');
 
 /**
  * Hàm phân tích câu hỏi người dùng bằng NLP / Rule Matching (Dự phòng Fallback)
@@ -126,25 +127,23 @@ async function handleChatbotMessage(req, res) {
     const pool = await getPool();
 
     // 1. Lấy toàn bộ danh sách phòng trọ đang mở đăng từ MySQL
-    const [allRooms] = await pool.query(`
-      SELECT 
-        p.id,
-        p.title,
-        p.description,
-        p.price,
-        p.area,
-        p.room_type,
-        p.status,
-        p.amenities,
-        p.address AS house_address,
-        p.district AS house_district,
-        p.city AS house_city,
-        p.contact_name AS landlord_name,
-        p.contact_phone AS landlord_phone,
-        (SELECT image_url FROM post_images WHERE post_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) AS primary_image
-      FROM posts p
-      WHERE p.status = 'active'
-    `);
+    const allPosts = await listPosts({ status: 'active' }).catch(() => []);
+    const allRooms = allPosts.map((p) => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      price: p.price,
+      area: p.area,
+      room_type: p.roomType,
+      status: p.status,
+      amenities: Array.isArray(p.amenities) ? p.amenities.join(', ') : (p.amenities || ''),
+      house_address: p.address,
+      house_district: p.district,
+      house_city: p.city,
+      landlord_name: p.contactName,
+      landlord_phone: p.contactPhone,
+      primary_image: p.images && p.images[0] ? p.images[0] : null,
+    }));
 
     // 2. Tìm thông tin phòng hiện tại nếu người dùng đang đứng ở /rooms/:id
     let currentRoom = null;

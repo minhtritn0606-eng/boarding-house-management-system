@@ -78,7 +78,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
   // Form State
   const [formName, setFormName] = useState('')
   const [formPhone, setFormPhone] = useState('')
-  const [formEmail, setFormEmail] = useState('')
   const [formIdCard, setFormIdCard] = useState('')
   const [formHometown, setFormHometown] = useState('')
   const [formJob, setFormJob] = useState('')
@@ -123,7 +122,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
         setEditingTenant(null)
         setFormName('')
         setFormPhone('')
-        setFormEmail('')
         setFormIdCard('')
         setFormHometown('')
         setFormJob('')
@@ -186,7 +184,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     setEditingTenant(null)
     setFormName('')
     setFormPhone('')
-    setFormEmail('')
     setFormIdCard('')
     setFormHometown('')
     setFormJob('')
@@ -205,7 +202,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     setEditingTenant(tenant)
     setFormName(tenant.name)
     setFormPhone(tenant.phone)
-    setFormEmail(tenant.email || '')
     setFormIdCard(tenant.idCard)
     setFormHometown(tenant.hometown)
     setFormJob(tenant.job || '')
@@ -246,7 +242,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     setEditingTenant(tenant)
     setFormName(tenant.name)
     setFormPhone(tenant.phone)
-    setFormEmail(tenant.email || '')
     setFormIdCard(tenant.idCard)
     setFormHometown(tenant.hometown)
     setFormJob(tenant.job || '')
@@ -297,7 +292,6 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
     const tenantPayload = {
       name: formName.trim(),
       phone: formPhone.trim(),
-      email: formEmail.trim() || undefined,
       idCard: formIdCard.trim(),
       hometown: formHometown.trim() || 'Chưa cập nhật',
       job: formJob.trim() || undefined,
@@ -884,28 +878,15 @@ export default function TenantsScreen({ onNavigateTab, initialAction }: TenantsS
                 </View>
               </View>
 
-              {/* Row 3: Nghề nghiệp + Email */}
-              <View style={styles.formRow}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.fieldLabel}>Nghề nghiệp</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="Kỹ sư / Sinh viên"
-                    value={formJob}
-                    onChangeText={setFormJob}
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 8 }}>
-                  <Text style={styles.fieldLabel}>Email</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="tenant@example.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={formEmail}
-                    onChangeText={setFormEmail}
-                  />
-                </View>
+              {/* Row 3: Nghề nghiệp */}
+              <View style={{ marginBottom: 4 }}>
+                <Text style={styles.fieldLabel}>Nghề nghiệp</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Kỹ sư / Sinh viên / Tự do..."
+                  value={formJob}
+                  onChangeText={setFormJob}
+                />
               </View>
 
               {/* Room Selection Header with Auto Rent Price Badge */}

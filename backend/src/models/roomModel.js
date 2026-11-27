@@ -18,10 +18,27 @@ async function ensureRoomsTable() {
       available_from DATE DEFAULT NULL,
       amenities TEXT DEFAULT NULL,
       note TEXT DEFAULT NULL,
+      electric_rate DECIMAL(10,2) DEFAULT NULL,
+      water_rate DECIMAL(10,2) DEFAULT NULL,
+      internet_fee DECIMAL(10,2) DEFAULT NULL,
+      trash_fee DECIMAL(10,2) DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM rooms LIKE 'electric_rate'");
+    if (cols.length === 0) {
+      await pool.query(`
+        ALTER TABLE rooms
+        ADD COLUMN electric_rate DECIMAL(10,2) DEFAULT NULL,
+        ADD COLUMN water_rate DECIMAL(10,2) DEFAULT NULL,
+        ADD COLUMN internet_fee DECIMAL(10,2) DEFAULT NULL,
+        ADD COLUMN trash_fee DECIMAL(10,2) DEFAULT NULL
+      `);
+    }
+  } catch (err) {}
   // Table rooms is ensured for internal management
 }
 
@@ -37,7 +54,22 @@ async function hasRoomAmenitiesCol(pool) {
   return _hasRoomAmenitiesCol;
 }
 
-async function createRoom({ boardingHouseId, title, description, price, roomType = 'standard', area, floor = 1, amenities, images = [], isPublished = false }) {
+async function createRoom({
+  boardingHouseId,
+  title,
+  description,
+  price,
+  roomType = 'standard',
+  area,
+  floor = 1,
+  amenities,
+  images = [],
+  isPublished = false,
+  electricRate = null,
+  waterRate = null,
+  internetFee = null,
+  trashFee = null,
+}) {
   await ensureRoomsTable();
   const pool = await getPool();
   const hasAmenitiesCol = await hasRoomAmenitiesCol(pool);
@@ -45,7 +77,10 @@ async function createRoom({ boardingHouseId, title, description, price, roomType
   let result;
   if (hasAmenitiesCol) {
     [result] = await pool.query(
-      'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, floor, amenities, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO rooms (
+        boarding_house_id, title, description, price, room_type, area, floor, amenities, is_published,
+        electric_rate, water_rate, internet_fee, trash_fee
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         boardingHouseId,
         title,
@@ -56,11 +91,18 @@ async function createRoom({ boardingHouseId, title, description, price, roomType
         floor || 1,
         Array.isArray(amenities) ? amenities.join(', ') : amenities || null,
         isPublished ? 1 : 0,
+        electricRate != null ? Number(electricRate) : null,
+        waterRate != null ? Number(waterRate) : null,
+        internetFee != null ? Number(internetFee) : null,
+        trashFee != null ? Number(trashFee) : null,
       ]
     );
   } else {
     [result] = await pool.query(
-      'INSERT INTO rooms (boarding_house_id, title, description, price, room_type, area, floor, is_published) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO rooms (
+        boarding_house_id, title, description, price, room_type, area, floor, is_published,
+        electric_rate, water_rate, internet_fee, trash_fee
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         boardingHouseId,
         title,
@@ -70,6 +112,10 @@ async function createRoom({ boardingHouseId, title, description, price, roomType
         area || null,
         floor || 1,
         isPublished ? 1 : 0,
+        electricRate != null ? Number(electricRate) : null,
+        waterRate != null ? Number(waterRate) : null,
+        internetFee != null ? Number(internetFee) : null,
+        trashFee != null ? Number(trashFee) : null,
       ]
     );
   }
@@ -150,6 +196,10 @@ async function findRoomById(id) {
     tenantName: row.tenant_name || (row.status === 'rented' ? 'Khách thuê' : undefined),
     tenantPhone: row.tenant_phone || undefined,
     images,
+    electricRate: row.electric_rate != null ? Number(row.electric_rate) : undefined,
+    waterRate: row.water_rate != null ? Number(row.water_rate) : undefined,
+    internetFee: row.internet_fee != null ? Number(row.internet_fee) : undefined,
+    trashFee: row.trash_fee != null ? Number(row.trash_fee) : undefined,
     postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -201,6 +251,22 @@ async function updateRoom(id, updates) {
   if (updates.floor !== undefined) {
     fields.push('floor = ?');
     values.push(updates.floor);
+  }
+  if (updates.electricRate !== undefined) {
+    fields.push('electric_rate = ?');
+    values.push(updates.electricRate != null ? Number(updates.electricRate) : null);
+  }
+  if (updates.waterRate !== undefined) {
+    fields.push('water_rate = ?');
+    values.push(updates.waterRate != null ? Number(updates.waterRate) : null);
+  }
+  if (updates.internetFee !== undefined) {
+    fields.push('internet_fee = ?');
+    values.push(updates.internetFee != null ? Number(updates.internetFee) : null);
+  }
+  if (updates.trashFee !== undefined) {
+    fields.push('trash_fee = ?');
+    values.push(updates.trashFee != null ? Number(updates.trashFee) : null);
   }
   if (updates.amenities !== undefined) {
     const hasAmenitiesCol = await hasRoomAmenitiesCol(pool);
@@ -366,6 +432,10 @@ async function listPublishedRooms(filters = {}) {
       tenantName: row.tenant_name || (row.status === 'rented' ? 'Khách thuê' : undefined),
       tenantPhone: row.tenant_phone || undefined,
       images: [],
+      electricRate: row.electric_rate != null ? Number(row.electric_rate) : undefined,
+      waterRate: row.water_rate != null ? Number(row.water_rate) : undefined,
+      internetFee: row.internet_fee != null ? Number(row.internet_fee) : undefined,
+      trashFee: row.trash_fee != null ? Number(row.trash_fee) : undefined,
       postedDate: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : '2026-08-01',
       createdAt: row.created_at,
       updatedAt: row.updated_at,

@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRooms } from '../context/RoomContext'
+import { useBills } from '../context/BillContext'
 import { useAuth } from '../context/AuthContext'
 import type { MobileRoom, RoomType, RoomStatus } from '../types/room'
 import type { TabType } from '../components/BottomTabBar'
@@ -52,6 +53,7 @@ interface RoomsScreenProps {
 
 export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScreenProps) {
   const { user } = useAuth()
+  const { utilitySettings } = useBills()
   const {
     rooms,
     addRoom,
@@ -134,6 +136,10 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
   const [formRoomType, setFormRoomType] = useState<RoomType>('private')
   const [formAmenities, setFormAmenities] = useState<string[]>([])
   const [formNote, setFormNote] = useState('')
+  const [formElectricRate, setFormElectricRate] = useState('')
+  const [formWaterRate, setFormWaterRate] = useState('')
+  const [formInternetFee, setFormInternetFee] = useState('')
+  const [formTrashFee, setFormTrashFee] = useState('')
 
   // Floor Filter Logic
   const availableFloors = useMemo(() => {
@@ -180,6 +186,10 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
     setFormRoomType('private')
     setFormAmenities(['Wifi tốc độ cao', 'Nóng lạnh'])
     setFormNote('')
+    setFormElectricRate(String(utilitySettings.electricRate))
+    setFormWaterRate(String(utilitySettings.waterRate))
+    setFormInternetFee(String(utilitySettings.internetFee))
+    setFormTrashFee(String(utilitySettings.trashFee))
     setEditingRoom(null)
     setIsAddModalOpen(true)
   }
@@ -194,6 +204,10 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
     setFormRoomType(room.roomType)
     setFormAmenities(room.amenities || [])
     setFormNote(room.note || '')
+    setFormElectricRate(String(room.electricRate ?? utilitySettings.electricRate))
+    setFormWaterRate(String(room.waterRate ?? utilitySettings.waterRate))
+    setFormInternetFee(String(room.internetFee ?? utilitySettings.internetFee))
+    setFormTrashFee(String(room.trashFee ?? utilitySettings.trashFee))
     setIsAddModalOpen(true)
   }
 
@@ -214,6 +228,10 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
     const priceNum = parseInt(formPrice.replace(/\D/g, ''), 10) || 2000000
     const areaNum = parseFloat(formArea) || 20
     const floorNum = parseInt(formFloor, 10) || 1
+    const electricRateNum = parseFloat(formElectricRate.replace(/\D/g, '')) || utilitySettings.electricRate
+    const waterRateNum = parseFloat(formWaterRate.replace(/\D/g, '')) || utilitySettings.waterRate
+    const internetFeeNum = parseFloat(formInternetFee.replace(/\D/g, '')) || utilitySettings.internetFee
+    const trashFeeNum = parseFloat(formTrashFee.replace(/\D/g, '')) || utilitySettings.trashFee
 
     if (editingRoom) {
       updateRoom(editingRoom.id, {
@@ -226,6 +244,10 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
         status: editingRoom.status, // Giữ nguyên trạng thái thực tế của phòng, không đổi thủ công tại form
         amenities: formAmenities,
         note: formNote.trim(),
+        electricRate: electricRateNum,
+        waterRate: waterRateNum,
+        internetFee: internetFeeNum,
+        trashFee: trashFeeNum,
       })
       Alert.alert('Thành công', 'Đã cập nhật thông tin phòng trọ!')
     } else {
@@ -241,6 +263,10 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
         ownerEmail: user?.email || 'nam.owner@example.com',
         amenities: formAmenities,
         note: formNote.trim(),
+        electricRate: electricRateNum,
+        waterRate: waterRateNum,
+        internetFee: internetFeeNum,
+        trashFee: trashFeeNum,
       })
       Alert.alert('Thành công', 'Đã thêm phòng trọ mới vào hệ thống!')
     }
@@ -479,6 +505,17 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
                         </View>
                       )}
 
+                      {/* Đơn giá dịch vụ của phòng */}
+                      <View style={styles.roomUtilityBar}>
+                        <Text style={styles.roomUtilityText}>
+                          ⚡ Điện: {(room.electricRate ?? utilitySettings.electricRate).toLocaleString('vi-VN')} đ/kWh
+                        </Text>
+                        <Text style={styles.roomUtilityDot}>•</Text>
+                        <Text style={styles.roomUtilityText}>
+                          💧 Nước: {(room.waterRate ?? utilitySettings.waterRate).toLocaleString('vi-VN')} đ/m³
+                        </Text>
+                      </View>
+
                       {/* Cụm thao tác nghiệp vụ (Đã bỏ icon bút chì và thùng rác) */}
                       <View style={styles.cardActionsContainer}>
                         {!isAvailable ? (
@@ -712,7 +749,7 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingRoom ? '✏️ Chỉnh sửa phòng trọ' : '➕ Thêm phòng trọ mới'}
+                {editingRoom ? 'Chỉnh sửa phòng trọ' : 'Thêm phòng trọ mới'}
               </Text>
               <TouchableOpacity onPress={() => setIsAddModalOpen(false)}>
                 <Text style={styles.modalCloseBtn}>✕</Text>
@@ -803,6 +840,63 @@ export default function RoomsScreen({ onNavigateTab, initialAction }: RoomsScree
                     </TouchableOpacity>
                   )
                 })}
+              </View>
+
+              {/* Utility Rates Card */}
+              <View style={styles.utilitySection}>
+                <View style={styles.utilityHeaderRow}>
+                  <Text style={styles.utilitySectionTitle}>Đơn giá dịch vụ</Text>
+
+                </View>
+                <Text style={styles.utilitySubText}>
+                  Mặc định theo cài đặt dãy trọ. Bạn có thể sửa riêng cho phòng này nếu muốn.
+                </Text>
+
+                <View style={styles.formRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formSubLabel}>Điện (VNĐ/kWh)</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="3500"
+                      keyboardType="numeric"
+                      value={formElectricRate}
+                      onChangeText={setFormElectricRate}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formSubLabel}>Nước (VNĐ/m³)</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="15000"
+                      keyboardType="numeric"
+                      value={formWaterRate}
+                      onChangeText={setFormWaterRate}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formSubLabel}>Internet (VNĐ/tháng)</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="100000"
+                      keyboardType="numeric"
+                      value={formInternetFee}
+                      onChangeText={setFormInternetFee}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formSubLabel}>Rác (VNĐ/tháng)</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="30000"
+                      keyboardType="numeric"
+                      value={formTrashFee}
+                      onChangeText={setFormTrashFee}
+                    />
+                  </View>
+                </View>
               </View>
 
               {/* Amenities */}
@@ -1555,5 +1649,70 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  roomUtilityBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  roomUtilityText: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  roomUtilityDot: {
+    marginHorizontal: 8,
+    color: '#94a3b8',
+    fontSize: 10,
+  },
+  utilitySection: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 12,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  utilityHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  utilitySectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  utilityBadge: {
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  utilityBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  utilitySubText: {
+    fontSize: 11,
+    color: '#64748b',
+    marginBottom: 8,
+  },
+  formSubLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 4,
   },
 })

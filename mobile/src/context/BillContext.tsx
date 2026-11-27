@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import type { BillItem, UtilitySettings, BillStatus } from '../types/bill'
-import { mobileBillApi } from '../services/api'
+import { mobileBillApi, mobileHouseApi } from '../services/api'
 import { useAuth } from './AuthContext'
 
 interface BillContextType {
@@ -8,7 +8,7 @@ interface BillContextType {
   isLoading: boolean
   refreshBills: () => Promise<void>
   utilitySettings: UtilitySettings
-  updateUtilitySettings: (settings: Partial<UtilitySettings>) => void
+  updateUtilitySettings: (settings: Partial<UtilitySettings>) => Promise<void>
   addBill: (bill: Omit<BillItem, 'id' | 'electricUsage' | 'electricAmount' | 'waterUsage' | 'waterAmount' | 'totalAmount'>) => Promise<void>
   updateBill: (id: string, updatedData: Partial<BillItem>) => Promise<void>
   deleteBill: (id: string) => Promise<void>
@@ -75,6 +75,20 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     } catch (e: any) {
       console.log('Mobile bill fetch error:', e.message)
       setBills([])
+    }
+
+    try {
+      const utilRes = await mobileHouseApi.getHouseUtilities(1)
+      if (utilRes && utilRes.settings) {
+        setUtilitySettings({
+          electricRate: Number(utilRes.settings.electricRate) || 3500,
+          waterRate: Number(utilRes.settings.waterRate) || 15000,
+          internetFee: Number(utilRes.settings.internetFee) || 100000,
+          trashFee: Number(utilRes.settings.trashFee) || 30000,
+        })
+      }
+    } catch (e: any) {
+      // Dùng mặc định nếu lỗi mạng
     } finally {
       setIsLoading(false)
     }
@@ -84,8 +98,15 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
     refreshBills()
   }, [user?.id, isAuthenticated])
 
-  const updateUtilitySettings = (settings: Partial<UtilitySettings>) => {
-    setUtilitySettings((prev) => ({ ...prev, ...settings }))
+  const updateUtilitySettings = async (settings: Partial<UtilitySettings>) => {
+    const merged = { ...utilitySettings, ...settings }
+    setUtilitySettings(merged)
+
+    try {
+      await mobileHouseApi.updateHouseUtilities(1, merged)
+    } catch (e: any) {
+      console.log('Mobile update house utilities error:', e.message)
+    }
   }
 
   const addBill = async (

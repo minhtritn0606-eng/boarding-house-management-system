@@ -32,6 +32,7 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   const {
     bills,
     utilitySettings,
+    updateUtilitySettings,
     addBill,
     updateBill,
     deleteBill,
@@ -50,7 +51,7 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
     setIsRefreshing(true)
     try {
       if (refreshBills) await refreshBills()
-    } catch {}
+    } catch { }
     setIsRefreshing(false)
   }
 
@@ -68,6 +69,14 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingBill, setEditingBill] = useState<BillItem | null>(null)
 
+  // House Utility Settings Modal State
+  const [isUtilityModalOpen, setIsUtilityModalOpen] = useState(false)
+  const [settingElectricRate, setSettingElectricRate] = useState(String(utilitySettings.electricRate))
+  const [settingWaterRate, setSettingWaterRate] = useState(String(utilitySettings.waterRate))
+  const [settingInternetFee, setSettingInternetFee] = useState(String(utilitySettings.internetFee))
+  const [settingTrashFee, setSettingTrashFee] = useState(String(utilitySettings.trashFee))
+  const [isSavingUtility, setIsSavingUtility] = useState(false)
+
   // Form State
   const [formRoomNumber, setFormRoomNumber] = useState('P.101')
   const [formTenantName, setFormTenantName] = useState('')
@@ -77,8 +86,10 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   const [formRoomFee, setFormRoomFee] = useState('2500000')
   const [formOldElectric, setFormOldElectric] = useState('1400')
   const [formNewElectric, setFormNewElectric] = useState('1470')
+  const [formElectricRate, setFormElectricRate] = useState(String(utilitySettings.electricRate))
   const [formOldWater, setFormOldWater] = useState('100')
   const [formNewWater, setFormNewWater] = useState('106')
+  const [formWaterRate, setFormWaterRate] = useState(String(utilitySettings.waterRate))
   const [formInternetFee, setFormInternetFee] = useState(String(utilitySettings.internetFee))
   const [formTrashFee, setFormTrashFee] = useState(String(utilitySettings.trashFee))
   const [formOtherFee, setFormOtherFee] = useState('0')
@@ -114,8 +125,11 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
           setFormNewWater('86')
         }
 
-        setFormInternetFee(String(utilitySettings.internetFee))
-        setFormTrashFee(String(utilitySettings.trashFee))
+        const roomObj = myRooms.find((r) => r.roomNumber.toLowerCase() === rNum.toLowerCase())
+        setFormElectricRate(String(roomObj?.electricRate != null ? roomObj.electricRate : utilitySettings.electricRate))
+        setFormWaterRate(String(roomObj?.waterRate != null ? roomObj.waterRate : utilitySettings.waterRate))
+        setFormInternetFee(String(roomObj?.internetFee != null ? roomObj.internetFee : utilitySettings.internetFee))
+        setFormTrashFee(String(roomObj?.trashFee != null ? roomObj.trashFee : utilitySettings.trashFee))
         setFormOtherFee('0')
         setFormOtherFeeNote('')
         setFormDueDate('2026-08-25')
@@ -131,6 +145,43 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   // Format currency
   const formatVND = (num: number) => {
     return num.toLocaleString('vi-VN') + ' đ'
+  }
+
+  // Utility settings handlers
+  const handleOpenUtilityModal = () => {
+    setSettingElectricRate(String(utilitySettings.electricRate))
+    setSettingWaterRate(String(utilitySettings.waterRate))
+    setSettingInternetFee(String(utilitySettings.internetFee))
+    setSettingTrashFee(String(utilitySettings.trashFee))
+    setIsUtilityModalOpen(true)
+  }
+
+  const handleSaveUtilitySettings = async () => {
+    const eRate = Number(settingElectricRate) || 0
+    const wRate = Number(settingWaterRate) || 0
+    const netFee = Number(settingInternetFee) || 0
+    const trFee = Number(settingTrashFee) || 0
+
+    if (eRate <= 0 || wRate <= 0) {
+      Alert.alert('Lưu ý', 'Đơn giá điện và nước phải lớn hơn 0!')
+      return
+    }
+
+    setIsSavingUtility(true)
+    try {
+      await updateUtilitySettings({
+        electricRate: eRate,
+        waterRate: wRate,
+        internetFee: netFee,
+        trashFee: trFee,
+      })
+      Alert.alert('Thành công', 'Đã lưu cài đặt đơn giá dịch vụ của dãy trọ vào CSDL!')
+      setIsUtilityModalOpen(false)
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.message || 'Không thể lưu đơn giá dịch vụ.')
+    } finally {
+      setIsSavingUtility(false)
+    }
   }
 
   // Filter bills
@@ -165,21 +216,33 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
         (t.roomNumber.toLowerCase() === roomNum.toLowerCase() || (cleanTarget !== '' && cleanT === cleanTarget))
       )
     })
+    const roomObj = myRooms.find((r) => {
+      const cleanR = r.roomNumber.replace(/[^\d]/g, '')
+      return r.roomNumber.toLowerCase() === roomNum.toLowerCase() || (cleanTarget !== '' && cleanR === cleanTarget)
+    })
+
     if (activeTenant) {
       setFormTenantName(activeTenant.name)
       setFormTenantPhone(activeTenant.phone)
       setFormRoomFee(String(activeTenant.monthlyRent))
     } else {
-      const roomObj = myRooms.find((r) => {
-        const cleanR = r.roomNumber.replace(/[^\d]/g, '')
-        return r.roomNumber.toLowerCase() === roomNum.toLowerCase() || (cleanTarget !== '' && cleanR === cleanTarget)
-      })
       if (roomObj) {
         setFormRoomFee(String(roomObj.price))
       }
       setFormTenantName('')
       setFormTenantPhone('')
     }
+
+    // Tự động điền đơn giá dịch vụ: Ưu tiên đơn giá theo phòng, nếu không lấy mặc định dãy trọ
+    const eRate = roomObj?.electricRate != null ? roomObj.electricRate : utilitySettings.electricRate
+    const wRate = roomObj?.waterRate != null ? roomObj.waterRate : utilitySettings.waterRate
+    const netFee = roomObj?.internetFee != null ? roomObj.internetFee : utilitySettings.internetFee
+    const trFee = roomObj?.trashFee != null ? roomObj.trashFee : utilitySettings.trashFee
+
+    setFormElectricRate(String(eRate))
+    setFormWaterRate(String(wRate))
+    setFormInternetFee(String(netFee))
+    setFormTrashFee(String(trFee))
 
     const lastBill = getLastBillForRoom(roomNum)
     if (lastBill) {
@@ -208,8 +271,6 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
     const targetM = typeof selectedMonth === 'number' ? selectedMonth : (new Date().getMonth() + 1)
     setFormMonth(targetM)
     setFormYear(selectedYear)
-    setFormInternetFee(String(utilitySettings.internetFee))
-    setFormTrashFee(String(utilitySettings.trashFee))
     setFormOtherFee('0')
     setFormOtherFeeNote('')
     setFormDueDate('2026-08-25')
@@ -229,8 +290,10 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
     setFormRoomFee(String(bill.roomFee))
     setFormOldElectric(String(bill.oldElectricMeter))
     setFormNewElectric(String(bill.newElectricMeter))
+    setFormElectricRate(String(bill.electricRate || utilitySettings.electricRate))
     setFormOldWater(String(bill.oldWaterMeter))
     setFormNewWater(String(bill.newWaterMeter))
+    setFormWaterRate(String(bill.waterRate || utilitySettings.waterRate))
     setFormInternetFee(String(bill.internetFee))
     setFormTrashFee(String(bill.trashFee))
     setFormOtherFee(String(bill.otherFee || 0))
@@ -248,6 +311,9 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
       return
     }
 
+    const appliedElectricRate = Number(formElectricRate) || utilitySettings.electricRate
+    const appliedWaterRate = Number(formWaterRate) || utilitySettings.waterRate
+
     const payload = {
       roomNumber: formRoomNumber,
       houseName: '',
@@ -258,10 +324,10 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
       roomFee: Number(formRoomFee) || 0,
       oldElectricMeter: Number(formOldElectric) || 0,
       newElectricMeter: Number(formNewElectric) || 0,
-      electricRate: utilitySettings.electricRate,
+      electricRate: appliedElectricRate,
       oldWaterMeter: Number(formOldWater) || 0,
       newWaterMeter: Number(formNewWater) || 0,
-      waterRate: utilitySettings.waterRate,
+      waterRate: appliedWaterRate,
       internetFee: Number(formInternetFee) || 0,
       trashFee: Number(formTrashFee) || 0,
       otherFee: Number(formOtherFee) || 0,
@@ -344,10 +410,13 @@ Vui lòng thanh toán qua STK chủ trọ.`
   }
 
   // Live estimate total calculation for modal
+  const appliedElectricRate = Number(formElectricRate) || utilitySettings.electricRate
+  const appliedWaterRate = Number(formWaterRate) || utilitySettings.waterRate
+
   const calcElectricUsage = Math.max(0, (Number(formNewElectric) || 0) - (Number(formOldElectric) || 0))
-  const calcElectricAmount = calcElectricUsage * utilitySettings.electricRate
+  const calcElectricAmount = calcElectricUsage * appliedElectricRate
   const calcWaterUsage = Math.max(0, (Number(formNewWater) || 0) - (Number(formOldWater) || 0))
-  const calcWaterAmount = calcWaterUsage * utilitySettings.waterRate
+  const calcWaterAmount = calcWaterUsage * appliedWaterRate
   const calcTotal =
     (Number(formRoomFee) || 0) +
     calcElectricAmount +
@@ -369,9 +438,14 @@ Vui lòng thanh toán qua STK chủ trọ.`
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.addBtn} onPress={handleOpenAddModal} activeOpacity={0.8}>
-          <Text style={styles.addBtnText}>+ Lập hóa đơn</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.settingsBtn} onPress={handleOpenUtilityModal} activeOpacity={0.8}>
+            <Text style={styles.settingsBtnText}>⚙️ Đơn giá</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtn} onPress={handleOpenAddModal} activeOpacity={0.8}>
+            <Text style={styles.addBtnText}>+ Lập HĐ</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -697,7 +771,10 @@ Vui lòng thanh toán qua STK chủ trọ.`
 
               {/* Electric Inputs */}
               <View style={styles.subCard}>
-                <Text style={styles.subCardTitle}>Điện sinh hoạt (Đơn giá: {formatVND(utilitySettings.electricRate)}/kWh)</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={styles.subCardTitle}>⚡ Điện sinh hoạt</Text>
+                  <Text style={styles.rateBadgeText}>Đơn giá: {formatVND(appliedElectricRate)}/kWh</Text>
+                </View>
                 <View style={styles.formRow}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={styles.fieldSubLabel}>Chỉ số cũ</Text>
@@ -725,7 +802,10 @@ Vui lòng thanh toán qua STK chủ trọ.`
 
               {/* Water Inputs */}
               <View style={styles.subCard}>
-                <Text style={styles.subCardTitle}>Nước sinh hoạt (Đơn giá: {formatVND(utilitySettings.waterRate)}/m³)</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={styles.subCardTitle}>💧 Nước sinh hoạt</Text>
+                  <Text style={styles.rateBadgeText}>Đơn giá: {formatVND(appliedWaterRate)}/m³</Text>
+                </View>
                 <View style={styles.formRow}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={styles.fieldSubLabel}>Chỉ số cũ</Text>
@@ -867,6 +947,87 @@ Vui lòng thanh toán qua STK chủ trọ.`
           </View>
         </SafeAreaView>
       </Modal>
+      {/* House Utility Settings Modal */}
+      <Modal
+        visible={isUtilityModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsUtilityModalOpen(false)}
+      >
+        <SafeAreaView style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={styles.modalTitle}>Đơn giá dịch vụ dãy trọ</Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsUtilityModalOpen(false)}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+
+              <Text style={styles.fieldLabel}>Đơn giá điện (VNĐ / kWh)</Text>
+              <TextInput
+                style={styles.formInput}
+                keyboardType="numeric"
+                value={settingElectricRate}
+                onChangeText={setSettingElectricRate}
+                placeholder="VD: 3500"
+              />
+
+              <Text style={styles.fieldLabel}>Đơn giá nước (VNĐ / m³)</Text>
+              <TextInput
+                style={styles.formInput}
+                keyboardType="numeric"
+                value={settingWaterRate}
+                onChangeText={setSettingWaterRate}
+                placeholder="VD: 15000"
+              />
+
+              <Text style={styles.fieldLabel}>Phí Internet / Wifi (VNĐ / tháng / phòng)</Text>
+              <TextInput
+                style={styles.formInput}
+                keyboardType="numeric"
+                value={settingInternetFee}
+                onChangeText={setSettingInternetFee}
+                placeholder="VD: 100000"
+              />
+
+              <Text style={styles.fieldLabel}>Phí thu gom rác & Vệ sinh (VNĐ / tháng / phòng)</Text>
+              <TextInput
+                style={styles.formInput}
+                keyboardType="numeric"
+                value={settingTrashFee}
+                onChangeText={setSettingTrashFee}
+                placeholder="VD: 30000"
+              />
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsUtilityModalOpen(false)}
+                disabled={isSavingUtility}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelText}>Đóng</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, isSavingUtility && { opacity: 0.6 }]}
+                onPress={handleSaveUtilitySettings}
+                disabled={isSavingUtility}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalSubmitText}>
+                  {isSavingUtility ? 'Đang lưu CSDL...' : 'Lưu đơn giá'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </View>
   )
 }
@@ -887,6 +1048,56 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: '#1e293b',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsBtn: {
+    height: 34,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsBtnText: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  rateBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563eb',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  utilityNoticeBox: {
+    flexDirection: 'row',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  utilityNoticeIcon: {
+    fontSize: 16,
+    marginTop: 2,
+  },
+  utilityNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#1e40af',
+    lineHeight: 18,
   },
   headerTextGroup: {
     flex: 1,

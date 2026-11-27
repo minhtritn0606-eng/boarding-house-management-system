@@ -73,6 +73,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           amenities: Array.isArray(r.amenities) ? r.amenities : ['Wifi', 'Điều hòa', 'Nóng lạnh'],
           floor: r.floor || 1,
           isPublished: Boolean(r.isPublished ?? r.is_published),
+          electricRate: r.electricRate != null ? Number(r.electricRate) : undefined,
+          waterRate: r.waterRate != null ? Number(r.waterRate) : undefined,
+          internetFee: r.internetFee != null ? Number(r.internetFee) : undefined,
+          trashFee: r.trashFee != null ? Number(r.trashFee) : undefined,
         }))
         setRooms(mapped)
       } else {
@@ -128,6 +132,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         floor: Number(roomData.floor) || 1,
         amenities: roomData.amenities,
         isPublished: false, // Phòng tạo trên mobile là phòng nội bộ, không tự đăng lên web
+        electricRate: roomData.electricRate,
+        waterRate: roomData.waterRate,
+        internetFee: roomData.internetFee,
+        trashFee: roomData.trashFee,
       })
       if (res && res.room) {
         await refreshRooms()

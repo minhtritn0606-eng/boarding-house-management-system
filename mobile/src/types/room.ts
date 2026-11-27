@@ -18,6 +18,10 @@ export interface MobileRoom {
   floor?: number
   note?: string
   isPublished?: boolean
+  electricRate?: number
+  waterRate?: number
+  internetFee?: number
+  trashFee?: number
 }
 
 export interface HouseBranch {

@@ -5,6 +5,8 @@ const {
   listAllHouses,
   updateHouse,
   deleteHouse,
+  getHouseUtilitySettings,
+  saveHouseUtilitySettings,
 } = require('../models/houseModel');
 const { getPool } = require('../config/database');
 const { resolveValidUser } = require('../utils/userResolver');
@@ -110,6 +112,26 @@ async function getHouseDetailsHandler(req, res) {
   }
 }
 
+async function getHouseUtilitiesHandler(req, res) {
+  try {
+    const houseId = Number(req.params.id) || 1;
+    const settings = await getHouseUtilitySettings(houseId);
+    return res.status(200).json({ settings });
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not fetch utility settings', error: error.message });
+  }
+}
+
+async function saveHouseUtilitiesHandler(req, res) {
+  try {
+    const houseId = Number(req.params.id) || 1;
+    const settings = await saveHouseUtilitySettings(houseId, req.body);
+    return res.status(200).json({ message: 'Cập nhật đơn giá thành công', settings });
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not save utility settings', error: error.message });
+  }
+}
+
 module.exports = {
   createHouseHandler,
   updateHouseHandler,
@@ -117,4 +139,6 @@ module.exports = {
   getMyHousesHandler,
   getHouseDetailsHandler,
   listHousesHandler,
+  getHouseUtilitiesHandler,
+  saveHouseUtilitiesHandler,
 };

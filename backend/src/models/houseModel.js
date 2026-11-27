@@ -106,7 +106,79 @@ async function updateHouse(id, updates) {
 async function deleteHouse(id) {
   await ensureHousesTable();
   const pool = await getPool();
+  try {
+    await pool.query('DELETE FROM house_utility_settings WHERE house_id = ?', [id]);
+  } catch (e) {}
   await pool.query('DELETE FROM boarding_houses WHERE id = ?', [id]);
+}
+
+async function ensureHouseUtilitySettingsTable() {
+  const pool = await getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS house_utility_settings (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      house_id INT NOT NULL UNIQUE,
+      electric_rate DECIMAL(10,2) DEFAULT 3500.00,
+      water_rate DECIMAL(10,2) DEFAULT 15000.00,
+      internet_fee DECIMAL(10,2) DEFAULT 100000.00,
+      trash_fee DECIMAL(10,2) DEFAULT 30000.00,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_house_id (house_id)
+    )
+  `);
+}
+
+async function getHouseUtilitySettings(houseId) {
+  await ensureHouseUtilitySettingsTable();
+  const pool = await getPool();
+  const [rows] = await pool.query(
+    'SELECT * FROM house_utility_settings WHERE house_id = ?',
+    [houseId]
+  );
+  if (rows.length === 0) {
+    return {
+      houseId: Number(houseId),
+      electricRate: 3500,
+      waterRate: 15000,
+      internetFee: 100000,
+      trashFee: 30000,
+    };
+  }
+  const r = rows[0];
+  return {
+    id: r.id,
+    houseId: r.house_id,
+    electricRate: Number(r.electric_rate) || 3500,
+    waterRate: Number(r.water_rate) || 15000,
+    internetFee: Number(r.internet_fee) || 100000,
+    trashFee: Number(r.trash_fee) || 30000,
+    updatedAt: r.updated_at,
+  };
+}
+
+async function saveHouseUtilitySettings(houseId, settings) {
+  await ensureHouseUtilitySettingsTable();
+  const pool = await getPool();
+
+  const electricRate = settings.electricRate !== undefined ? Number(settings.electricRate) : 3500;
+  const waterRate = settings.waterRate !== undefined ? Number(settings.waterRate) : 15000;
+  const internetFee = settings.internetFee !== undefined ? Number(settings.internetFee) : 100000;
+  const trashFee = settings.trashFee !== undefined ? Number(settings.trashFee) : 30000;
+
+  await pool.query(
+    `INSERT INTO house_utility_settings (house_id, electric_rate, water_rate, internet_fee, trash_fee)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       electric_rate = VALUES(electric_rate),
+       water_rate = VALUES(water_rate),
+       internet_fee = VALUES(internet_fee),
+       trash_fee = VALUES(trash_fee),
+       updated_at = CURRENT_TIMESTAMP`,
+    [houseId, electricRate, waterRate, internetFee, trashFee]
+  );
+
+  return await getHouseUtilitySettings(houseId);
 }
 
 async function listAllHouses(filters = {}) {
@@ -159,4 +231,6 @@ module.exports = {
   listAllHouses,
   updateHouse,
   deleteHouse,
+  getHouseUtilitySettings,
+  saveHouseUtilitySettings,
 };

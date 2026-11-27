@@ -151,6 +151,15 @@ export const mobileHouseApi = {
   getHouses: async () => {
     return await mobileRequest<{ houses: any[] }>('/houses')
   },
+  getHouseUtilities: async (id: number | string = 1) => {
+    return await mobileRequest<{ settings: any }>(`/houses/${id}/utilities`)
+  },
+  updateHouseUtilities: async (id: number | string = 1, data: any) => {
+    return await mobileRequest<{ settings: any; message?: string }>(`/houses/${id}/utilities`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
 }
 
 // ================= ROOMS =================

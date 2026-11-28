@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native'
 
-export type TabType = 'dashboard' | 'rooms' | 'appointments' | 'tenants' | 'bills'
+export type TabType = 'dashboard' | 'rooms' | 'appointments' | 'tenants' | 'bills' | 'settings'
 
 interface Props {
   activeTab: TabType

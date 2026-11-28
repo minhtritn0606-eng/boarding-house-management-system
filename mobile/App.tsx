@@ -13,6 +13,7 @@ import RoomsScreen from './src/screens/RoomsScreen'
 import AppointmentsScreen from './src/screens/AppointmentsScreen'
 import TenantsScreen from './src/screens/TenantsScreen'
 import BillsScreen from './src/screens/BillsScreen'
+import SettingsScreen from './src/screens/SettingsScreen'
 import BottomTabBar, { type TabType } from './src/components/BottomTabBar'
 
 function MainApp() {
@@ -55,6 +56,13 @@ function MainApp() {
         return <TenantsScreen onNavigateTab={handleNavigate} initialAction={tabPayload} />
       case 'bills':
         return <BillsScreen onNavigateTab={handleNavigate} initialAction={tabPayload} />
+      case 'settings':
+        return (
+          <SettingsScreen
+            onNavigateTab={handleNavigate}
+            onNavigateBack={() => setActiveTab('dashboard')}
+          />
+        )
       default:
         return <HomeScreen onNavigateTab={handleNavigate} />
     }

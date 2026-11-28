@@ -69,14 +69,6 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingBill, setEditingBill] = useState<BillItem | null>(null)
 
-  // House Utility Settings Modal State
-  const [isUtilityModalOpen, setIsUtilityModalOpen] = useState(false)
-  const [settingElectricRate, setSettingElectricRate] = useState(String(utilitySettings.electricRate))
-  const [settingWaterRate, setSettingWaterRate] = useState(String(utilitySettings.waterRate))
-  const [settingInternetFee, setSettingInternetFee] = useState(String(utilitySettings.internetFee))
-  const [settingTrashFee, setSettingTrashFee] = useState(String(utilitySettings.trashFee))
-  const [isSavingUtility, setIsSavingUtility] = useState(false)
-
   // Form State
   const [formRoomNumber, setFormRoomNumber] = useState('P.101')
   const [formTenantName, setFormTenantName] = useState('')
@@ -145,43 +137,6 @@ export default function BillsScreen({ onNavigateTab, initialAction }: BillsScree
   // Format currency
   const formatVND = (num: number) => {
     return num.toLocaleString('vi-VN') + ' đ'
-  }
-
-  // Utility settings handlers
-  const handleOpenUtilityModal = () => {
-    setSettingElectricRate(String(utilitySettings.electricRate))
-    setSettingWaterRate(String(utilitySettings.waterRate))
-    setSettingInternetFee(String(utilitySettings.internetFee))
-    setSettingTrashFee(String(utilitySettings.trashFee))
-    setIsUtilityModalOpen(true)
-  }
-
-  const handleSaveUtilitySettings = async () => {
-    const eRate = Number(settingElectricRate) || 0
-    const wRate = Number(settingWaterRate) || 0
-    const netFee = Number(settingInternetFee) || 0
-    const trFee = Number(settingTrashFee) || 0
-
-    if (eRate <= 0 || wRate <= 0) {
-      Alert.alert('Lưu ý', 'Đơn giá điện và nước phải lớn hơn 0!')
-      return
-    }
-
-    setIsSavingUtility(true)
-    try {
-      await updateUtilitySettings({
-        electricRate: eRate,
-        waterRate: wRate,
-        internetFee: netFee,
-        trashFee: trFee,
-      })
-      Alert.alert('Thành công', 'Đã lưu cài đặt đơn giá dịch vụ của dãy trọ vào CSDL!')
-      setIsUtilityModalOpen(false)
-    } catch (err: any) {
-      Alert.alert('Lỗi', err?.message || 'Không thể lưu đơn giá dịch vụ.')
-    } finally {
-      setIsSavingUtility(false)
-    }
   }
 
   // Filter bills
@@ -438,14 +393,9 @@ Vui lòng thanh toán qua STK chủ trọ.`
           </Text>
         </View>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.settingsBtn} onPress={handleOpenUtilityModal} activeOpacity={0.8}>
-            <Text style={styles.settingsBtnText}>⚙️ Đơn giá</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.addBtn} onPress={handleOpenAddModal} activeOpacity={0.8}>
-            <Text style={styles.addBtnText}>+ Lập HĐ</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.addBtn} onPress={handleOpenAddModal} activeOpacity={0.8}>
+          <Text style={styles.addBtnText}>+ Lập hóa đơn</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -942,87 +892,6 @@ Vui lòng thanh toán qua STK chủ trọ.`
 
               <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleSaveBill} activeOpacity={0.8}>
                 <Text style={styles.modalSubmitText}>{editingBill ? 'Cập nhật' : 'Lưu hóa đơn'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </SafeAreaView>
-      </Modal>
-      {/* House Utility Settings Modal */}
-      <Modal
-        visible={isUtilityModalOpen}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsUtilityModalOpen(false)}
-      >
-        <SafeAreaView style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={styles.modalTitle}>Đơn giá dịch vụ dãy trọ</Text>
-              </View>
-              <TouchableOpacity onPress={() => setIsUtilityModalOpen(false)}>
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-
-              <Text style={styles.fieldLabel}>Đơn giá điện (VNĐ / kWh)</Text>
-              <TextInput
-                style={styles.formInput}
-                keyboardType="numeric"
-                value={settingElectricRate}
-                onChangeText={setSettingElectricRate}
-                placeholder="VD: 3500"
-              />
-
-              <Text style={styles.fieldLabel}>Đơn giá nước (VNĐ / m³)</Text>
-              <TextInput
-                style={styles.formInput}
-                keyboardType="numeric"
-                value={settingWaterRate}
-                onChangeText={setSettingWaterRate}
-                placeholder="VD: 15000"
-              />
-
-              <Text style={styles.fieldLabel}>Phí Internet / Wifi (VNĐ / tháng / phòng)</Text>
-              <TextInput
-                style={styles.formInput}
-                keyboardType="numeric"
-                value={settingInternetFee}
-                onChangeText={setSettingInternetFee}
-                placeholder="VD: 100000"
-              />
-
-              <Text style={styles.fieldLabel}>Phí thu gom rác & Vệ sinh (VNĐ / tháng / phòng)</Text>
-              <TextInput
-                style={styles.formInput}
-                keyboardType="numeric"
-                value={settingTrashFee}
-                onChangeText={setSettingTrashFee}
-                placeholder="VD: 30000"
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setIsUtilityModalOpen(false)}
-                disabled={isSavingUtility}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.modalCancelText}>Đóng</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalSubmitBtn, isSavingUtility && { opacity: 0.6 }]}
-                onPress={handleSaveUtilitySettings}
-                disabled={isSavingUtility}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.modalSubmitText}>
-                  {isSavingUtility ? 'Đang lưu CSDL...' : 'Lưu đơn giá'}
-                </Text>
               </TouchableOpacity>
             </View>
           </View>

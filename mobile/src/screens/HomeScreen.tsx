@@ -171,8 +171,12 @@ export default function HomeScreen({ onNavigateTab }: HomeScreenProps) {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.headerActionBtn} onPress={logout} activeOpacity={0.8}>
-          <Text style={styles.headerActionText}>Đăng xuất</Text>
+        <TouchableOpacity
+          style={styles.headerSettingsBtn}
+          onPress={() => onNavigateTab && onNavigateTab('settings')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.headerSettingsText}>⚙️ Cài đặt</Text>
         </TouchableOpacity>
       </View>
 
@@ -572,7 +576,7 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     marginTop: 2,
   },
-  headerActionBtn: {
+  headerSettingsBtn: {
     height: 34,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -582,7 +586,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerActionText: {
+  headerSettingsText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#f8fafc',
